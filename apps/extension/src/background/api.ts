@@ -2,7 +2,7 @@ import {
 	AnalyzeTweetResponseSchema,
 	ExtensionSessionStatusSchema,
 	SavedBookmarkSchema,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 
 import { APP_BASE_URL } from "../shared/config.js";
 
@@ -25,7 +25,7 @@ async function readJsonResponse(response: Response): Promise<unknown> {
 		return {
 			error: {
 				code: "INVALID_RESPONSE",
-				message: "Rabbitbrain returned a non-JSON response.",
+				message: "Tenbrains returned a non-JSON response.",
 			},
 		};
 	}

@@ -1,4 +1,4 @@
-import type { FollowSummary, SavedBookmark } from "@pi-starter/contracts";
+import type { FollowSummary, SavedBookmark } from "@tenbrains/contracts";
 
 import {
 	normalizeCreatorUsername,

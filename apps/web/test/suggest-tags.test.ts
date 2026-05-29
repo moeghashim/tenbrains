@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { SavedBookmark, SubjectFollow } from "@pi-starter/contracts";
+import type { SavedBookmark, SubjectFollow } from "@tenbrains/contracts";
 
 import { suggestBookmarkTags } from "../src/bookmarks/suggest-tags.js";
 

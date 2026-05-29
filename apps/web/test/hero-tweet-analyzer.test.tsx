@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AnalyzeTweetResult, FollowSummary } from "@pi-starter/contracts";
+import type { AnalyzeTweetResult, FollowSummary } from "@tenbrains/contracts";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 

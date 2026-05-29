@@ -7,9 +7,9 @@
 		"noEmit": true,
 		"baseUrl": ".",
 		"paths": {
-			"@pi-starter/ai": ["../../packages/ai/src/index.ts"],
-			"@pi-starter/contracts": ["../../packages/contracts/src/index.ts"],
-			"rabbitbrain": ["../../packages/core/src/index.ts"]
+			"@tenbrains/ai": ["../../packages/ai/src/index.ts"],
+			"@tenbrains/contracts": ["../../packages/contracts/src/index.ts"],
+			"tenbrains": ["../../packages/core/src/index.ts"]
 		}
 	},
 	"include": ["src/**/*.ts"]

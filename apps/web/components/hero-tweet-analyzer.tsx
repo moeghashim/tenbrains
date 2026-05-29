@@ -1,16 +1,16 @@
 "use client";
 
-import { PROVIDER_OPTIONS, getProviderCatalogEntry, resolveProviderCatalogModel } from "@pi-starter/ai";
-import { parseBookmarkTags, validateBookmarkTags } from "@pi-starter/contracts/bookmark-tags";
-import { renderAnalyzeTweetMarkdown } from "@pi-starter/contracts";
+import { PROVIDER_OPTIONS, getProviderCatalogEntry, resolveProviderCatalogModel } from "@tenbrains/ai";
+import { parseBookmarkTags, validateBookmarkTags } from "@tenbrains/contracts/bookmark-tags";
+import { renderAnalyzeTweetMarkdown } from "@tenbrains/contracts";
 import type {
 	AnalyzeTweetResult,
 	CreateFollowInput,
 	FollowSummary,
 	ProviderId,
 	SavedBookmark,
-} from "@pi-starter/contracts";
-import type { TweetMedia, TweetPublicMetrics } from "@pi-starter/x-client";
+} from "@tenbrains/contracts";
+import type { TweetMedia, TweetPublicMetrics } from "@tenbrains/x-client";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";

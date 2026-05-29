@@ -27,7 +27,7 @@ export function registerTweetActionController(tweetUrl: string, controller: Twee
 }
 
 export function dispatchRuntimeEvent(message: RuntimeEventMessage): void {
-	if (message.type !== "rabbitbrain/resume-pending-action") {
+	if (message.type !== "tenbrains/resume-pending-action") {
 		return;
 	}
 
@@ -48,7 +48,7 @@ export function readResumePendingActionMessage(
 	}
 
 	const maybeMessage = value as Partial<ResumePendingActionMessage>;
-	if (maybeMessage.type !== "rabbitbrain/resume-pending-action" || !maybeMessage.pendingAction) {
+	if (maybeMessage.type !== "tenbrains/resume-pending-action" || !maybeMessage.pendingAction) {
 		return null;
 	}
 

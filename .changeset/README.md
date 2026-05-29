@@ -1,6 +1,6 @@
 # Changesets
 
-Rabbitbrain uses Changesets to prepare release PRs for the repo.
+Tenbrains uses Changesets to prepare release PRs for the repo.
 
 ## Contributor flow
 

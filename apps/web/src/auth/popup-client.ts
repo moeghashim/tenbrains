@@ -28,7 +28,7 @@ export function startTwitterPopupAuth(options: StartTwitterPopupAuthOptions): ()
 	const popupStartPath = buildTwitterAuthStartPath(options.callbackUrl);
 	const popup = window.open(
 		popupStartPath,
-		"rabbitbrain-twitter-auth",
+		"tenbrains-twitter-auth",
 		"popup=yes,width=540,height=760,menubar=no,toolbar=no,status=no,resizable=yes,scrollbars=yes",
 	);
 

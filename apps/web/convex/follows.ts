@@ -8,7 +8,7 @@ import {
 	FollowingFeedResponseSchema,
 	SavedBookmarkSchema,
 	SubjectFollowSchema,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 import {
 	mutationGeneric,
 	queryGeneric,

@@ -1,8 +1,8 @@
 import type {
 	AnalyzeTweetResponse,
 	SaveBookmarkInput,
-} from "@pi-starter/contracts";
-import { renderAnalyzeTweetMarkdown } from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
+import { renderAnalyzeTweetMarkdown } from "@tenbrains/contracts";
 import React, { useEffect, useState } from "react";
 
 import type { TweetActionController } from "./controller.js";
@@ -127,7 +127,7 @@ export function TweetActionApp({ tweetUrl }: Readonly<TweetActionAppProps>) {
 		}
 
 		setTagsInput(parsedTags.join(", "));
-		setSaveMessage("Saved to Rabbitbrain bookmarks.");
+		setSaveMessage("Saved to Tenbrains bookmarks.");
 		setStatus("success");
 		setIsSaving(false);
 	}

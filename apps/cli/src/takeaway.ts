@@ -4,9 +4,9 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { analyzeAccountTakeaway, getProviderCatalogEntry } from "@pi-starter/ai";
-import type { AccountTakeawaySnapshot, ProviderId, TakeawayFollow } from "@pi-starter/contracts";
-import { XApiV2Client } from "@pi-starter/x-client";
+import { analyzeAccountTakeaway, getProviderCatalogEntry } from "@tenbrains/ai";
+import type { AccountTakeawaySnapshot, ProviderId, TakeawayFollow } from "@tenbrains/contracts";
+import { XApiV2Client } from "@tenbrains/x-client";
 
 import {
 	DEFAULT_MODELS,
@@ -26,11 +26,11 @@ interface RefreshArgs {
 	model: string;
 }
 
-const DEFAULT_CONFIG_DIR = process.env.RABBITBRAIN_CONFIG_DIR
-	? path.resolve(process.env.RABBITBRAIN_CONFIG_DIR)
-	: path.join(homedir(), ".config", "rabbitbrain");
+const configuredConfigDir = process.env.TENBRAINS_CONFIG_DIR ?? process.env.RABBITBRAIN_CONFIG_DIR;
+const DEFAULT_CONFIG_DIR = configuredConfigDir ? path.resolve(configuredConfigDir) : path.join(homedir(), ".config", "tenbrains");
 const TAKEAWAY_STATE_PATH = path.join(DEFAULT_CONFIG_DIR, "takeaway-state.json");
-const CLI_USER_ID = "rabbitbrain-cli";
+const LEGACY_TAKEAWAY_STATE_PATH = path.join(homedir(), ".config", "rabbitbrain", "takeaway-state.json");
+const CLI_USER_ID = "tenbrains-cli";
 
 function printUsage() {
 	console.error(
@@ -76,17 +76,36 @@ function buildDateKey(timestamp: number): string {
 async function readState(): Promise<CliState> {
 	try {
 		const raw = await readFile(TAKEAWAY_STATE_PATH, "utf8");
-		const parsed = JSON.parse(raw) as Partial<CliState>;
-		return {
-			follows: Array.isArray(parsed.follows) ? parsed.follows : [],
-			snapshots: Array.isArray(parsed.snapshots) ? parsed.snapshots : [],
-		};
+		return parseState(raw);
+	} catch (error) {
+		if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+			if (!configuredConfigDir) {
+				return readLegacyState();
+			}
+			return { follows: [], snapshots: [] };
+		}
+		throw error;
+	}
+}
+
+async function readLegacyState(): Promise<CliState> {
+	try {
+		const raw = await readFile(LEGACY_TAKEAWAY_STATE_PATH, "utf8");
+		return parseState(raw);
 	} catch (error) {
 		if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
 			return { follows: [], snapshots: [] };
 		}
 		throw error;
 	}
+}
+
+function parseState(raw: string): CliState {
+	const parsed = JSON.parse(raw) as Partial<CliState>;
+	return {
+		follows: Array.isArray(parsed.follows) ? parsed.follows : [],
+		snapshots: Array.isArray(parsed.snapshots) ? parsed.snapshots : [],
+	};
 }
 
 async function writeState(state: CliState): Promise<void> {

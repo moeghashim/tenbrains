@@ -4,9 +4,9 @@ import {
 	type TakeawayFollow,
 	type AccountTakeawaySnapshot,
 	type ProviderId,
-} from "@pi-starter/contracts";
-import { analyzeAccountTakeaway } from "@pi-starter/ai";
-import { XApiV2Client, type TweetPayload } from "@pi-starter/x-client";
+} from "@tenbrains/contracts";
+import { analyzeAccountTakeaway } from "@tenbrains/ai";
+import { XApiV2Client, type TweetPayload } from "@tenbrains/x-client";
 
 import {
 	getPreferencesForSession,

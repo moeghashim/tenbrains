@@ -10,11 +10,11 @@ export default defineConfig({
 	resolve: {
 		alias: [
 			{
-				find: "@pi-starter/contracts/bookmark-tags",
+				find: "@tenbrains/contracts/bookmark-tags",
 				replacement: fileURLToPath(new URL("../../packages/contracts/src/bookmark-tags.ts", import.meta.url)),
 			},
 			{
-				find: "@pi-starter/contracts",
+				find: "@tenbrains/contracts",
 				replacement: fileURLToPath(new URL("../../packages/contracts/src/index.ts", import.meta.url)),
 			},
 		],

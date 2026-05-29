@@ -1,11 +1,11 @@
-import { resolveProviderCatalogModel } from "@pi-starter/ai";
+import { resolveProviderCatalogModel } from "@tenbrains/ai";
 import {
 	type ProviderId,
 	UserPreferencesInputSchema,
 	UserPreferencesResultSchema,
 	type UserPreferencesInput,
 	type UserPreferencesResult,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 
 export interface StoredUser {
 	id: string;

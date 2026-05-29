@@ -1,4 +1,4 @@
-import { readXApiConfigFromEnv } from "@pi-starter/x-client";
+import { readXApiConfigFromEnv } from "@tenbrains/x-client";
 
 type EnvMap = Record<string, string | undefined>;
 

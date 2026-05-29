@@ -1,4 +1,4 @@
-import type { SavedBookmark } from "@pi-starter/contracts";
+import type { SavedBookmark } from "@tenbrains/contracts";
 import { strToU8, zipSync } from "fflate";
 
 export function buildBookmarkCanonicalUrl(bookmark: SavedBookmark): string {
@@ -36,11 +36,11 @@ export function buildBookmarkMarkdownFileName(bookmark: SavedBookmark, position:
 export function buildBookmarksArchiveFileName(tags: string[]): string {
 	const dateSegment = new Date().toISOString().slice(0, 10);
 	if (tags.length === 0) {
-		return `rabbitbrain-bookmarks-${dateSegment}.zip`;
+		return `tenbrains-bookmarks-${dateSegment}.zip`;
 	}
 
 	const tagSegment = tags.map((tag) => sanitizeFileNameSegment(tag)).join("-");
-	return `rabbitbrain-bookmarks-${tagSegment.slice(0, 48)}-${dateSegment}.zip`;
+	return `tenbrains-bookmarks-${tagSegment.slice(0, 48)}-${dateSegment}.zip`;
 }
 
 export function renderBookmarkMarkdown(bookmark: SavedBookmark): string {

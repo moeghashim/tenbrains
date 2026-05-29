@@ -1,4 +1,4 @@
-import type { ProviderId } from "@pi-starter/contracts";
+import type { ProviderId } from "@tenbrains/contracts";
 
 export interface ProviderCatalogEntry {
 	id: ProviderId;

@@ -12,7 +12,7 @@ test("dispatchRuntimeEvent resumes the controller registered for a tweet URL", (
 	});
 
 	dispatchRuntimeEvent({
-		type: "rabbitbrain/resume-pending-action",
+		type: "tenbrains/resume-pending-action",
 		pendingAction: {
 			type: "analyze",
 			tweetUrl: "https://x.com/ctatedev/status/2028960626685386994",

@@ -1,4 +1,4 @@
-import { BookmarkTagSchema } from "@pi-starter/contracts";
+import { BookmarkTagSchema } from "@tenbrains/contracts";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 

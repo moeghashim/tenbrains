@@ -1,5 +1,5 @@
 {
-  "name": "@pi-starter/web",
+  "name": "@tenbrains/web",
   "version": "1.1.0",
   "private": true,
   "type": "module",
@@ -15,10 +15,10 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@pi-starter/ai": "1.1.0",
-    "@pi-starter/contracts": "1.1.0",
-    "rabbitbrain": "1.1.0",
-    "@pi-starter/x-client": "1.1.0",
+    "@tenbrains/ai": "1.1.0",
+    "@tenbrains/contracts": "1.1.0",
+    "tenbrains": "1.1.0",
+    "@tenbrains/x-client": "1.1.0",
     "convex": "^1.32.0",
     "fflate": "^0.8.2",
     "lucide-react": "^0.576.0",

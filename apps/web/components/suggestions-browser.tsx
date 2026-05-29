@@ -1,6 +1,6 @@
 "use client";
 
-import type { Suggestion } from "@pi-starter/contracts";
+import type { Suggestion } from "@tenbrains/contracts";
 import React, { useEffect, useState } from "react";
 
 import { readJsonResponse, readResponseErrorMessage, type ApiErrorPayload } from "../src/http/read-json-response.js";
@@ -89,7 +89,7 @@ export function SuggestionsBrowser() {
 		return (
 			<div className="border border-outline-variant/10 bg-surface-container-low p-6">
 				<p className="font-body text-sm text-secondary/70">
-					No suggestions yet. Rabbit Brain will surface new posts once enough bookmark, follow, and takeaway signal is available.
+					No suggestions yet. Tenbrains will surface new posts once enough bookmark, follow, and takeaway signal is available.
 				</p>
 			</div>
 		);

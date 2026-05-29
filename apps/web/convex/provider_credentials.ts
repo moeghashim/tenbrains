@@ -2,7 +2,7 @@ import {
 	type ProviderId,
 	ProviderCredentialSummaryListSchema,
 	ProviderIdSchema,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 import {
 	mutationGeneric,
 	queryGeneric,

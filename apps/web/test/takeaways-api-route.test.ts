@@ -8,7 +8,7 @@ import type {
 	TakeawayFollow,
 	TakeawayHistoryResponse,
 	TakeawayWorkspaceResponse,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 
 import {
 	handleTakeawayFollowsDelete,

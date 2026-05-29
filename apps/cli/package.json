@@ -1,5 +1,5 @@
 {
-  "name": "@pi-starter/cli",
+  "name": "@tenbrains/cli",
   "version": "1.1.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@pi-starter/ai": "1.1.0",
-    "@pi-starter/contracts": "1.1.0",
-    "rabbitbrain": "1.1.0"
+    "@tenbrains/ai": "1.1.0",
+    "@tenbrains/contracts": "1.1.0",
+    "tenbrains": "1.1.0"
   },
   "engines": {
     "node": ">=20.0.0"

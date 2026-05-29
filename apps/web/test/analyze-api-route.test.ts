@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AnalyzeTweetResult, SavedAnalysis } from "@pi-starter/contracts";
-import type { ThreadPayload, TweetPayload, TweetSourceProvider } from "@pi-starter/x-client";
+import type { AnalyzeTweetResult, SavedAnalysis } from "@tenbrains/contracts";
+import type { ThreadPayload, TweetPayload, TweetSourceProvider } from "@tenbrains/x-client";
 
 import { handleAnalyzePost } from "../app/api/analyze/route.js";
 

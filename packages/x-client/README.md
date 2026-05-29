@@ -1,3 +1,3 @@
-# @pi-starter/x-client
+# @tenbrains/x-client
 
 Server-side X client helpers.

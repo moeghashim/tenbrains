@@ -6,7 +6,7 @@ import {
 	createTrackFromSavedAnalysis,
 } from "../src/track/track-pipeline.js";
 
-import type { SavedAnalysis } from "@pi-starter/contracts";
+import type { SavedAnalysis } from "@tenbrains/contracts";
 
 function createSavedAnalysis(): SavedAnalysis {
 	return {

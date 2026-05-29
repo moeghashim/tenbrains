@@ -13,11 +13,11 @@
 		"isolatedModules": true,
 		"baseUrl": ".",
 		"paths": {
-			"@pi-starter/ai": ["../../packages/ai/src/index.ts"],
-			"@pi-starter/contracts": ["../../packages/contracts/src/index.ts"],
-			"@pi-starter/contracts/bookmark-tags": ["../../packages/contracts/src/bookmark-tags.ts"],
-			"rabbitbrain": ["../../packages/core/src/index.ts"],
-			"@pi-starter/x-client": ["../../packages/x-client/src/index.ts"]
+			"@tenbrains/ai": ["../../packages/ai/src/index.ts"],
+			"@tenbrains/contracts": ["../../packages/contracts/src/index.ts"],
+			"@tenbrains/contracts/bookmark-tags": ["../../packages/contracts/src/bookmark-tags.ts"],
+			"tenbrains": ["../../packages/core/src/index.ts"],
+			"@tenbrains/x-client": ["../../packages/x-client/src/index.ts"]
 		}
 	},
 	"include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],

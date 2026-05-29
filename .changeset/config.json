@@ -4,13 +4,13 @@
 	"commit": false,
 	"fixed": [
 		[
-			"@pi-starter/ai",
-			"@pi-starter/cli",
-			"@pi-starter/contracts",
-			"rabbitbrain",
-			"@pi-starter/extension",
-			"@pi-starter/web",
-			"@pi-starter/x-client"
+			"@tenbrains/ai",
+			"@tenbrains/cli",
+			"@tenbrains/contracts",
+			"tenbrains",
+			"@tenbrains/extension",
+			"@tenbrains/web",
+			"@tenbrains/x-client"
 		]
 	],
 	"linked": [],

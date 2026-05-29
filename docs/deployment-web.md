@@ -23,7 +23,7 @@ Optional runtime control:
 
 1. Configure X app callback URLs for both preview and production:
    - `https://<preview-domain>/api/auth/callback/twitter`
-   - `https://www.rabbitbrain.app/api/auth/callback/twitter`
+   - `https://www.tenbrains.app/api/auth/callback/twitter`
 2. If the apex host redirects to `www`, register the `www` callback URL in X exactly as shown above. Auth.js uses the request host when building the Twitter callback URL.
 3. Use `/sign-in` as the application entry route for authentication.
 4. Keep protected routes:
@@ -58,7 +58,7 @@ Local development note:
 
 ## Model Provider Runtime Notes
 
-1. Rabbitbrain no longer needs app-owned OpenAI, Gemini, Grok, or Claude keys for end-user analysis.
+1. Tenbrains no longer needs app-owned OpenAI, Gemini, Grok, or Claude keys for end-user analysis.
 2. End users bring their own provider keys through `/account`.
 3. `USER_SECRETS_ENCRYPTION_KEY` is required even if only one provider is used. Without it, startup validation fails.
 4. Rotating `USER_SECRETS_ENCRYPTION_KEY` without a migration will invalidate previously stored user provider credentials.
@@ -82,8 +82,8 @@ Vercel production also fails fast if `CONVEX_DEPLOYMENT` starts with `dev:`.
 
 1. Run `npm test`.
 2. Run `npm run check`.
-3. Run `npm run -w @pi-starter/web typecheck`.
-4. Build preview: `npm run -w @pi-starter/web build`.
+3. Run `npm run -w @tenbrains/web typecheck`.
+4. Build preview: `npm run -w @tenbrains/web build`.
 
 ## Post-Deploy Smoke Test
 

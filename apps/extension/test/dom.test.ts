@@ -22,7 +22,7 @@ test("findTweetArticles discovers tweet article nodes", () => {
 	assert.equal(findTweetArticles(dom.window.document).length, 1);
 });
 
-test("ensureMountTarget inserts a single Rabbitbrain host per tweet article", () => {
+test("ensureMountTarget inserts a single Tenbrains host per tweet article", () => {
 	const dom = createDom();
 	const article = dom.window.document.querySelector<HTMLElement>("article[data-testid='tweet']");
 	assert.ok(article);
@@ -34,5 +34,5 @@ test("ensureMountTarget inserts a single Rabbitbrain host per tweet article", ()
 	assert.ok(secondTarget);
 	assert.equal(firstTarget?.tweetUrl, "https://x.com/ctatedev/status/2028960626685386994");
 	assert.equal(firstTarget?.host, secondTarget?.host);
-	assert.equal(article?.querySelectorAll("[data-rabbitbrain-root='true']").length, 1);
+	assert.equal(article?.querySelectorAll("[data-tenbrains-root='true']").length, 1);
 });

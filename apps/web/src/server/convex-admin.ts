@@ -53,8 +53,8 @@ import {
 	UserPreferencesInputSchema,
 	UserPreferencesResultSchema,
 	type UserPreferencesResult,
-} from "@pi-starter/contracts";
-import type { TweetPayload } from "@pi-starter/x-client";
+} from "@tenbrains/contracts";
+import type { TweetPayload } from "@tenbrains/x-client";
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 
@@ -353,7 +353,7 @@ function readRequiredEnv(name: keyof ConvexEnv, env: ConvexEnv): string {
 }
 
 function createActingIdentity(user: SessionUserIdentity): ConvexActingIdentity {
-	const issuer = "https://www.rabbitbrain.app/authjs";
+	const issuer = "https://www.tenbrains.app/authjs";
 	return {
 		subject: user.id,
 		issuer,

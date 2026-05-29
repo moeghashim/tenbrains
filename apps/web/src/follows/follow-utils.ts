@@ -5,7 +5,7 @@ import type {
 	SavedBookmark,
 	SubjectFollow,
 	SuggestedCreator,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 
 export const ALL_FEED_SUBJECT_KEY = "__all_feed__";
 

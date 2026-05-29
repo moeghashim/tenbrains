@@ -1,4 +1,4 @@
-import { SaveSuggestionInputSchema } from "@pi-starter/contracts";
+import { SaveSuggestionInputSchema } from "@tenbrains/contracts";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 

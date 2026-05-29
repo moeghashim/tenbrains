@@ -1,6 +1,6 @@
 import type {
 	SaveBookmarkInput,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 import type {
 	AnalyzeTweetMessage,
 	AnalyzeTweetMessageResponse,
@@ -16,7 +16,7 @@ async function sendRuntimeMessage<TResponse>(message: RuntimeRequestMessage): Pr
 
 export async function analyzeTweet(tweetUrl: string): Promise<AnalyzeTweetMessageResponse> {
 	const message: AnalyzeTweetMessage = {
-		type: "rabbitbrain/analyze-tweet",
+		type: "tenbrains/analyze-tweet",
 		tweetUrl,
 	};
 	return sendRuntimeMessage<AnalyzeTweetMessageResponse>(message);
@@ -24,7 +24,7 @@ export async function analyzeTweet(tweetUrl: string): Promise<AnalyzeTweetMessag
 
 export async function saveBookmark(payload: SaveBookmarkInput, tags: string[]): Promise<SaveBookmarkMessageResponse> {
 	const message: SaveBookmarkMessage = {
-		type: "rabbitbrain/save-bookmark",
+		type: "tenbrains/save-bookmark",
 		payload,
 		tags,
 	};
@@ -33,6 +33,6 @@ export async function saveBookmark(payload: SaveBookmarkInput, tags: string[]): 
 
 export async function checkSession(): Promise<CheckSessionMessageResponse> {
 	return sendRuntimeMessage<CheckSessionMessageResponse>({
-		type: "rabbitbrain/check-session",
+		type: "tenbrains/check-session",
 	});
 }

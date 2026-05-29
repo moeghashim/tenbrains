@@ -6,7 +6,7 @@ import {
 	createInMemoryAnalysisStorage,
 } from "../src/analysis/analysis-pipeline.js";
 
-import type { TweetSourceProvider } from "@pi-starter/x-client";
+import type { TweetSourceProvider } from "@tenbrains/x-client";
 
 function createFakeTweetSource(): TweetSourceProvider {
 	const readTweet = async (input: string) => {

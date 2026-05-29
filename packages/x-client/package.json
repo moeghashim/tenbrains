@@ -1,5 +1,5 @@
 {
-  "name": "@pi-starter/x-client",
+  "name": "@tenbrains/x-client",
   "version": "1.1.0",
   "description": "X API client abstractions",
   "license": "MIT",

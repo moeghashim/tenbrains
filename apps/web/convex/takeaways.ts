@@ -7,7 +7,7 @@ import {
 	type AccountTakeawayPost,
 	type AccountTakeawaySnapshot,
 	type TakeawayFollow,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 import {
 	mutationGeneric,
 	queryGeneric,

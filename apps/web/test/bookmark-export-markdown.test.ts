@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { SavedBookmark } from "@pi-starter/contracts";
+import type { SavedBookmark } from "@tenbrains/contracts";
 import { strFromU8, unzipSync } from "fflate";
 
 import {
@@ -60,5 +60,5 @@ test("buildBookmarksMarkdownArchive creates a zip with one markdown file per boo
 test("buildBookmarksArchiveFileName uses active tags when present", () => {
 	const fileName = buildBookmarksArchiveFileName(["Deep Work", "Agent Ops"]);
 	const dateSegment = new Date().toISOString().slice(0, 10);
-	assert.equal(fileName, `rabbitbrain-bookmarks-deep-work-agent-ops-${dateSegment}.zip`);
+	assert.equal(fileName, `tenbrains-bookmarks-deep-work-agent-ops-${dateSegment}.zip`);
 });

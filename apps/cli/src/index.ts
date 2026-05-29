@@ -1,1 +1,1 @@
-export const CLI_APP_ID = "rabbitbrain-cli";
+export const CLI_APP_ID = "tenbrains-cli";

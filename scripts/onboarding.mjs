@@ -81,7 +81,7 @@ async function main() {
 	const rl = interactive ? readline.createInterface({ input: process.stdin, output: process.stdout }) : null;
 
 	try {
-		console.log("Rabbitbrain onboarding");
+		console.log("Tenbrains onboarding");
 		console.log("======================");
 
 		let xurlInstalled = false;

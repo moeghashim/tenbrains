@@ -1,5 +1,5 @@
-import { SavedAnalysisSchema } from "@pi-starter/contracts";
-import { XApiV2Client } from "@pi-starter/x-client";
+import { SavedAnalysisSchema } from "@tenbrains/contracts";
+import { XApiV2Client } from "@tenbrains/x-client";
 import {
 	mutationGeneric,
 	queryGeneric,

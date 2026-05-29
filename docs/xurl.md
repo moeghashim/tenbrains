@@ -79,7 +79,7 @@ Use onboarding first. It checks:
 - X OAuth2 auth available (and can run `xurl auth oauth2`)
 - provider analyze auth available (and can run `npm run xurl:analyze:auth`)
 
-Set up a provider once. Config now lives under `~/.config/rabbitbrain/ai-providers.json` and will auto-migrate legacy OpenAI config from `~/.config/rabbitbrain/openai-analyze.json` if present:
+Set up a provider once. Config now lives under `~/.config/tenbrains/ai-providers.json` and will read legacy provider state from `~/.config/rabbitbrain` when no Tenbrains config exists yet:
 
 ```bash
 npm run xurl:analyze:auth

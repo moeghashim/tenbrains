@@ -1,5 +1,5 @@
-import { parseBookmarkTags, validateBookmarkTags } from "@pi-starter/contracts/bookmark-tags";
-import type { SavedBookmark, SubjectFollow } from "@pi-starter/contracts";
+import { parseBookmarkTags, validateBookmarkTags } from "@tenbrains/contracts/bookmark-tags";
+import type { SavedBookmark, SubjectFollow } from "@tenbrains/contracts";
 
 const STOP_WORDS = new Set([
 	"about",

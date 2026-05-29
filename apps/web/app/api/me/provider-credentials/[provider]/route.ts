@@ -1,4 +1,4 @@
-import { ProviderIdSchema } from "@pi-starter/contracts";
+import { ProviderIdSchema } from "@tenbrains/contracts";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 

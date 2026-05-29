@@ -1,5 +1,5 @@
 {
-	"name": "pi-starter",
+	"name": "tenbrains",
 	"private": true,
 	"license": "MIT",
 	"type": "module",
@@ -8,15 +8,15 @@
 		"apps/*"
 	],
 	"scripts": {
-		"dev": "npm run -w @pi-starter/web dev",
+		"dev": "npm run -w @tenbrains/web dev",
 		"clean": "npm run clean --workspaces --if-present",
 		"build": "npm run build --workspaces --if-present",
 		"test": "npm run test --workspaces --if-present",
 		"check": "biome check --write --error-on-warnings . && node scripts/check-file-length.mjs && tsgo --noEmit",
-		"extension:dev": "npm run -w @pi-starter/extension dev",
-		"extension:build": "npm run -w @pi-starter/extension build",
-		"extension:package": "npm run -w @pi-starter/extension package",
-		"extension:test": "npm run -w @pi-starter/extension test",
+		"extension:dev": "npm run -w @tenbrains/extension dev",
+		"extension:build": "npm run -w @tenbrains/extension build",
+		"extension:package": "npm run -w @tenbrains/extension package",
+		"extension:test": "npm run -w @tenbrains/extension test",
 		"changeset": "changeset",
 		"release:status": "changeset status --verbose",
 		"release:version": "changeset version",

@@ -1,4 +1,4 @@
-import type { TweetPayload } from "@pi-starter/x-client";
+import type { TweetPayload } from "@tenbrains/x-client";
 
 function compactIncludes(tweet: TweetPayload) {
 	return {

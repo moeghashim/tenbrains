@@ -1,5 +1,5 @@
-import type { Suggestion } from "@pi-starter/contracts";
-import { XApiV2Client, type TweetPayload } from "@pi-starter/x-client";
+import type { Suggestion } from "@tenbrains/contracts";
+import { XApiV2Client, type TweetPayload } from "@tenbrains/x-client";
 
 import { suggestBookmarkTags } from "../bookmarks/suggest-tags.js";
 import {

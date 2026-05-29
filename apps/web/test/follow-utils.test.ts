@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { CreatorFollow, SavedBookmark, SubjectFollow } from "@pi-starter/contracts";
+import type { CreatorFollow, SavedBookmark, SubjectFollow } from "@tenbrains/contracts";
 
 import {
 	buildCreatorSuggestions,

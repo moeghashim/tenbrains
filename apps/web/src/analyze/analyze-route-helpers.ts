@@ -1,5 +1,5 @@
-import type { AiProviderErrorCode } from "@pi-starter/ai";
-import type { XProviderErrorCode } from "@pi-starter/x-client";
+import type { AiProviderErrorCode } from "@tenbrains/ai";
+import type { XProviderErrorCode } from "@tenbrains/x-client";
 
 import { buildSignInRedirectPath } from "../auth/routing.js";
 

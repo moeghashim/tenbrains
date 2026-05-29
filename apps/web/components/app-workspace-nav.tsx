@@ -1,7 +1,7 @@
 import Link from "next/link";
 import React from "react";
 
-import { RabbitBrandMark } from "./rabbit-brand-mark.js";
+import { BrandMark } from "./brand-mark.js";
 import { workspaceMenuLinks, type WorkspaceMenuItem } from "./workspace-menu.js";
 
 export interface AppWorkspaceNavProps {
@@ -19,8 +19,8 @@ export function AppWorkspaceNav({
 		<nav className="sticky top-0 z-40 border-b border-outline-variant/10 bg-surface/95 backdrop-blur-md">
 			<div className="mx-auto flex max-w-[1440px] items-center justify-between gap-8 px-6 py-4 sm:px-10 lg:px-16">
 				<Link href="/" id="nav-logo" className="group flex items-center gap-2">
-					<RabbitBrandMark className="h-8 w-8 transition-transform duration-700 ease-redsun group-hover:-rotate-6 group-hover:scale-105" />
-					<span className="font-headline text-2xl font-bold tracking-tight text-primary">Rabbit Brain</span>
+					<BrandMark className="h-8 w-8 transition-transform duration-700 ease-redsun group-hover:-rotate-6 group-hover:scale-105" />
+					<span className="font-headline text-2xl font-bold tracking-tight text-primary">Tenbrains</span>
 				</Link>
 
 				<div className="hidden items-center gap-10 md:flex">

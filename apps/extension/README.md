@@ -1,6 +1,6 @@
-# Rabbitbrain for X
+# Tenbrains for X
 
-Chrome extension that injects Rabbitbrain controls into `x.com`, analyzes public posts inline, and saves tagged insights to Rabbitbrain bookmarks.
+Chrome extension that injects Tenbrains controls into `x.com`, analyzes public posts inline, and saves tagged insights to Tenbrains bookmarks.
 
 ## Scripts
 
@@ -11,6 +11,6 @@ Chrome extension that injects Rabbitbrain controls into `x.com`, analyzes public
 
 ## Runtime
 
-- Production base URL defaults to `https://rabbitbrain.app`
+- Production base URL defaults to `https://www.tenbrains.app`
 - Development base URL defaults to `http://localhost:3000`
-- Override with `VITE_RABBITBRAIN_BASE_URL` when needed
+- Override with `VITE_TENBRAINS_BASE_URL` when needed. `VITE_RABBITBRAIN_BASE_URL` is still read as a legacy alias.

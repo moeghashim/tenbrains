@@ -3,7 +3,7 @@ import type {
 	ExtensionSessionStatus,
 	SaveBookmarkInput,
 	SavedBookmark,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 
 export type PendingAuthActionType = "analyze" | "save-bookmark";
 
@@ -28,18 +28,18 @@ export interface ErrorResponse {
 }
 
 export interface AnalyzeTweetMessage {
-	type: "rabbitbrain/analyze-tweet";
+	type: "tenbrains/analyze-tweet";
 	tweetUrl: string;
 }
 
 export interface SaveBookmarkMessage {
-	type: "rabbitbrain/save-bookmark";
+	type: "tenbrains/save-bookmark";
 	payload: SaveBookmarkInput;
 	tags: string[];
 }
 
 export interface CheckSessionMessage {
-	type: "rabbitbrain/check-session";
+	type: "tenbrains/check-session";
 }
 
 export type RuntimeRequestMessage = AnalyzeTweetMessage | SaveBookmarkMessage | CheckSessionMessage;
@@ -49,7 +49,7 @@ export type SaveBookmarkMessageResponse = SuccessResponse<SavedBookmark> | Error
 export type CheckSessionMessageResponse = SuccessResponse<ExtensionSessionStatus> | ErrorResponse;
 
 export interface ResumePendingActionMessage {
-	type: "rabbitbrain/resume-pending-action";
+	type: "tenbrains/resume-pending-action";
 	pendingAction: PendingAuthAction;
 }
 

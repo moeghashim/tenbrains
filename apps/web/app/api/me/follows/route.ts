@@ -1,7 +1,7 @@
 import {
 	CreateFollowInputSchema,
 	DeleteFollowInputSchema,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 

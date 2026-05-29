@@ -56,7 +56,7 @@ async function openAuthTab(): Promise<void> {
 async function notifyResume(pendingAction: PendingAuthAction): Promise<void> {
 	try {
 		await chrome.tabs.sendMessage(pendingAction.tabId, {
-			type: "rabbitbrain/resume-pending-action",
+			type: "tenbrains/resume-pending-action",
 			pendingAction,
 		});
 	} catch {
@@ -100,13 +100,13 @@ async function queueAuthAndResume(pendingAction: PendingAuthAction): Promise<Err
 	return {
 		ok: false,
 		code: "AUTH_REQUIRED",
-		message: "Complete Rabbitbrain sign-in in the opened tab, then return to X.",
+		message: "Complete Tenbrains sign-in in the opened tab, then return to X.",
 		authStarted: true,
 	};
 }
 
 async function handleAnalyze(
-	message: Extract<RuntimeRequestMessage, { type: "rabbitbrain/analyze-tweet" }>,
+	message: Extract<RuntimeRequestMessage, { type: "tenbrains/analyze-tweet" }>,
 	tabId: number,
 ) {
 	const response = await postAnalyzeTweet(message.tweetUrl);
@@ -131,7 +131,7 @@ async function handleAnalyze(
 }
 
 async function handleBookmark(
-	message: Extract<RuntimeRequestMessage, { type: "rabbitbrain/save-bookmark" }>,
+	message: Extract<RuntimeRequestMessage, { type: "tenbrains/save-bookmark" }>,
 	tabId: number,
 ) {
 	const response = await postBookmark(JSON.stringify(message.payload));
@@ -166,12 +166,12 @@ async function handleCheckSession(): Promise<CheckSessionMessageResponse> {
 				data: parsed.data,
 			};
 		}
-		return readErrorMessage(parsed.payload, "Unable to verify Rabbitbrain sign-in.");
+		return readErrorMessage(parsed.payload, "Unable to verify Tenbrains sign-in.");
 	} catch (error) {
 		return {
 			ok: false,
 			code: "NETWORK_ERROR",
-			message: error instanceof Error ? error.message : "Unable to verify Rabbitbrain sign-in.",
+			message: error instanceof Error ? error.message : "Unable to verify Tenbrains sign-in.",
 		};
 	}
 }
@@ -187,30 +187,30 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onMessage.addListener((message: RuntimeRequestMessage, sender, sendResponse) => {
 	void (async () => {
 		const tabId = sender.tab?.id;
-		if (!tabId && message.type !== "rabbitbrain/check-session") {
+		if (!tabId && message.type !== "tenbrains/check-session") {
 			sendResponse({
 				ok: false,
 				code: "TAB_REQUIRED",
-				message: "Rabbitbrain actions must be started from an X tab.",
+				message: "Tenbrains actions must be started from an X tab.",
 			} satisfies ErrorResponse);
 			return;
 		}
 
 		switch (message.type) {
-			case "rabbitbrain/analyze-tweet":
+			case "tenbrains/analyze-tweet":
 				sendResponse(await handleAnalyze(message, tabId ?? -1));
 				return;
-			case "rabbitbrain/save-bookmark":
+			case "tenbrains/save-bookmark":
 				sendResponse(await handleBookmark(message, tabId ?? -1));
 				return;
-			case "rabbitbrain/check-session":
+			case "tenbrains/check-session":
 				sendResponse(await handleCheckSession());
 				return;
 			default:
 				sendResponse({
 					ok: false,
 					code: "UNKNOWN_MESSAGE",
-					message: "Unknown Rabbitbrain extension message.",
+					message: "Unknown Tenbrains extension message.",
 				} satisfies ErrorResponse);
 		}
 	})();

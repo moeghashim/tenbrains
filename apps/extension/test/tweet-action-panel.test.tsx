@@ -55,7 +55,7 @@ function createProps() {
 		tagsInput: "Iteration, Scope",
 		errorMessage: null,
 		authMessage: null,
-		saveMessage: "Saved to Rabbitbrain bookmarks.",
+		saveMessage: "Saved to Tenbrains bookmarks.",
 		copyStatus: null,
 		isSaving: false,
 		onAnalyze: () => {},
@@ -68,9 +68,9 @@ function createProps() {
 
 test("TweetActionPanel renders analysis and bookmark states", () => {
 	const html = renderToStaticMarkup(<TweetActionPanel {...createProps()} />);
-	assert.match(html, /Rabbitbrain for X/);
+	assert.match(html, /Tenbrains for X/);
 	assert.match(html, /Shipping cadence/);
-	assert.match(html, /Saved to Rabbitbrain bookmarks/);
+	assert.match(html, /Saved to Tenbrains bookmarks/);
 	assert.match(html, /Iteration/);
 	assert.match(html, /Open Bookmarks/);
 	assert.match(html, /Copy Thread Markdown/);
@@ -98,10 +98,10 @@ test("TweetActionPanel renders auth-pending message", () => {
 			{...createProps()}
 			status="auth-pending"
 			analysisResult={null}
-			authMessage="Complete Rabbitbrain sign-in in the opened tab, then return to X."
+			authMessage="Complete Tenbrains sign-in in the opened tab, then return to X."
 			saveMessage={null}
 		/>,
 	);
-	assert.match(html, /Complete Rabbitbrain sign-in/);
-	assert.doesNotMatch(html, /Saved to Rabbitbrain bookmarks/);
+	assert.match(html, /Complete Tenbrains sign-in/);
+	assert.doesNotMatch(html, /Saved to Tenbrains bookmarks/);
 });

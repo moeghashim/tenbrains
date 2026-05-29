@@ -3,15 +3,15 @@ import {
 	AnalyzeTweetInputSchema,
 	type ProviderId,
 	type AnalyzeTweetInput,
-} from "@pi-starter/contracts";
-import { AiProviderError, analyzeTweetPayload } from "@pi-starter/ai";
+} from "@tenbrains/contracts";
+import { AiProviderError, analyzeTweetPayload } from "@tenbrains/ai";
 import {
 	buildThreadAnalysisPayload,
 	XApiV2Client,
 	type TweetPayload,
 	type TweetSourceProvider,
 	XProviderError,
-} from "@pi-starter/x-client";
+} from "@tenbrains/x-client";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 

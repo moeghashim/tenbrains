@@ -1,1 +1,1 @@
-export { parseBookmarkTags, validateBookmarkTags } from "@pi-starter/contracts/bookmark-tags";
+export { parseBookmarkTags, validateBookmarkTags } from "@tenbrains/contracts/bookmark-tags";

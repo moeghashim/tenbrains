@@ -1,9 +1,9 @@
 import {
 	AnalyzeTweetResultSchema,
 	type AnalyzeTweetResult,
-} from "@pi-starter/contracts";
-import { parseTweetLearningAnalysisText } from "rabbitbrain";
-import type { TweetPayload } from "@pi-starter/x-client";
+} from "@tenbrains/contracts";
+import { parseTweetLearningAnalysisText } from "tenbrains";
+import type { TweetPayload } from "@tenbrains/x-client";
 
 function toSentence(text: string, maxLength: number): string {
 	const compact = text.replace(/\s+/g, " ").trim();

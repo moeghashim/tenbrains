@@ -1,5 +1,5 @@
-import type { BookmarkSyncMode, BookmarkSyncState, SavedBookmark } from "@pi-starter/contracts";
-import { XUserOAuthClient } from "@pi-starter/x-client";
+import type { BookmarkSyncMode, BookmarkSyncState, SavedBookmark } from "@tenbrains/contracts";
+import { XUserOAuthClient } from "@tenbrains/x-client";
 
 import { isBookmarkAlreadyExistsError } from "./errors.js";
 import { suggestBookmarkTags } from "./suggest-tags.js";

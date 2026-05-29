@@ -1,5 +1,5 @@
 {
-  "name": "@pi-starter/contracts",
+  "name": "@tenbrains/contracts",
   "version": "1.1.0",
   "description": "Shared contracts and schemas",
   "license": "MIT",

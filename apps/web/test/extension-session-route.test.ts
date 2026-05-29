@@ -24,8 +24,8 @@ test("GET /api/extension/session returns a stable user payload for authenticated
 		getServerAuthSession: async () => ({
 			user: {
 				id: "user_1",
-				name: "Rabbit Brain",
-				xUsername: "rabbitbrain",
+				name: "Tenbrains",
+				xUsername: "tenbrains",
 			},
 		}),
 	});
@@ -41,6 +41,6 @@ test("GET /api/extension/session returns a stable user payload for authenticated
 	};
 	assert.equal(payload.authenticated, true);
 	assert.equal(payload.user?.id, "user_1");
-	assert.equal(payload.user?.xUsername, "rabbitbrain");
-	assert.equal(payload.user?.name, "Rabbit Brain");
+	assert.equal(payload.user?.xUsername, "tenbrains");
+	assert.equal(payload.user?.name, "Tenbrains");
 });

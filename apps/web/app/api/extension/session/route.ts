@@ -1,4 +1,4 @@
-import { ExtensionSessionStatusSchema } from "@pi-starter/contracts";
+import { ExtensionSessionStatusSchema } from "@tenbrains/contracts";
 import { NextResponse } from "next/server";
 
 import { getServerAuthSession } from "../../../../src/auth/auth.js";

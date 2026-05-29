@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { FollowSummary, SavedBookmark } from "@pi-starter/contracts";
+import type { FollowSummary, SavedBookmark } from "@tenbrains/contracts";
 
 import {
 	BOOKMARK_DETAILS_PANEL_CLASS,

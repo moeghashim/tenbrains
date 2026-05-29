@@ -1,6 +1,6 @@
-import { type AccountTakeawayAnalysis, AccountTakeawayAnalysisSchema, type ProviderId } from "@pi-starter/contracts";
-import type { TweetPayload, XUserPayload } from "@pi-starter/x-client";
-import { parseTweetLearningAnalysisText, type TweetLearningAnalysis } from "rabbitbrain";
+import { type AccountTakeawayAnalysis, AccountTakeawayAnalysisSchema, type ProviderId } from "@tenbrains/contracts";
+import type { TweetPayload, XUserPayload } from "@tenbrains/x-client";
+import { parseTweetLearningAnalysisText, type TweetLearningAnalysis } from "tenbrains";
 
 import { getProviderCatalogEntry } from "./catalog.js";
 import { AiProviderError } from "./errors.js";

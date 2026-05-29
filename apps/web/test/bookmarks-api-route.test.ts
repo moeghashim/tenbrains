@@ -5,7 +5,7 @@ import type {
 	SaveBookmarkInput,
 	SavedBookmark,
 	UpdateBookmarkTagsInput,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 import { ConvexError } from "convex/values";
 
 import {

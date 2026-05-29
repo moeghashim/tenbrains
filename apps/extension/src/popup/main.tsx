@@ -1,4 +1,4 @@
-import type { ExtensionSessionStatus } from "@pi-starter/contracts";
+import type { ExtensionSessionStatus } from "@tenbrains/contracts";
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -30,13 +30,13 @@ function PopupApp() {
 	return (
 		<main className="popup-shell">
 			<section className="popup-card">
-				<p className="popup-kicker">Rabbitbrain for X</p>
-				<h1 className="popup-title">Analyze public X posts and save tagged insights to Rabbitbrain.</h1>
+				<p className="popup-kicker">Tenbrains for X</p>
+				<h1 className="popup-title">Analyze public X posts and save tagged insights to Tenbrains.</h1>
 			</section>
 
 			<section className="popup-card popup-row">
 				<p className="popup-kicker">Status</p>
-				{status === "loading" ? <p className="popup-copy">Checking Rabbitbrain sign-in...</p> : null}
+				{status === "loading" ? <p className="popup-copy">Checking Tenbrains sign-in...</p> : null}
 				{status === "error" ? <p className="popup-copy">{errorMessage}</p> : null}
 				{status === "ready" && session ? (
 					session.authenticated ? (
@@ -55,7 +55,7 @@ function PopupApp() {
 						</>
 					) : (
 						<>
-							<p className="popup-copy">You need a Rabbitbrain account connected with X before the extension can analyze or save tweets.</p>
+							<p className="popup-copy">You need a Tenbrains account connected with X before the extension can analyze or save tweets.</p>
 							<a className="popup-link" href={signInHref} target="_blank" rel="noreferrer">
 								Sign in with X
 							</a>

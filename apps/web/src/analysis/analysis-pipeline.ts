@@ -3,8 +3,8 @@ import {
 	SavedAnalysisSchema,
 	type AnalyzeTweetInput,
 	type SavedAnalysis,
-} from "@pi-starter/contracts";
-import type { TweetSourceProvider } from "@pi-starter/x-client";
+} from "@tenbrains/contracts";
+import type { TweetSourceProvider } from "@tenbrains/x-client";
 
 import { buildAnalysisFromTweetPayload } from "./build-analysis.js";
 

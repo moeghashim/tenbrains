@@ -13,7 +13,7 @@
   <rect x="242" y="144" width="130" height="10" rx="5" fill="rgba(253,241,238,0.16)"/>
   <rect x="242" y="164" width="108" height="10" rx="5" fill="rgba(253,241,238,0.16)"/>
   <rect x="242" y="198" width="134" height="30" rx="15" fill="#EF4623"/>
-  <text x="50" y="210" fill="#FDF1EE" font-family="Newsreader, Georgia, serif" font-size="18" font-weight="600">Rabbitbrain for X</text>
+  <text x="50" y="210" fill="#FDF1EE" font-family="Newsreader, Georgia, serif" font-size="18" font-weight="600">Tenbrains for X</text>
   <text x="50" y="232" fill="rgba(253,241,238,0.72)" font-family="Space Grotesk, Arial, sans-serif" font-size="13">Analyze public X posts and save tagged insights.</text>
   <defs>
     <linearGradient id="paint0_linear" x1="32" y1="24" x2="408" y2="256" gradientUnits="userSpaceOnUse">

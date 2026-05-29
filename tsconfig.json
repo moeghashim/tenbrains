@@ -3,10 +3,10 @@
 	"compilerOptions": {
 		"noEmit": true,
 		"paths": {
-			"rabbitbrain": [
+			"tenbrains": [
 				"./packages/core/src/index.ts"
 			],
-			"@pi-starter/*": [
+			"@tenbrains/*": [
 				"./packages/*/src/index.ts"
 			]
 		}

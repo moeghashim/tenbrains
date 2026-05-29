@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import process from "node:process";
 import readline from "node:readline/promises";
 import { promisify } from "node:util";
-import { PROVIDER_OPTIONS, analyzeTweetPayload, getProviderCatalogEntry } from "@pi-starter/ai";
+import { PROVIDER_OPTIONS, analyzeTweetPayload, getProviderCatalogEntry } from "@tenbrains/ai";
 import {
 	buildFeynmanTrack,
 	type ConceptRating,
@@ -13,13 +13,13 @@ import {
 	renderLearningTrackMarkdown,
 	type TweetLearningAnalysis,
 	prioritizeConcepts,
-} from "rabbitbrain";
-import type { ProviderId } from "@pi-starter/contracts";
+} from "tenbrains";
+import type { ProviderId } from "@tenbrains/contracts";
 import {
 	buildThreadAnalysisPayload,
 	type ThreadPayload,
 	type ThreadTweetPayload,
-} from "@pi-starter/x-client";
+} from "@tenbrains/x-client";
 import { buildAnalyzeCliJsonResult, renderThreadMarkdown } from "./output.js";
 import {
 	DEFAULT_MODELS,

@@ -9,7 +9,7 @@ import Link from "next/link";
 import React from "react";
 
 import { HeroTweetAnalyzer } from "../components/hero-tweet-analyzer.js";
-import { RabbitBrandMark } from "../components/rabbit-brand-mark.js";
+import { BrandMark } from "../components/brand-mark.js";
 import { Reveal } from "../components/reveal.js";
 import { workspaceMenuLinks } from "../components/workspace-menu.js";
 import { getServerAuthSession } from "../src/auth/auth.js";
@@ -41,7 +41,7 @@ const architectureCards = [
 	{
 		title: "Work Anywhere",
 		description:
-			"Use the web app, CLI, or extension depending on the workflow, without changing the underlying Rabbit Brain model.",
+			"Use the web app, CLI, or extension depending on the workflow, without changing the underlying Tenbrains model.",
 		icon: ScanSearch,
 		iconClassName: "text-secondary",
 	},
@@ -80,7 +80,7 @@ export default async function LandingPage({ searchParams }: Readonly<LandingPage
 	const navCtaLabel = isAuthenticated ? "Account" : "Connect";
 	const footerCtaLabel = isAuthenticated ? "Open Workspace" : "Authenticate with X";
 	const footerCtaHref = isAuthenticated ? "/app" : twitterLoginPath;
-	const githubRepoUrl = "https://github.com/moeghashim/rabbitbrain";
+	const githubRepoUrl = "https://github.com/moeghashim/tenbrains";
 
 	return (
 		<div className="min-h-screen bg-surface text-on-surface">
@@ -92,8 +92,8 @@ export default async function LandingPage({ searchParams }: Readonly<LandingPage
 			<nav className="fixed top-0 z-50 w-full border-b border-outline-variant/10 bg-surface/95 backdrop-blur-md">
 				<div className="mx-auto flex max-w-[1440px] items-center justify-between gap-8 px-6 py-4 sm:px-10 lg:px-16">
 					<Link href="/" className="group flex items-center gap-3">
-						<RabbitBrandMark className="h-8 w-8 text-primary transition-transform duration-700 ease-redsun group-hover:-rotate-6 group-hover:scale-105" />
-						<span className="font-headline text-2xl font-bold tracking-tight text-primary">Rabbit Brain</span>
+							<BrandMark className="h-8 w-8 text-primary transition-transform duration-700 ease-redsun group-hover:-rotate-6 group-hover:scale-105" />
+						<span className="font-headline text-2xl font-bold tracking-tight text-primary">Tenbrains</span>
 					</Link>
 					<div className="hidden items-center gap-12 md:flex">
 						{workspaceMenuLinks.map((item) => (
@@ -131,7 +131,7 @@ export default async function LandingPage({ searchParams }: Readonly<LandingPage
 								<span className="text-glow text-primary"> structured learning</span>
 							</h1>
 							<p className="mt-6 max-w-2xl font-body text-base leading-7 text-on-surface-variant sm:text-lg">
-								Rabbit Brain analyzes tweets, saves bookmarks, tracks creators, and builds daily account takeaways so useful
+								Tenbrains analyzes tweets, saves bookmarks, tracks creators, and builds daily account takeaways so useful
 								ideas are easier to revisit than the timeline they came from.
 							</p>
 							<div className="mt-10 w-full max-w-4xl">
@@ -211,7 +211,7 @@ export default async function LandingPage({ searchParams }: Readonly<LandingPage
 									Core Workflows
 								</h2>
 								<p className="mt-4 max-w-2xl font-body text-base leading-7 text-on-surface-variant">
-									The public product has grown past one analyzer. Rabbit Brain now connects post analysis, bookmarks,
+									The public product has grown past one analyzer. Tenbrains now connects post analysis, bookmarks,
 									following, account takeaways, and CLI refresh flows into one working system.
 								</p>
 							</div>
@@ -271,7 +271,7 @@ export default async function LandingPage({ searchParams }: Readonly<LandingPage
 			<footer className="relative z-10 border-t border-outline-variant/10 bg-surface px-6 py-10 sm:px-10 lg:px-16 lg:py-12">
 				<div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 md:flex-row md:items-center md:justify-between">
 					<div className="font-label text-[10px] uppercase tracking-[0.24em] text-secondary/60">
-						© 2026 Rabbit Brain. Built by @moeghashim as part of 10claws.com.
+						© 2026 Tenbrains. Built by @moeghashim as part of 10claws.com.
 					</div>
 					<div className="flex flex-wrap justify-end gap-8 self-end md:ml-auto">
 						<Link

@@ -1,4 +1,4 @@
-import { UserPreferencesInputSchema } from "@pi-starter/contracts";
+import { UserPreferencesInputSchema } from "@tenbrains/contracts";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 

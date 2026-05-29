@@ -21,7 +21,7 @@ export default function AccountPage() {
 										Account Settings
 									</h1>
 									<p className="mt-4 max-w-2xl font-body text-sm leading-7 text-on-surface-variant md:text-base">
-										Configure your default model stack, keep provider keys current, and control the session that powers the rest of the Rabbit Brain workspace.
+										Configure your default model stack, keep provider keys current, and control the session that powers the rest of the Tenbrains workspace.
 									</p>
 								</div>
 

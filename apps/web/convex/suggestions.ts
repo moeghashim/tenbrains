@@ -6,7 +6,7 @@ import {
 	SuggestionSchema,
 	SuggestionsResponseSchema,
 	SaveSuggestionInputSchema,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
 

@@ -1,4 +1,4 @@
-import { RefreshTakeawayInputSchema } from "@pi-starter/contracts";
+import { RefreshTakeawayInputSchema } from "@tenbrains/contracts";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 

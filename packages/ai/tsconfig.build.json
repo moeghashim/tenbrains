@@ -4,9 +4,9 @@
 		"outDir": "./dist",
 		"rootDir": "./src",
 		"paths": {
-			"@pi-starter/contracts": ["../contracts/src/index.ts"],
-			"rabbitbrain": ["../core/src/index.ts"],
-			"@pi-starter/x-client": ["../x-client/src/index.ts"]
+			"@tenbrains/contracts": ["../contracts/src/index.ts"],
+			"tenbrains": ["../core/src/index.ts"],
+			"@tenbrains/x-client": ["../x-client/src/index.ts"]
 		}
 	},
 	"include": [

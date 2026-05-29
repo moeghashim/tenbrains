@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { BookmarkSyncStatusResponse } from "@pi-starter/contracts";
+import type { BookmarkSyncStatusResponse } from "@tenbrains/contracts";
 
 import { handleBookmarkSyncGet, handleBookmarkSyncPost } from "../app/api/me/bookmark-sync/route.js";
 

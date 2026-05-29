@@ -2,31 +2,31 @@ import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import React from "react";
 
-import { RabbitBrandMark } from "../../components/rabbit-brand-mark.js";
+import { BrandMark } from "../../components/brand-mark.js";
 
 const collectedData = [
 	"X post URLs, post text, and public tweet metadata needed to analyze a post, save a bookmark, or build an account takeaway snapshot.",
-	"Bookmark tags, followed creators, followed subjects, and followed takeaway accounts that you create inside Rabbit Brain.",
+	"Bookmark tags, followed creators, followed subjects, and followed takeaway accounts that you create inside Tenbrains.",
 	"Account details needed for sign-in and ownership checks, such as your X user id, username, name, and avatar when those are available through the auth flow or X API.",
 	"Provider configuration you explicitly set, such as model preferences and encrypted provider API keys stored for your account.",
 ];
 
 const storageDetails = [
-	"Saved analyses, bookmarks, follows, preferences, provider credential records, and takeaway snapshots are stored in Rabbit Brain so they can appear across the web app and related workflows.",
+	"Saved analyses, bookmarks, follows, preferences, provider credential records, and takeaway snapshots are stored in Tenbrains so they can appear across the web app and related workflows.",
 	"The extension keeps lightweight browser state needed for sign-in resume and in-progress actions. It does not execute remote code inside x.com.",
-	"CLI takeaway state is stored locally on the machine where you run the CLI, alongside your local Rabbit Brain configuration.",
+	"CLI takeaway state is stored locally on the machine where you run the CLI, alongside your local Tenbrains configuration.",
 ];
 
 const serviceUsage = [
-	"Rabbit Brain fetches public X metadata on the server side to analyze posts and refresh account takeaways.",
-	"AI providers are used to produce structured tweet analysis and account-takeaway summaries from the posts you ask Rabbit Brain to process.",
-	"Rabbit Brain does not sell personal data.",
+	"Tenbrains fetches public X metadata on the server side to analyze posts and refresh account takeaways.",
+	"AI providers are used to produce structured tweet analysis and account-takeaway summaries from the posts you ask Tenbrains to process.",
+	"Tenbrains does not sell personal data.",
 ];
 
 const controlsAndRetention = [
 	"You control what gets saved by choosing which posts to analyze, which bookmarks to keep, and which creators, subjects, or accounts to follow.",
 	"Takeaway history is stored so you can inspect prior daily snapshots and the exact posts behind them.",
-	"If you remove bookmarks, follows, or provider credentials from the product, Rabbit Brain stops using those records for future workflows.",
+	"If you remove bookmarks, follows, or provider credentials from the product, Tenbrains stops using those records for future workflows.",
 ];
 
 const policySections = [
@@ -63,8 +63,8 @@ export default function PrivacyPage() {
 			<nav className="fixed top-0 z-50 w-full border-b border-outline-variant/10 bg-surface/95 backdrop-blur-md">
 				<div className="mx-auto flex max-w-[1440px] items-center justify-between gap-8 px-6 py-4 sm:px-10 lg:px-16">
 					<Link href="/" className="group flex items-center gap-3">
-						<RabbitBrandMark className="h-8 w-8 text-primary transition-transform duration-700 ease-redsun group-hover:-rotate-6 group-hover:scale-105" />
-						<span className="font-headline text-2xl font-bold tracking-tight text-primary">Rabbit Brain</span>
+						<BrandMark className="h-8 w-8 text-primary transition-transform duration-700 ease-redsun group-hover:-rotate-6 group-hover:scale-105" />
+						<span className="font-headline text-2xl font-bold tracking-tight text-primary">Tenbrains</span>
 					</Link>
 					<Link
 						href="/app"
@@ -86,27 +86,27 @@ export default function PrivacyPage() {
 									<p className="font-label text-[11px] uppercase tracking-[0.5em] text-secondary/70">Privacy Policy</p>
 								</div>
 								<h1 className="max-w-4xl font-headline text-[3rem] font-bold uppercase leading-[0.95] tracking-[-0.04em] text-on-surface sm:text-[4.6rem]">
-									Rabbit Brain for X
+									Tenbrains for X
 								</h1>
 								<p className="mt-6 max-w-3xl font-body text-base leading-7 text-on-surface-variant sm:text-lg">
-									This policy explains the data handled by the Rabbit Brain extension, web app, and related CLI workflows
+									This policy explains the data handled by the Tenbrains extension, web app, and related CLI workflows
 									when you analyze X posts, save bookmarks, and track daily account takeaways.
 								</p>
 							</div>
 							<div className="border border-outline-variant/20 bg-surface-container-high p-6">
 								<p className="font-mono text-[10px] uppercase tracking-[0.35em] text-primary/70">Contact</p>
 								<p className="mt-4 font-body text-sm leading-7 text-on-surface-variant">
-									Questions about this policy or Rabbit Brain data handling can be sent to
+									Questions about this policy or Tenbrains data handling can be sent to
 								</p>
 								<a
-									href="mailto:rabbitbrain@10claws.com"
+									href="mailto:tenbrains@10claws.com"
 									className="mt-5 inline-flex items-center gap-3 bg-primary-container px-5 py-3 font-mono text-[11px] font-semibold uppercase tracking-[0.28em] text-on-primary-container transition-shadow hover:shadow-[0_0_30px_rgba(110,229,145,0.3)]"
 								>
-									rabbitbrain@10claws.com
+									tenbrains@10claws.com
 									<ArrowUpRight className="h-4 w-4 text-on-primary-container/80" />
 								</a>
 								<p className="mt-5 font-label text-[10px] uppercase tracking-[0.35em] text-secondary/50">
-									Rabbit Brain only runs on https://x.com/* when you choose to analyze a post or save it into your workspace.
+									Tenbrains only runs on https://x.com/* when you choose to analyze a post or save it into your workspace.
 								</p>
 							</div>
 						</div>
@@ -119,7 +119,7 @@ export default function PrivacyPage() {
 								<h2 className="font-label text-[11px] uppercase tracking-[0.45em] text-secondary">Overview</h2>
 							</div>
 							<p className="mt-6 font-body text-base leading-7 text-on-surface-variant">
-								Rabbit Brain is built to help you capture useful posts, keep research trails, and generate daily account
+								Tenbrains is built to help you capture useful posts, keep research trails, and generate daily account
 								takeaways without scraping unrelated browsing activity.
 							</p>
 							<p className="mt-4 font-body text-base leading-7 text-on-surface-variant">
@@ -141,7 +141,7 @@ export default function PrivacyPage() {
 								</div>
 								<div className="border-l border-primary/30 pl-4">
 									<p className="mb-2 font-label text-[10px] uppercase tracking-[0.35em] text-secondary/40">Commitment</p>
-									<p className="font-label text-xl text-primary">Rabbit Brain does not sell personal data</p>
+									<p className="font-label text-xl text-primary">Tenbrains does not sell personal data</p>
 								</div>
 							</div>
 						</div>

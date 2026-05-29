@@ -32,7 +32,7 @@ async function collectFiles(rootDir, currentDir = rootDir) {
 
 async function main() {
 	const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
-	const zipName = `rabbitbrain-for-x-${packageJson.version}.zip`;
+	const zipName = `tenbrains-for-x-${packageJson.version}.zip`;
 	const zipPath = path.join(distDir, zipName);
 	const distStats = await stat(distDir).catch(() => null);
 

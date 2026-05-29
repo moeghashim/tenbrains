@@ -1,6 +1,6 @@
-# Rabbitbrain Releases
+# Tenbrains Releases
 
-Rabbitbrain uses Changesets and GitHub Releases for release automation directly from `main` pushes.
+Tenbrains uses Changesets and GitHub Releases for release automation directly from `main` pushes.
 
 ## What gets released
 
@@ -28,7 +28,7 @@ Private apps are not published to npm.
    - update `package-lock.json`
    - commit the version/changelog changes back to `main`
    - run `npm run release:publish`
-   - run `npm run -w @pi-starter/web build`
+   - run `npm run -w @tenbrains/web build`
    - run `npm run extension:package`
    - deploy the release commit to Vercel production
    - create the GitHub Release and attach the extension zip

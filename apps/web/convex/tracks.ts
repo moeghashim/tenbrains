@@ -1,7 +1,7 @@
 import {
 	CreateLearningTrackResultSchema,
 	SavedAnalysisSchema,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 import {
 	mutationGeneric,
 	queryGeneric,

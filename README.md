@@ -1,13 +1,13 @@
-# Rabbitbrain
+# Tenbrains
 
-Rabbitbrain is an X research workspace for analyzing posts, importing bookmarks, tracking followed accounts, and surfacing suggested posts from your saved signal.
+Tenbrains is an X research workspace for analyzing posts, importing bookmarks, tracking followed accounts, and surfacing suggested posts from your saved signal.
 
 ## Features
 
 - Tweet analysis from X URLs/IDs via `xurl`
 - Daily X bookmark sync in the web app:
   - Reads a signed-in user’s X bookmarks once per day
-  - Imports only new bookmarked posts into Rabbitbrain
+  - Imports only new bookmarked posts into Tenbrains
   - Applies suggested tags automatically, while keeping tags editable
 - Suggested posts in the web app and API:
   - Recommends posts from followed creators
@@ -111,10 +111,10 @@ npm run xurl:takeaway -- show ctatedev --history
 Inspect bookmark sync status or work with suggestions from the CLI:
 
 ```bash
-RABBITBRAIN_AUTH_COOKIE='next-auth.session-token=...' npm run xurl:suggestions -- status
-RABBITBRAIN_AUTH_COOKIE='next-auth.session-token=...' npm run xurl:suggestions -- list
-RABBITBRAIN_AUTH_COOKIE='next-auth.session-token=...' npm run xurl:suggestions -- save <suggestion_id>
-RABBITBRAIN_AUTH_COOKIE='next-auth.session-token=...' npm run xurl:suggestions -- dismiss <suggestion_id>
+TENBRAINS_AUTH_COOKIE='next-auth.session-token=...' npm run xurl:suggestions -- status
+TENBRAINS_AUTH_COOKIE='next-auth.session-token=...' npm run xurl:suggestions -- list
+TENBRAINS_AUTH_COOKIE='next-auth.session-token=...' npm run xurl:suggestions -- save <suggestion_id>
+TENBRAINS_AUTH_COOKIE='next-auth.session-token=...' npm run xurl:suggestions -- dismiss <suggestion_id>
 ```
 
 ## Web App
@@ -128,7 +128,7 @@ RABBITBRAIN_AUTH_COOKIE='next-auth.session-token=...' npm run xurl:suggestions -
 End-user workflow:
 
 1. Sign in with X in the web app.
-2. Rabbitbrain stores the X OAuth credentials needed for bookmark sync.
+2. Tenbrains stores the X OAuth credentials needed for bookmark sync.
 3. A daily cron imports new X bookmarks into `/app/bookmarks`.
 4. Imported bookmarks arrive with suggested tags that can be edited later.
 5. `/app/suggestions` recommends posts based on follows, bookmark patterns, and takeaway themes.
@@ -151,7 +151,7 @@ npm test
   - `AUTH_X_SECRET`
   - `AUTH_SECRET`
   - `USER_SECRETS_ENCRYPTION_KEY`
-- CLI takeaway state is stored locally in the Rabbitbrain config directory alongside provider config
+- CLI takeaway state is stored locally in the Tenbrains config directory alongside provider config. Legacy `~/.config/rabbitbrain` state and `RABBITBRAIN_*` env vars are still read as migration fallbacks.
 
 Developer notes:
 
@@ -166,7 +166,7 @@ Developer notes:
 
 ## Releases
 
-Rabbitbrain uses Changesets and GitHub Releases.
+Tenbrains uses Changesets and GitHub Releases.
 
 ```bash
 npm run changeset

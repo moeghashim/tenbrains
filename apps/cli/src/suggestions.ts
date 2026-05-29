@@ -9,13 +9,16 @@ interface ApiErrorPayload {
 }
 
 function readBaseUrl(): string {
-	return (process.env.RABBITBRAIN_BASE_URL?.trim() || "http://localhost:3000").replace(/\/+$/, "");
+	return (process.env.TENBRAINS_BASE_URL?.trim() || process.env.RABBITBRAIN_BASE_URL?.trim() || "http://localhost:3000").replace(
+		/\/+$/,
+		"",
+	);
 }
 
 function readAuthCookie(): string {
-	const cookie = process.env.RABBITBRAIN_AUTH_COOKIE?.trim();
+	const cookie = process.env.TENBRAINS_AUTH_COOKIE?.trim() || process.env.RABBITBRAIN_AUTH_COOKIE?.trim();
 	if (!cookie) {
-		throw new Error("Set RABBITBRAIN_AUTH_COOKIE to an authenticated Cookie header value.");
+		throw new Error("Set TENBRAINS_AUTH_COOKIE to an authenticated Cookie header value.");
 	}
 	return cookie;
 }
@@ -46,8 +49,9 @@ function printUsage(): void {
 			"  npm run xurl:suggestions -- dismiss <suggestion_id>",
 			"",
 			"Environment:",
-			"  RABBITBRAIN_BASE_URL     Optional, defaults to http://localhost:3000",
-			"  RABBITBRAIN_AUTH_COOKIE  Required authenticated Cookie header value",
+			"  TENBRAINS_BASE_URL     Optional, defaults to http://localhost:3000",
+			"  TENBRAINS_AUTH_COOKIE  Required authenticated Cookie header value",
+			"  RABBITBRAIN_*          Still accepted as legacy aliases",
 		].join("\n"),
 	);
 }

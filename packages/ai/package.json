@@ -1,5 +1,5 @@
 {
-	"name": "@pi-starter/ai",
+	"name": "@tenbrains/ai",
 	"version": "1.1.0",
 	"description": "Shared AI provider adapters and model catalog",
 	"license": "MIT",
@@ -22,8 +22,8 @@
 		"node": ">=20.0.0"
 	},
 	"dependencies": {
-		"@pi-starter/contracts": "1.1.0",
-		"rabbitbrain": "1.1.0",
-		"@pi-starter/x-client": "1.1.0"
+		"@tenbrains/contracts": "1.1.0",
+		"tenbrains": "1.1.0",
+		"@tenbrains/x-client": "1.1.0"
 	}
 }

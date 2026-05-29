@@ -1,8 +1,8 @@
 import { normalizeTweetUrl, resolveTweetUrlFromArticle } from "./tweet-url.js";
 
 export const ARTICLE_SELECTOR = "article[data-testid='tweet']";
-export const MOUNT_ATTRIBUTE = "data-rabbitbrain-mounted";
-export const ROOT_ATTRIBUTE = "data-rabbitbrain-root";
+export const MOUNT_ATTRIBUTE = "data-tenbrains-mounted";
+export const ROOT_ATTRIBUTE = "data-tenbrains-root";
 
 export interface TweetMountTarget {
 	article: HTMLElement;

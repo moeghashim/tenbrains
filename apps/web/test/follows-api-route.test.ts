@@ -10,7 +10,7 @@ import type {
 	SubjectFollow,
 	TakeawayFollow,
 	TakeawayWorkspaceResponse,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 
 import {
 	handleFollowSuggestionsGet,

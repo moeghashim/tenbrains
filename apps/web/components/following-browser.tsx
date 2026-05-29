@@ -9,7 +9,7 @@ import type {
 	FollowingFeedResponse,
 	SubjectFollow,
 	SuggestedCreator,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 import React, { useEffect, useState } from "react";
 import {
 	type ApiErrorPayload,

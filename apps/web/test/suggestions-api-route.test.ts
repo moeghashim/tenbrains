@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { Suggestion } from "@pi-starter/contracts";
+import type { Suggestion } from "@tenbrains/contracts";
 
 import { handleSuggestionsDismissPost } from "../app/api/me/suggestions/dismiss/route.js";
 import { handleSuggestionsGet } from "../app/api/me/suggestions/route.js";

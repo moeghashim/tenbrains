@@ -6,11 +6,11 @@ const isProductionBuild = process.env.NODE_ENV === "production";
 
 export default defineManifest({
 	manifest_version: 3,
-	name: "Rabbitbrain for X",
-	description: "Analyze public X posts and save tagged insights to Rabbitbrain.",
+	name: "Tenbrains for X",
+	description: "Analyze public X posts and save tagged insights to Tenbrains.",
 	version: packageJson.version,
 	action: {
-		default_title: "Rabbitbrain for X",
+		default_title: "Tenbrains for X",
 		default_popup: "src/popup/index.html",
 	},
 	background: {
@@ -27,7 +27,8 @@ export default defineManifest({
 	permissions: ["storage"],
 	host_permissions: [
 		"https://x.com/*",
-		"https://rabbitbrain.app/*",
+		"https://www.tenbrains.app/*",
+		"https://tenbrains.app/*",
 		...(isProductionBuild ? [] : ["http://localhost:3000/*"]),
 	],
 	icons: {

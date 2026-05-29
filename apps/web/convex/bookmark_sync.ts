@@ -1,4 +1,4 @@
-import { BookmarkSyncStateSchema, BookmarkSyncStatusResponseSchema } from "@pi-starter/contracts";
+import { BookmarkSyncStateSchema, BookmarkSyncStatusResponseSchema } from "@tenbrains/contracts";
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
 

@@ -1,5 +1,5 @@
-import { resolveProviderCatalogModel } from "@pi-starter/ai";
-import { ProviderIdSchema, UserPreferencesInputSchema, UserPreferencesResultSchema } from "@pi-starter/contracts";
+import { resolveProviderCatalogModel } from "@tenbrains/ai";
+import { ProviderIdSchema, UserPreferencesInputSchema, UserPreferencesResultSchema } from "@tenbrains/contracts";
 import {
 	mutationGeneric,
 	queryGeneric,

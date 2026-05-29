@@ -15,18 +15,18 @@ let animationFrameId = 0;
 
 function ensureShadowContainer(host: HTMLElement): HTMLElement {
 	const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: "open" });
-	let styleElement = shadowRoot.querySelector("style[data-rabbitbrain-styles]");
+	let styleElement = shadowRoot.querySelector("style[data-tenbrains-styles]");
 	if (!styleElement) {
 		styleElement = document.createElement("style");
-		styleElement.setAttribute("data-rabbitbrain-styles", "true");
+		styleElement.setAttribute("data-tenbrains-styles", "true");
 		styleElement.textContent = contentStyles;
 		shadowRoot.append(styleElement);
 	}
 
-	let container = shadowRoot.querySelector<HTMLElement>("[data-rabbitbrain-shadow-container]");
+	let container = shadowRoot.querySelector<HTMLElement>("[data-tenbrains-shadow-container]");
 	if (!container) {
 		container = document.createElement("div");
-		container.setAttribute("data-rabbitbrain-shadow-container", "true");
+		container.setAttribute("data-tenbrains-shadow-container", "true");
 		shadowRoot.append(container);
 	}
 

@@ -54,7 +54,7 @@ jobs:
         run: npm test
 
       - name: Typecheck web app
-        run: npm run -w @pi-starter/web typecheck
+        run: npm run -w @tenbrains/web typecheck
 
       - name: Stop when no release work is pending
         if: steps.changesets.outputs.pending != 'true'
@@ -115,7 +115,7 @@ jobs:
         run: npx convex deploy -y
 
       - name: Build web app
-        run: npm run -w @pi-starter/web build
+        run: npm run -w @tenbrains/web build
 
       - name: Build extension release zip
         if: steps.changesets.outputs.pending == 'true'
@@ -124,7 +124,7 @@ jobs:
       - name: Resolve extension asset path
         if: steps.changesets.outputs.pending == 'true'
         id: extension-asset
-        run: echo "path=$(ls apps/extension/dist/rabbitbrain-for-x-*.zip)" >> "$GITHUB_OUTPUT"
+        run: echo "path=$(ls apps/extension/dist/tenbrains-for-x-*.zip)" >> "$GITHUB_OUTPUT"
 
       - name: Publish npm packages
         if: steps.changesets.outputs.pending == 'true'
@@ -153,4 +153,4 @@ jobs:
             --generate-notes \
             --notes "Production deploy: ${{ steps.deploy.outputs.url }}
 
-            Site alias: https://www.rabbitbrain.app"
+            Site alias: https://www.tenbrains.app"

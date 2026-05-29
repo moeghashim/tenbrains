@@ -1,11 +1,11 @@
 "use client";
 
-import { parseBookmarkTags, validateBookmarkTags } from "@pi-starter/contracts/bookmark-tags";
+import { parseBookmarkTags, validateBookmarkTags } from "@tenbrains/contracts/bookmark-tags";
 import type {
 	CreateFollowInput,
 	FollowSummary,
 	SavedBookmark,
-} from "@pi-starter/contracts";
+} from "@tenbrains/contracts";
 import { buildBookmarkCanonicalUrl, buildBookmarksArchiveFileName, buildBookmarksMarkdownArchive } from "../src/bookmarks/export-markdown.js";
 import {
 	buildBookmarkFollowState,

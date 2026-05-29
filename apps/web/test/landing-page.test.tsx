@@ -33,9 +33,9 @@ test("landing page ctas route to auth pages", async () => {
 	assert.match(html, /id=\"hero-analyze-button\"/);
 	assert.match(html, /Connect<\/a>/);
 	assert.match(html, /Authenticate with X/);
-	assert.match(html, /https:\/\/github\.com\/moeghashim\/rabbitbrain/);
+	assert.match(html, /https:\/\/github\.com\/moeghashim\/tenbrains/);
 	assert.match(html, /10claws\.com/);
-	assert.doesNotMatch(html, /Rabbit Brain on X/);
+	assert.doesNotMatch(html, /Tenbrains on X/);
 	assert.doesNotMatch(html, /href=\"https:\/\/x\.com\/moeghashim\"/);
 	assert.doesNotMatch(html, /href=\"https:\/\/10claws\.com\"/);
 	assert.ok(bookmarksIndex >= 0 && followingIndex > bookmarksIndex && takeawayIndex > followingIndex && suggestionsIndex > takeawayIndex);

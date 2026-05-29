@@ -1,7 +1,7 @@
 "use client";
 
-import { PROVIDER_OPTIONS, getProviderCatalogEntry, resolveProviderCatalogModel } from "@pi-starter/ai";
-import type { ProviderCredentialSummary, ProviderId, UserPreferencesResult } from "@pi-starter/contracts";
+import { PROVIDER_OPTIONS, getProviderCatalogEntry, resolveProviderCatalogModel } from "@tenbrains/ai";
+import type { ProviderCredentialSummary, ProviderId, UserPreferencesResult } from "@tenbrains/contracts";
 import { ChevronDown } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -154,7 +154,7 @@ export function AccountSettingsPanel() {
 						Preference stack
 					</h2>
 					<p className="mt-4 font-body text-sm leading-7 text-on-surface-variant">
-						Set the provider, model, and study cadence Rabbit Brain should reach for first when a workflow does not override them.
+						Set the provider, model, and study cadence Tenbrains should reach for first when a workflow does not override them.
 					</p>
 				</div>
 				<div className="bg-surface-container-low p-6">

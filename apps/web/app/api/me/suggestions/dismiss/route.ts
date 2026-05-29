@@ -1,4 +1,4 @@
-import { DismissSuggestionInputSchema } from "@pi-starter/contracts";
+import { DismissSuggestionInputSchema } from "@tenbrains/contracts";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 

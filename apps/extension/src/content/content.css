@@ -2,105 +2,105 @@
 	all: initial;
 }
 
-.rb-shell,
-.rb-shell * {
+.tb-shell,
+.tb-shell * {
 	box-sizing: border-box;
 	font-family: "Space Grotesk", system-ui, sans-serif;
 }
 
-.rb-shell {
-	--rb-bg: #2d3b42;
-	--rb-bg-dark: #1c262b;
-	--rb-surface: #222d33;
-	--rb-surface-soft: rgba(34, 45, 51, 0.84);
-	--rb-border: rgba(253, 241, 238, 0.15);
-	--rb-text: #fdf1ee;
-	--rb-text-soft: rgba(253, 241, 238, 0.74);
-	--rb-accent: #ef4623;
-	--rb-accent-hover: #d83a1a;
-	--rb-success: rgba(59, 184, 126, 0.3);
+.tb-shell {
+	--tb-bg: #2d3b42;
+	--tb-bg-dark: #1c262b;
+	--tb-surface: #222d33;
+	--tb-surface-soft: rgba(34, 45, 51, 0.84);
+	--tb-border: rgba(253, 241, 238, 0.15);
+	--tb-text: #fdf1ee;
+	--tb-text-soft: rgba(253, 241, 238, 0.74);
+	--tb-accent: #ef4623;
+	--tb-accent-hover: #d83a1a;
+	--tb-success: rgba(59, 184, 126, 0.3);
 	display: block;
 	margin: 10px 0 4px;
-	color: var(--rb-text);
+	color: var(--tb-text);
 }
 
-.rb-stack {
+.tb-stack {
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
 }
 
-.rb-header {
+.tb-header {
 	display: flex;
 	gap: 12px;
 	justify-content: space-between;
 	align-items: flex-start;
 }
 
-.rb-kicker {
+.tb-kicker {
 	margin: 0;
 	font-size: 11px;
 	font-weight: 700;
 	letter-spacing: 0.18em;
 	text-transform: uppercase;
-	color: var(--rb-accent);
+	color: var(--tb-accent);
 }
 
-.rb-title,
-.rb-analysis-title {
+.tb-title,
+.tb-analysis-title {
 	margin: 6px 0 0;
 	font-family: "Newsreader", Georgia, serif;
 	font-size: 20px;
 	line-height: 1;
 }
 
-.rb-caption,
-.rb-analysis-summary,
-.rb-analysis-intent,
-.rb-bookmark-copy,
-.rb-author-handle {
+.tb-caption,
+.tb-analysis-summary,
+.tb-analysis-intent,
+.tb-bookmark-copy,
+.tb-author-handle {
 	margin: 0;
 	font-size: 13px;
 	line-height: 1.5;
-	color: var(--rb-text-soft);
+	color: var(--tb-text-soft);
 }
 
-.rb-card-grid {
+.tb-card-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 	gap: 12px;
 }
 
-.rb-card {
-	border: 1px solid var(--rb-border);
+.tb-card {
+	border: 1px solid var(--tb-border);
 	border-radius: 22px;
 	background: linear-gradient(135deg, rgba(28, 38, 43, 0.96), rgba(45, 59, 66, 0.94));
 	padding: 14px;
 	box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
 }
 
-.rb-card--analysis {
+.tb-card--analysis {
 	background: linear-gradient(135deg, rgba(239, 70, 35, 0.16), rgba(34, 45, 51, 0.96));
 }
 
-.rb-card--bookmark {
+.tb-card--bookmark {
 	background: rgba(34, 45, 51, 0.92);
 }
 
-.rb-author {
+.tb-author {
 	display: flex;
 	align-items: center;
 	gap: 10px;
 }
 
-.rb-author-name {
+.tb-author-name {
 	margin: 0;
 	font-size: 14px;
 	font-weight: 600;
-	color: var(--rb-text);
+	color: var(--tb-text);
 }
 
-.rb-avatar {
+.tb-avatar {
 	width: 36px;
 	height: 36px;
 	border-radius: 999px;
@@ -108,7 +108,7 @@
 	border: 1px solid rgba(253, 241, 238, 0.15);
 }
 
-.rb-avatar--fallback {
+.tb-avatar--fallback {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -116,21 +116,21 @@
 	font-weight: 700;
 }
 
-.rb-tweet-text {
+.tb-tweet-text {
 	margin: 12px 0 0;
 	font-size: 14px;
 	line-height: 1.55;
 	white-space: pre-wrap;
 }
 
-.rb-chip-row {
+.tb-chip-row {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
 	margin-top: 12px;
 }
 
-.rb-chip {
+.tb-chip {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
@@ -140,27 +140,27 @@
 	background: rgba(253, 241, 238, 0.06);
 	font-size: 11px;
 	line-height: 1;
-	color: var(--rb-text-soft);
+	color: var(--tb-text-soft);
 }
 
-.rb-chip strong {
-	color: var(--rb-text);
+.tb-chip strong {
+	color: var(--tb-text);
 }
 
-.rb-chip--button {
+.tb-chip--button {
 	cursor: pointer;
-	color: var(--rb-text);
+	color: var(--tb-text);
 	transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
 }
 
-.rb-chip--button:hover {
+.tb-chip--button:hover {
 	border-color: rgba(239, 70, 35, 0.55);
 	background: rgba(239, 70, 35, 0.12);
-	color: var(--rb-accent);
+	color: var(--tb-accent);
 }
 
-.rb-button,
-.rb-link {
+.tb-button,
+.tb-link {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -168,7 +168,7 @@
 	padding: 10px 16px;
 	border-radius: 999px;
 	border: 0;
-	background: var(--rb-accent);
+	background: var(--tb-accent);
 	color: white;
 	font-size: 13px;
 	font-weight: 700;
@@ -177,53 +177,53 @@
 	transition: transform 160ms ease, background-color 160ms ease, opacity 160ms ease;
 }
 
-.rb-button:hover,
-.rb-link:hover {
-	background: var(--rb-accent-hover);
+.tb-button:hover,
+.tb-link:hover {
+	background: var(--tb-accent-hover);
 	transform: translateY(-1px);
 }
 
-.rb-button:disabled {
+.tb-button:disabled {
 	opacity: 0.64;
 	cursor: not-allowed;
 	transform: none;
 }
 
-.rb-bookmark-header {
+.tb-bookmark-header {
 	display: flex;
 	gap: 12px;
 	align-items: flex-start;
 	justify-content: space-between;
 }
 
-.rb-bookmark-controls {
+.tb-bookmark-controls {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 10px;
 	margin-top: 12px;
 }
 
-.rb-input {
+.tb-input {
 	flex: 1 1 220px;
 	min-width: 0;
 	padding: 11px 14px;
 	border-radius: 16px;
 	border: 1px solid rgba(253, 241, 238, 0.16);
 	background: rgba(28, 38, 43, 0.85);
-	color: var(--rb-text);
+	color: var(--tb-text);
 	font-size: 13px;
 }
 
-.rb-input::placeholder {
+.tb-input::placeholder {
 	color: rgba(253, 241, 238, 0.42);
 }
 
-.rb-input:focus {
+.tb-input:focus {
 	outline: 2px solid rgba(239, 70, 35, 0.55);
 	outline-offset: 2px;
 }
 
-.rb-banner {
+.tb-banner {
 	margin: 12px 0 0;
 	padding: 10px 12px;
 	border-radius: 16px;
@@ -232,32 +232,32 @@
 	line-height: 1.5;
 }
 
-.rb-banner--error {
+.tb-banner--error {
 	background: rgba(239, 70, 35, 0.12);
 	border-color: rgba(239, 70, 35, 0.35);
 }
 
-.rb-banner--info {
+.tb-banner--info {
 	background: rgba(253, 241, 238, 0.08);
 }
 
-.rb-banner--success {
+.tb-banner--success {
 	background: rgba(59, 184, 126, 0.12);
-	border-color: var(--rb-success);
+	border-color: var(--tb-success);
 }
 
 @media (max-width: 720px) {
-	.rb-shell {
+	.tb-shell {
 		margin-top: 8px;
 	}
 
-	.rb-header,
-	.rb-bookmark-header {
+	.tb-header,
+	.tb-bookmark-header {
 		flex-direction: column;
 	}
 
-	.rb-button,
-	.rb-link {
+	.tb-button,
+	.tb-link {
 		width: 100%;
 	}
 }
