@@ -275,6 +275,24 @@ export default defineSchema({
 		.index("by_user_id_created_at", ["userId", "createdAt"])
 		.index("by_follow_id_created_at", ["followId", "createdAt"])
 		.index("by_follow_id_snapshot_date_key", ["followId", "snapshotDateKey"]),
+	embeddings: defineTable({
+		userId: v.id("users"),
+		sourceType: v.union(v.literal("bookmark"), v.literal("analysis"), v.literal("takeaway")),
+		sourceId: v.string(),
+		text: v.string(),
+		contentHash: v.string(),
+		model: v.string(),
+		embedding: v.array(v.float64()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_source", ["sourceType", "sourceId"])
+		.index("by_user_source", ["userId", "sourceType"])
+		.vectorIndex("by_embedding", {
+			vectorField: "embedding",
+			dimensions: 1536,
+			filterFields: ["userId", "sourceType"],
+		}),
 	suggestions: defineTable({
 		userId: v.id("users"),
 		tweetId: v.string(),
