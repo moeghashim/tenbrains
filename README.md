@@ -141,6 +141,43 @@ npm run check
 npm test
 ```
 
+### Embeddings Backfill
+
+After deploying the embeddings Convex functions, operators can backfill existing bookmarks, analyses, and takeaway snapshots manually. Start with a dry run; it reads Convex and reports planned work, but makes zero embedding API calls and zero writes.
+
+```bash
+NEXT_PUBLIC_CONVEX_URL="https://<deployment>.convex.cloud" \
+CONVEX_DEPLOY_KEY="<deploy-key>" \
+USER_SECRETS_ENCRYPTION_KEY="<secret-key>" \
+PLATFORM_OPENAI_API_KEY="<optional-fallback-key>" \
+node scripts/backfill-embeddings.mjs --dry-run --source=all
+```
+
+Run the migration without `--dry-run` after reviewing the summary:
+
+```bash
+NEXT_PUBLIC_CONVEX_URL="https://<deployment>.convex.cloud" \
+CONVEX_DEPLOY_KEY="<deploy-key>" \
+USER_SECRETS_ENCRYPTION_KEY="<secret-key>" \
+PLATFORM_OPENAI_API_KEY="<optional-fallback-key>" \
+node scripts/backfill-embeddings.mjs --source=all --batch-size=32
+```
+
+Useful scoped runs:
+
+```bash
+node scripts/backfill-embeddings.mjs --source=bookmark --user=<userId> --limit=100
+node scripts/backfill-embeddings.mjs --source=analysis --batch-size=16
+```
+
+Flags:
+
+- `--dry-run`: plan only; no embedding requests and no writes.
+- `--source=bookmark|analysis|takeaway|all`: choose which source rows to inspect.
+- `--user=<userId>`: restrict to one Convex user id.
+- `--limit=<n>`: cap considered rows across selected sources.
+- `--batch-size=<n>`: source rows per embedding request, capped at the service maximum of 96.
+
 ## Deployment Notes
 
 - Web account takeaways and bookmark sync require the existing X API credentials plus a `CRON_SECRET` value for the internal scheduled routes
