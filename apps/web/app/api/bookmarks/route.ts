@@ -14,10 +14,12 @@ import {
 import { validateStartupEnvIfNeeded } from "../../../src/config/startup-env.js";
 import {
 	deleteBookmarkForSession,
+	deleteEmbeddingsForSourceForSession,
 	listBookmarksForSession,
 	saveBookmarkForSession,
 	updateBookmarkTagsForSession,
 } from "../../../src/server/convex-admin.js";
+import { embedBookmarkSource } from "../../../src/embeddings/embed-source.js";
 import { reportServerError } from "../../../src/telemetry/report-error.js";
 
 interface SessionUserLike {
@@ -43,6 +45,8 @@ interface BookmarksRouteDependencies {
 	listBookmarksForSession: typeof listBookmarksForSession;
 	updateBookmarkTagsForSession: typeof updateBookmarkTagsForSession;
 	deleteBookmarkForSession: typeof deleteBookmarkForSession;
+	deleteEmbeddingsForSourceForSession?: typeof deleteEmbeddingsForSourceForSession;
+	embedBookmarkSource?: typeof embedBookmarkSource;
 	reportServerError: typeof reportServerError;
 }
 
@@ -53,6 +57,8 @@ const defaultDependencies: BookmarksRouteDependencies = {
 	listBookmarksForSession,
 	updateBookmarkTagsForSession,
 	deleteBookmarkForSession,
+	deleteEmbeddingsForSourceForSession,
+	embedBookmarkSource,
 	reportServerError,
 };
 
@@ -108,6 +114,10 @@ export async function handleBookmarksPost(
 		const saved = await dependencies.saveBookmarkForSession({
 			sessionUser,
 			input,
+		});
+		void dependencies.embedBookmarkSource?.({
+			sessionUser,
+			bookmark: saved,
 		});
 
 		return NextResponse.json(saved);
@@ -248,10 +258,41 @@ export async function handleBookmarksDelete(
 		}
 
 		const input = DeleteBookmarkInputSchema.parse(await req.json());
+		let deletedBookmarkSourceId: string | null = null;
+		try {
+			const bookmarks = await dependencies.listBookmarksForSession({ sessionUser });
+			deletedBookmarkSourceId = bookmarks.find((bookmark) => bookmark.id === input.bookmarkId)?.tweetId ?? null;
+		} catch (error) {
+			dependencies.reportServerError({
+				scope: "api.bookmarks.delete_embedding_lookup_failure",
+				error,
+				metadata: {
+					bookmarkId: input.bookmarkId,
+				},
+			});
+		}
 		const deleted = await dependencies.deleteBookmarkForSession({
 			sessionUser,
 			bookmarkId: input.bookmarkId,
 		});
+		if (deletedBookmarkSourceId) {
+			void dependencies
+				.deleteEmbeddingsForSourceForSession?.({
+					sessionUser,
+					sourceType: "bookmark",
+					sourceId: deletedBookmarkSourceId,
+				})
+				.catch((error) => {
+					dependencies.reportServerError({
+						scope: "api.bookmarks.delete_embedding_failure",
+						error,
+						metadata: {
+							bookmarkId: input.bookmarkId,
+							sourceId: deletedBookmarkSourceId,
+						},
+					});
+				});
+		}
 		return NextResponse.json(deleted);
 	} catch (error) {
 		if (error instanceof ZodError) {

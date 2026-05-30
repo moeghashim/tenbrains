@@ -16,6 +16,7 @@ import {
 	markTakeawayRefreshErrorForSession,
 	persistTakeawaySnapshotForSession,
 } from "../server/convex-admin.js";
+import { embedTakeawaySnapshotSource } from "../embeddings/embed-source.js";
 
 interface SessionUserIdentity {
 	id: string;
@@ -80,7 +81,7 @@ async function buildSnapshot({
 		posts,
 	});
 
-	return await persistTakeawaySnapshotForSession({
+	const snapshot = await persistTakeawaySnapshotForSession({
 		sessionUser,
 		input: {
 			followId: follow.id,
@@ -98,6 +99,11 @@ async function buildSnapshot({
 			createdAt: refreshedAt,
 		},
 	});
+	await embedTakeawaySnapshotSource({
+		sessionUser,
+		snapshot,
+	});
+	return snapshot;
 }
 
 export async function refreshTakeawayForSession({

@@ -27,6 +27,7 @@ import {
 	getProviderApiKeyForSession,
 	persistAnalysisForSession,
 } from "../../../src/server/convex-admin.js";
+import { embedAnalysisSource } from "../../../src/embeddings/embed-source.js";
 import { reportServerError } from "../../../src/telemetry/report-error.js";
 
 interface SessionUserLike {
@@ -47,6 +48,7 @@ interface AnalyzeRouteDependencies {
 	getProviderApiKeyForSession: typeof getProviderApiKeyForSession;
 	analyzeTweetPayload: typeof analyzeTweetPayload;
 	persistAnalysisForSession: typeof persistAnalysisForSession;
+	embedAnalysisSource?: typeof embedAnalysisSource;
 	reportServerError: typeof reportServerError;
 }
 
@@ -58,6 +60,7 @@ const defaultDependencies: AnalyzeRouteDependencies = {
 	getProviderApiKeyForSession,
 	analyzeTweetPayload,
 	persistAnalysisForSession,
+	embedAnalysisSource,
 	reportServerError,
 };
 
@@ -164,7 +167,7 @@ export async function handleAnalyzePost(
 			tweet: buildThreadAnalysisPayload(thread),
 		});
 		try {
-			await dependencies.persistAnalysisForSession({
+			const savedAnalysis = await dependencies.persistAnalysisForSession({
 				sessionUser: {
 					id: userId,
 					email: sessionUser.email,
@@ -180,6 +183,14 @@ export async function handleAnalyzePost(
 					rootTweetId: thread.rootTweetId,
 					tweets: thread.tweets.map(toTweetPreview),
 				},
+			});
+			void dependencies.embedAnalysisSource?.({
+				sessionUser: {
+					id: userId,
+					email: sessionUser.email,
+					name: sessionUser.name,
+				},
+				analysis: savedAnalysis,
 			});
 		} catch (error) {
 			dependencies.reportServerError({

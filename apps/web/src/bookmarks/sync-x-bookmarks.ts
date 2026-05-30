@@ -3,6 +3,7 @@ import { XUserOAuthClient } from "@tenbrains/x-client";
 
 import { isBookmarkAlreadyExistsError } from "./errors.js";
 import { suggestBookmarkTags } from "./suggest-tags.js";
+import { embedBookmarkSource } from "../embeddings/embed-source.js";
 import {
 	type XAccountCredentialRecord,
 	getBookmarkSyncStatusForSession,
@@ -120,6 +121,10 @@ async function syncXBookmarksWithCredential({
 				knownTweetIds.add(saved.tweetId);
 				importedBookmarks.push(saved);
 				importedCount += 1;
+				await embedBookmarkSource({
+					sessionUser,
+					bookmark: saved,
+				});
 			} catch (error) {
 				if (isBookmarkAlreadyExistsError(error)) {
 					continue;
