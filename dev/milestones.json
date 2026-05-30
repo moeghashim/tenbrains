@@ -1,0 +1,18 @@
+{
+  "milestones": [
+    {
+      "id": "v1.2-semantic-suggestions",
+      "status": "planned",
+      "tasks": [
+        "001-ai-embedding-service",
+        "002-convex-embeddings-table",
+        "003-embed-on-write",
+        "004-backfill-migration",
+        "005-semantic-affinity-ranking",
+        "006-search-api",
+        "007-search-page",
+        "008-rollout-docs"
+      ]
+    }
+  ]
+}
