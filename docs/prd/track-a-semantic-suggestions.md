@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Track | A (highest product impact) |
-| Status | Ready for implementation |
+| Status | Shipped |
 | Author / Reviewer | Claude (planning + per-PR sign-off) |
 | Implementing agent | TBD (Codex / Claude Code / other — assigned at handoff) |
 | Merge authority | Repo owner |
@@ -405,3 +405,11 @@ implement. The repo owner merges.
 |------|----------|--------|
 | 2026-05-29 | D1–D7 locked | Embedding model, key source, backfill, surface, vector store, storage shape, fixed dimension — see §3 |
 | 2026-05-29 | PR breakdown locked | 8 PRs, one per task, in dependency order — see §7 |
+| 2026-05-31 | PR2 added `getCurrentUserId` internal query | The `searchSimilar` action resolves userId via a small internal query rather than direct auth in the action, to avoid a circular type initializer in `next build`. References use `makeFunctionReference` strings. |
+| 2026-05-31 | PR3 expanded embed-on-write to the suggestions/save route | The save-suggestion-as-bookmark path at `/api/me/suggestions/save` creates a bookmark and was wired to embed-on-write alongside the explicitly-listed paths. |
+| 2026-05-31 | PR4 extracted shared text-composition to `source-content.ts` | `computeEmbeddingContentHash`, `buildAnalysisEmbeddingText`, `buildTakeawayEmbeddingText`, and `normalizeEmbeddingText` moved out of PR3's `embed-source.ts` into a shared module to guarantee byte-for-byte parity between embed-on-write and backfill. PR3's module re-exports from there to preserve its public surface. |
+| 2026-05-31 | PR5 used whole-run fallback | When key resolution returns null OR any embedding/search call fails during a suggestions build, the entire run reverts to the pre-change substring scorer (`semanticMode = false`). Per-candidate fallback was not implemented. |
+| 2026-05-31 | Q1 semantic affinity constants resolved | PR5 locked the semantic affinity threshold at `0.78` and weight at `40`. |
+| 2026-05-31 | Q2 search ranking resolved | PR6/PR7 shipped pure similarity ranking for v1; recency blending remains a follow-up. |
+| 2026-05-31 | PR6 added `SearchSourceTypeSchema` to contracts | No existing reusable source-type enum was available, so a new schema was added rather than reusing a route-internal type. |
+| 2026-05-31 | PR7 ships workspace-level links only for analyses/takeaways | The search API response carries `text`, `sourceType`, `sourceId`, `score`, and timestamps — not enough metadata for deep links to specific records. Bookmarks link to the x.com tweet URL (sourceId is the tweetId); analyses link to `/app`; takeaways link to `/app/takeaway`. Deep linking is a documented follow-up. |

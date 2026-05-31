@@ -11,7 +11,7 @@ document's Decisions log.
 
 | Track | PRD | Status | Summary |
 |-------|-----|--------|---------|
-| A | [track-a-semantic-suggestions.md](track-a-semantic-suggestions.md) | Ready for implementation | Embeddings-based suggestion ranking + unified semantic search over the user's saved corpus |
+| A | [track-a-semantic-suggestions.md](track-a-semantic-suggestions.md) | Shipped | Embeddings-based suggestion ranking + unified semantic search over the user's saved corpus |
 | B | _planned_ | Not written | Reliability & cost control for X/LLM APIs (parallel fan-out, caching, rate-limit backoff, budget guards) |
 | C | _planned_ | Not written | Codebase & DX cleanup (remove `.js` re-export shims, package the CLI, burn down legacy fields/TODOs, coverage) |
 | D | _planned_ | Not written | Security & privacy hardening pass |
