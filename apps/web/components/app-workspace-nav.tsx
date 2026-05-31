@@ -2,18 +2,21 @@ import Link from "next/link";
 import React from "react";
 
 import { BrandMark } from "./brand-mark.js";
+import { NavSignOutButton } from "./nav-sign-out-button.js";
 import { workspaceMenuLinks, type WorkspaceMenuItem } from "./workspace-menu.js";
 
 export interface AppWorkspaceNavProps {
 	activeItem?: WorkspaceMenuItem;
 	ctaHref?: string;
 	ctaLabel?: string;
+	signedIn?: boolean;
 }
 
 export function AppWorkspaceNav({
 	activeItem,
 	ctaHref = "/account",
 	ctaLabel = "Account Settings",
+	signedIn = false,
 }: Readonly<AppWorkspaceNavProps>) {
 	return (
 		<nav className="sticky top-0 z-40 border-b border-outline-variant/10 bg-surface/95 backdrop-blur-md">
@@ -37,13 +40,16 @@ export function AppWorkspaceNav({
 					))}
 				</div>
 
-				<Link
-					href={ctaHref}
-					id="nav-cta"
-					className="bg-primary-container px-6 py-3 font-mono text-[11px] font-semibold uppercase tracking-[0.32em] text-on-primary-container transition-transform hover:scale-[1.02]"
-				>
-					{ctaLabel}
-				</Link>
+				<div className="flex items-center gap-5">
+					<Link
+						href={ctaHref}
+						id="nav-cta"
+						className="bg-primary-container px-6 py-3 font-mono text-[11px] font-semibold uppercase tracking-[0.32em] text-on-primary-container transition-transform hover:scale-[1.02]"
+					>
+						{ctaLabel}
+					</Link>
+					{signedIn ? <NavSignOutButton /> : null}
+				</div>
 			</div>
 		</nav>
 	);

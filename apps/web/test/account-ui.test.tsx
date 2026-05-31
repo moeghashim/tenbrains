@@ -40,6 +40,7 @@ test("account page includes preferences and sign-out actions", () => {
 	assert.match(html, /name=\"learningMinutes\"/);
 	assert.match(html, /Provider API Keys/);
 	assert.match(html, /id=\"sign-out-button\"/);
+	assert.match(html, /id=\"nav-sign-out\"/);
 	assert.match(html, /Save Preferences/);
 	assert.match(html, /Sign Out/);
 });

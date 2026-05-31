@@ -6,7 +6,7 @@ import { FollowingBrowser } from "../../../components/following-browser.js";
 export default function AppFollowingPage() {
 	return (
 		<div className="min-h-screen bg-surface text-on-surface">
-			<AppWorkspaceNav activeItem="Following" />
+			<AppWorkspaceNav activeItem="Following" signedIn />
 			<main className="px-6 pb-16 pt-10 sm:px-10 lg:px-16">
 				<div className="mx-auto flex w-full max-w-[1440px] flex-col gap-10">
 					<section className="relative overflow-hidden border border-outline-variant/10 bg-surface-container-low">
