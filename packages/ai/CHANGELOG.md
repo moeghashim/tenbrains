@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.0
+
+### Minor Changes
+
+- b50d376: Add OpenAI embedding text service
+
+### Patch Changes
+
+- Updated dependencies [b50d376]
+  - @tenbrains/contracts@1.2.0
+  - tenbrains@1.2.0
+  - @tenbrains/x-client@1.2.0
+
 ## 1.1.0
 
 ### Minor Changes

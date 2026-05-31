@@ -1,5 +1,12 @@
 # @pi-starter/extension
 
+## 1.2.0
+
+### Patch Changes
+
+- Updated dependencies [b50d376]
+  - @tenbrains/contracts@1.2.0
+
 ## 1.1.0
 
 ### Patch Changes

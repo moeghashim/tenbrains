@@ -1,5 +1,16 @@
 # @pi-starter/web
 
+## 1.2.0
+
+### Patch Changes
+
+- Updated dependencies [b50d376]
+- Updated dependencies [b50d376]
+  - @tenbrains/ai@1.2.0
+  - @tenbrains/contracts@1.2.0
+  - tenbrains@1.2.0
+  - @tenbrains/x-client@1.2.0
+
 ## 1.1.0
 
 ### Minor Changes
