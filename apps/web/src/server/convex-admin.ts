@@ -109,6 +109,10 @@ export interface StoredEmbedding {
 	updatedAt: number;
 }
 
+export interface ScoredEmbeddingRecord extends StoredEmbedding {
+	_score: number;
+}
+
 const upsertCurrentUserRef = makeFunctionReference<
 	"mutation",
 	{ email?: string; name?: string },
@@ -179,6 +183,11 @@ const deleteEmbeddingsForSourceRef = makeFunctionReference<
 	{ sourceType: EmbeddingSourceType; sourceId: string },
 	{ deletedCount: number }
 >("embeddings:deleteEmbeddingsForSource");
+const searchSimilarEmbeddingsRef = makeFunctionReference<
+	"action",
+	{ vector: number[]; limit?: number; sourceTypes?: EmbeddingSourceType[] },
+	ScoredEmbeddingRecord[]
+>("embeddings:searchSimilar");
 const listFollowsRef = makeFunctionReference<"query", Record<string, never>, FollowSummary>("follows:listSummary");
 const upsertCreatorFollowRef = makeFunctionReference<
 	"mutation",
@@ -877,6 +886,27 @@ export async function deleteEmbeddingsForSourceForSession({
 	return await client.mutation(deleteEmbeddingsForSourceRef, {
 		sourceType,
 		sourceId,
+	});
+}
+
+export async function searchSimilarEmbeddingsForSession({
+	sessionUser,
+	vector,
+	limit,
+	sourceTypes,
+	env,
+}: {
+	sessionUser: SessionUserIdentity;
+	vector: number[];
+	limit?: number;
+	sourceTypes?: EmbeddingSourceType[];
+	env?: ConvexEnv;
+}): Promise<ScoredEmbeddingRecord[]> {
+	const { client } = await createAuthedAdminClient({ sessionUser, env });
+	return await client.action(searchSimilarEmbeddingsRef, {
+		vector,
+		limit,
+		sourceTypes,
 	});
 }
 
