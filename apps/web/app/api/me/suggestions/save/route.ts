@@ -10,6 +10,7 @@ import {
 	recordSuggestionFeedbackForSession,
 	saveBookmarkForSession,
 } from "../../../../../src/server/convex-admin.js";
+import { embedBookmarkSource } from "../../../../../src/embeddings/embed-source.js";
 import {
 	buildSuggestionsForSession,
 	listRenderableSuggestionsForSession,
@@ -38,6 +39,7 @@ interface SaveSuggestionsRouteDependencies {
 	getSuggestionByIdForSession: typeof getSuggestionByIdForSession;
 	saveBookmarkForSession: typeof saveBookmarkForSession;
 	recordSuggestionFeedbackForSession: typeof recordSuggestionFeedbackForSession;
+	embedBookmarkSource?: typeof embedBookmarkSource;
 	buildSuggestionsForSession: typeof buildSuggestionsForSession;
 	listRenderableSuggestionsForSession: typeof listRenderableSuggestionsForSession;
 	reportServerError: typeof reportServerError;
@@ -49,6 +51,7 @@ const defaultDependencies: SaveSuggestionsRouteDependencies = {
 	getSuggestionByIdForSession,
 	saveBookmarkForSession,
 	recordSuggestionFeedbackForSession,
+	embedBookmarkSource,
 	buildSuggestionsForSession,
 	listRenderableSuggestionsForSession,
 	reportServerError,
@@ -89,7 +92,7 @@ export async function handleSuggestionsSavePost(
 		}
 
 		try {
-			await dependencies.saveBookmarkForSession({
+			const savedBookmark = await dependencies.saveBookmarkForSession({
 				sessionUser,
 				input: {
 					tweetId: suggestion.tweetId,
@@ -102,6 +105,10 @@ export async function handleSuggestionsSavePost(
 					source: "suggestion",
 					systemSuggestedTags: suggestion.suggestedTags.length > 0 ? suggestion.suggestedTags : ["Inbox"],
 				},
+			});
+			void dependencies.embedBookmarkSource?.({
+				sessionUser,
+				bookmark: savedBookmark,
 			});
 		} catch (error) {
 			if (!isBookmarkAlreadyExistsError(error)) {

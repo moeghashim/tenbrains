@@ -1,7 +1,9 @@
+import { embedTexts } from "@tenbrains/ai";
 import type { Suggestion } from "@tenbrains/contracts";
 import { XApiV2Client, type TweetPayload } from "@tenbrains/x-client";
 
 import { suggestBookmarkTags } from "../bookmarks/suggest-tags.js";
+import { resolveEmbeddingKey } from "../embeddings/resolve-key.js";
 import {
 	getTakeawayHistoryForSession,
 	listBookmarksForSession,
@@ -9,6 +11,7 @@ import {
 	listFollowsForSession,
 	listSuggestionsForSession,
 	listTakeawayWorkspaceForSession,
+	searchSimilarEmbeddingsForSession,
 	upsertSuggestionsForSession,
 } from "../server/convex-admin.js";
 import { reportServerError } from "../telemetry/report-error.js";
@@ -23,6 +26,7 @@ interface Candidate {
 	tweet: TweetPayload;
 	reasons: Suggestion["reasons"];
 	sourceSignals: string[];
+	semanticScore?: number;
 }
 
 interface SuggestionsClient {
@@ -36,6 +40,23 @@ interface SuggestionsClient {
 }
 
 const MAX_SUGGESTION_QUERY_LENGTH = 128;
+const SEMANTIC_AFFINITY_THRESHOLD = 0.78;
+const SEMANTIC_AFFINITY_WEIGHT = 40;
+const SEMANTIC_AFFINITY_SEARCH_LIMIT = 1;
+const SEMANTIC_AFFINITY_CONCURRENCY = 8;
+
+interface BuildSuggestionsDependencies {
+	listBookmarksForSession: typeof listBookmarksForSession;
+	listFollowsForSession: typeof listFollowsForSession;
+	listTakeawayWorkspaceForSession: typeof listTakeawayWorkspaceForSession;
+	listDismissedSuggestionTweetIdsForSession: typeof listDismissedSuggestionTweetIdsForSession;
+	getTakeawayHistoryForSession: typeof getTakeawayHistoryForSession;
+	upsertSuggestionsForSession: typeof upsertSuggestionsForSession;
+	resolveEmbeddingKey: typeof resolveEmbeddingKey;
+	embedTexts: typeof embedTexts;
+	searchSimilarEmbeddingsForSession: typeof searchSimilarEmbeddingsForSession;
+	reportServerError: typeof reportServerError;
+}
 
 function buildTweetUrl(tweet: TweetPayload): string {
 	const username = tweet.authorUsername?.trim().replace(/^@+/, "");
@@ -73,7 +94,13 @@ function deriveTopBookmarkTags(textTags: string[], limit: number): string[] {
 		.map(([tag]) => tag);
 }
 
-function mergeCandidate(map: Map<string, Candidate>, tweet: TweetPayload, nextReason: Suggestion["reasons"][number], signal: string) {
+function mergeCandidate(
+	map: Map<string, Candidate>,
+	tweet: TweetPayload,
+	nextReason: Suggestion["reasons"][number],
+	signal: string,
+	options: { dedupeReasonByCode?: boolean } = {},
+) {
 	const existing = map.get(tweet.id);
 	if (!existing) {
 		map.set(tweet.id, {
@@ -84,7 +111,12 @@ function mergeCandidate(map: Map<string, Candidate>, tweet: TweetPayload, nextRe
 		return;
 	}
 
-	if (!existing.reasons.some((reason) => reason.code === nextReason.code && reason.label === nextReason.label)) {
+	const existingReason = existing.reasons.some((reason) =>
+		options.dedupeReasonByCode
+			? reason.code === nextReason.code
+			: reason.code === nextReason.code && reason.label === nextReason.label,
+	);
+	if (!existingReason) {
 		existing.reasons.push(nextReason);
 	}
 	if (!existing.sourceSignals.includes(signal)) {
@@ -92,35 +124,176 @@ function mergeCandidate(map: Map<string, Candidate>, tweet: TweetPayload, nextRe
 	}
 }
 
+async function mapWithConcurrency<T, R>(
+	items: T[],
+	concurrency: number,
+	mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+	const results: R[] = [];
+	let nextIndex = 0;
+	const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+
+	await Promise.all(
+		Array.from({ length: workerCount }, async () => {
+			for (;;) {
+				const index = nextIndex;
+				nextIndex += 1;
+				const item = items[index];
+				if (item === undefined) {
+					return;
+				}
+				results[index] = await mapper(item, index);
+			}
+		}),
+	);
+
+	return results;
+}
+
+function toSemanticReason(sourceType: "bookmark" | "takeaway"): Suggestion["reasons"][number] {
+	return sourceType === "takeaway"
+		? { code: "takeaway_theme", label: "Similar to a recent takeaway theme" }
+		: { code: "bookmark_affinity", label: "Similar to a bookmark you saved" };
+}
+
+function toSemanticSignal(sourceType: "bookmark" | "takeaway"): string {
+	return `semantic:${sourceType}`;
+}
+
+async function applySemanticAffinity({
+	sessionUser,
+	candidates,
+	candidateById,
+	resolveEmbeddingKey: resolveKeyDep,
+	embedTexts: embedTextsDep,
+	searchSimilarEmbeddingsForSession: searchSimilarDep,
+	reportServerError: reportDep,
+}: {
+	sessionUser: SessionUserIdentity;
+	candidates: Candidate[];
+	candidateById: Map<string, Candidate>;
+	resolveEmbeddingKey: BuildSuggestionsDependencies["resolveEmbeddingKey"];
+	embedTexts: BuildSuggestionsDependencies["embedTexts"];
+	searchSimilarEmbeddingsForSession: BuildSuggestionsDependencies["searchSimilarEmbeddingsForSession"];
+	reportServerError: BuildSuggestionsDependencies["reportServerError"];
+}): Promise<boolean> {
+	let apiKey: string | null;
+	try {
+		apiKey = await resolveKeyDep({ sessionUser });
+	} catch (error) {
+		reportDep({
+			scope: "suggestions.semantic_affinity_failure",
+			error,
+			metadata: {
+				userId: sessionUser.id,
+				stage: "resolve_key",
+			},
+		});
+		return false;
+	}
+	if (!apiKey) {
+		return false;
+	}
+	if (candidates.length === 0) {
+		return true;
+	}
+
+	try {
+		const result = await embedTextsDep({
+			texts: candidates.map((candidate) => candidate.tweet.text),
+			apiKey,
+		});
+		if (result.vectors.length !== candidates.length) {
+			throw new Error("Embedding response vector count did not match suggestion candidate count.");
+		}
+
+		const matches = await mapWithConcurrency(
+			candidates,
+			SEMANTIC_AFFINITY_CONCURRENCY,
+			async (candidate, index) => {
+				const vector = result.vectors[index];
+				if (!vector) {
+					throw new Error("Embedding response did not include a vector for a suggestion candidate.");
+				}
+				const records = await searchSimilarDep({
+					sessionUser,
+					vector,
+					limit: SEMANTIC_AFFINITY_SEARCH_LIMIT,
+					sourceTypes: ["bookmark", "takeaway"],
+				});
+				return {
+					candidate,
+					topMatch: records[0] ?? null,
+				};
+			},
+		);
+
+		for (const match of matches) {
+			const topMatch = match.topMatch;
+			if (
+				!topMatch ||
+				topMatch._score < SEMANTIC_AFFINITY_THRESHOLD ||
+				(topMatch.sourceType !== "bookmark" && topMatch.sourceType !== "takeaway")
+			) {
+				continue;
+			}
+			mergeCandidate(
+				candidateById,
+				match.candidate.tweet,
+				toSemanticReason(topMatch.sourceType),
+				toSemanticSignal(topMatch.sourceType),
+				{ dedupeReasonByCode: true },
+			);
+			match.candidate.semanticScore = Math.round(topMatch._score * SEMANTIC_AFFINITY_WEIGHT);
+		}
+		return true;
+	} catch (error) {
+		reportDep({
+			scope: "suggestions.semantic_affinity_failure",
+			error,
+			metadata: {
+				userId: sessionUser.id,
+			},
+		});
+		return false;
+	}
+}
+
 function scoreCandidate({
 	candidate,
 	bookmarks,
 	followedCreators,
+	semanticMode,
 }: {
 	candidate: Candidate;
 	bookmarks: Awaited<ReturnType<typeof listBookmarksForSession>>;
 	followedCreators: Set<string>;
+	semanticMode: boolean;
 }): number {
 	let score = 0;
 	if (followedCreators.has(normalize(candidate.tweet.authorUsername ?? ""))) {
 		score += 60;
 	}
 
-	const bookmarkTagMatches = new Set<string>();
-	for (const bookmark of bookmarks) {
-		const bookmarkText = normalize(bookmark.tweetText);
-		const candidateText = normalize(candidate.tweet.text);
-		if (bookmarkText && candidateText.includes(bookmarkText.slice(0, Math.min(bookmarkText.length, 48)))) {
-			score += 6;
-		}
-		for (const tag of bookmark.tags) {
-			if (normalize(candidate.tweet.text).includes(normalize(tag))) {
-				bookmarkTagMatches.add(tag);
+	if (semanticMode) {
+		score += candidate.semanticScore ?? 0;
+	} else {
+		const bookmarkTagMatches = new Set<string>();
+		for (const bookmark of bookmarks) {
+			const bookmarkText = normalize(bookmark.tweetText);
+			const candidateText = normalize(candidate.tweet.text);
+			if (bookmarkText && candidateText.includes(bookmarkText.slice(0, Math.min(bookmarkText.length, 48)))) {
+				score += 6;
+			}
+			for (const tag of bookmark.tags) {
+				if (normalize(candidate.tweet.text).includes(normalize(tag))) {
+					bookmarkTagMatches.add(tag);
+				}
 			}
 		}
+		score += bookmarkTagMatches.size * 12;
 	}
 
-	score += bookmarkTagMatches.size * 12;
 	for (const reason of candidate.reasons) {
 		if (reason.code === "subject_search") {
 			score += 30;
@@ -140,16 +313,26 @@ export async function buildSuggestionsForSession({
 	sessionUser,
 	limit = 20,
 	xClient = new XApiV2Client(),
+	listBookmarksForSession: listBookmarksDep = listBookmarksForSession,
+	listFollowsForSession: listFollowsDep = listFollowsForSession,
+	listTakeawayWorkspaceForSession: listTakeawayWorkspaceDep = listTakeawayWorkspaceForSession,
+	listDismissedSuggestionTweetIdsForSession: listDismissedTweetIdsDep = listDismissedSuggestionTweetIdsForSession,
+	getTakeawayHistoryForSession: getTakeawayHistoryDep = getTakeawayHistoryForSession,
+	upsertSuggestionsForSession: upsertSuggestionsDep = upsertSuggestionsForSession,
+	resolveEmbeddingKey: resolveKeyDep = resolveEmbeddingKey,
+	embedTexts: embedTextsDep = embedTexts,
+	searchSimilarEmbeddingsForSession: searchSimilarDep = searchSimilarEmbeddingsForSession,
+	reportServerError: reportDep = reportServerError,
 }: {
 	sessionUser: SessionUserIdentity;
 	limit?: number;
 	xClient?: SuggestionsClient;
-}) {
+} & Partial<BuildSuggestionsDependencies>) {
 	const [bookmarks, followSummary, takeawayWorkspace, dismissedTweetIds] = await Promise.all([
-		listBookmarksForSession({ sessionUser }),
-		listFollowsForSession({ sessionUser }),
-		listTakeawayWorkspaceForSession({ sessionUser }),
-		listDismissedSuggestionTweetIdsForSession({ sessionUser }),
+		listBookmarksDep({ sessionUser }),
+		listFollowsDep({ sessionUser }),
+		listTakeawayWorkspaceDep({ sessionUser }),
+		listDismissedTweetIdsDep({ sessionUser }),
 	]);
 	const bookmarkedTweetIds = new Set(bookmarks.map((bookmark) => bookmark.tweetId));
 	const dismissedTweetIdSet = new Set(dismissedTweetIds);
@@ -161,7 +344,7 @@ export async function buildSuggestionsForSession({
 		try {
 			tweets = await xClient.getLatestPostsByUsername(follow.creatorUsername, 5);
 		} catch (error) {
-			reportServerError({
+			reportDep({
 				scope: "suggestions.followed_creator_fetch_failure",
 				error,
 				metadata: {
@@ -199,7 +382,7 @@ export async function buildSuggestionsForSession({
 		try {
 			page = await xClient.searchRecentPosts(query, 8);
 		} catch (error) {
-			reportServerError({
+			reportDep({
 				scope: "suggestions.subject_search_failure",
 				error,
 				metadata: {
@@ -222,9 +405,9 @@ export async function buildSuggestionsForSession({
 	for (const follow of takeawayWorkspace.follows.slice(0, 3)) {
 		let history: Awaited<ReturnType<typeof getTakeawayHistoryForSession>>;
 		try {
-			history = await getTakeawayHistoryForSession({ sessionUser, followId: follow.id });
+			history = await getTakeawayHistoryDep({ sessionUser, followId: follow.id });
 		} catch (error) {
-			reportServerError({
+			reportDep({
 				scope: "suggestions.takeaway_history_failure",
 				error,
 				metadata: {
@@ -248,7 +431,7 @@ export async function buildSuggestionsForSession({
 			try {
 				page = await xClient.searchRecentPosts(query, 5);
 			} catch (error) {
-				reportServerError({
+				reportDep({
 					scope: "suggestions.takeaway_search_failure",
 					error,
 					metadata: {
@@ -270,7 +453,18 @@ export async function buildSuggestionsForSession({
 		}
 	}
 
-	const ranked = Array.from(candidateById.values())
+	const candidates = Array.from(candidateById.values());
+	const semanticMode = await applySemanticAffinity({
+		sessionUser,
+		candidates,
+		candidateById,
+		resolveEmbeddingKey: resolveKeyDep,
+		embedTexts: embedTextsDep,
+		searchSimilarEmbeddingsForSession: searchSimilarDep,
+		reportServerError: reportDep,
+	});
+
+	const ranked = candidates
 		.filter((candidate) => !bookmarkedTweetIds.has(candidate.tweet.id) && !dismissedTweetIdSet.has(candidate.tweet.id))
 		.map((candidate) => ({
 			candidate,
@@ -278,6 +472,7 @@ export async function buildSuggestionsForSession({
 				candidate,
 				bookmarks,
 				followedCreators,
+				semanticMode,
 			}),
 		}))
 		.filter((item) => item.score > 0)
@@ -305,7 +500,7 @@ export async function buildSuggestionsForSession({
 			suggestedTags: item.suggestedTags.length > 0 ? item.suggestedTags : ["Inbox"],
 		}));
 
-	return await upsertSuggestionsForSession({
+	return await upsertSuggestionsDep({
 		sessionUser,
 		suggestions: ranked,
 	});

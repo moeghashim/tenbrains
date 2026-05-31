@@ -9,6 +9,15 @@ export interface ProviderCatalogEntry {
 	models: readonly string[];
 }
 
+export interface EmbeddingCatalogEntry {
+	provider: ProviderId;
+	model: string;
+	dimensions: number;
+}
+
+export const OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
+export const OPENAI_EMBEDDING_DIMENSIONS = 1536;
+
 export const PROVIDER_CATALOG: Record<ProviderId, ProviderCatalogEntry> = {
 	openai: {
 		id: "openai",
@@ -44,10 +53,26 @@ export const PROVIDER_CATALOG: Record<ProviderId, ProviderCatalogEntry> = {
 	},
 };
 
+export const EMBEDDING_CATALOG: Record<string, EmbeddingCatalogEntry> = {
+	[OPENAI_EMBEDDING_MODEL]: {
+		provider: "openai",
+		model: OPENAI_EMBEDDING_MODEL,
+		dimensions: OPENAI_EMBEDDING_DIMENSIONS,
+	},
+};
+
 export const PROVIDER_OPTIONS = Object.values(PROVIDER_CATALOG);
 
 export function getProviderCatalogEntry(provider: ProviderId): ProviderCatalogEntry {
 	return PROVIDER_CATALOG[provider];
+}
+
+export function getEmbeddingCatalogEntry(model: string): EmbeddingCatalogEntry | null {
+	return EMBEDDING_CATALOG[model] ?? null;
+}
+
+export function getDefaultEmbeddingCatalogEntry(): EmbeddingCatalogEntry {
+	return EMBEDDING_CATALOG[OPENAI_EMBEDDING_MODEL];
 }
 
 export function resolveProviderCatalogModel(provider: ProviderId, model?: string): string {
