@@ -2,7 +2,7 @@ import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 
 import type { Doc, Id } from "./_generated/dataModel.js";
-import { action, internalQuery, mutation, query } from "./_generated/server.js";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { requireUserBySession } from "./auth_helpers.js";
 
@@ -117,6 +117,10 @@ function pickLatestRecord(records: Doc<"embeddings">[]): Doc<"embeddings"> | nul
 		return null;
 	}
 	return records.reduce((latest, record) => (record.updatedAt > latest.updatedAt ? record : latest));
+}
+
+function toNextCursor(result: { isDone: boolean; continueCursor: string }): string | null {
+	return result.isDone ? null : result.continueCursor;
 }
 
 export const upsertEmbedding = mutation({
@@ -234,6 +238,216 @@ export const getCurrentUserId = internalQuery({
 	handler: async (ctx) => {
 		const user = await requireUserBySession(ctx);
 		return user._id;
+	},
+});
+
+export const listBackfillUsers = internalQuery({
+	args: {
+		cursor: v.optional(v.union(v.string(), v.null())),
+		limit: v.number(),
+	},
+	handler: async (ctx, args) => {
+		const result = await ctx.db.query("users").paginate({
+			cursor: args.cursor ?? null,
+			numItems: args.limit,
+		});
+		return {
+			items: result.page.map((record) => ({
+				_id: record._id,
+				xUserId: record.xUserId ?? null,
+			})),
+			nextCursor: toNextCursor(result),
+		};
+	},
+});
+
+export const getBackfillOpenAiCredentialForUser = internalQuery({
+	args: {
+		userId: v.id("users"),
+	},
+	handler: async (ctx, args) => {
+		const records = await ctx.db
+			.query("userProviderCredentials")
+			.withIndex("by_user_id_provider", (index) => index.eq("userId", args.userId).eq("provider", "openai"))
+			.collect();
+		const latest = records.reduce<(typeof records)[number] | null>(
+			(current, record) => (!current || record.updatedAt > current.updatedAt ? record : current),
+			null,
+		);
+		return latest
+			? {
+					encryptedApiKey: latest.encryptedApiKey,
+					updatedAt: latest.updatedAt,
+				}
+			: null;
+	},
+});
+
+export const listBackfillBookmarksForUser = internalQuery({
+	args: {
+		userId: v.id("users"),
+		cursor: v.optional(v.union(v.string(), v.null())),
+		limit: v.number(),
+	},
+	handler: async (ctx, args) => {
+		const result = await ctx.db
+			.query("bookmarks")
+			.withIndex("by_user_id_updated_at", (index) => index.eq("userId", args.userId))
+			.paginate({
+				cursor: args.cursor ?? null,
+				numItems: args.limit,
+			});
+		return {
+			items: result.page.map((record) => ({
+				_id: record._id,
+				tweetId: record.tweetId,
+				tweetText: record.tweetText,
+			})),
+			nextCursor: toNextCursor(result),
+		};
+	},
+});
+
+export const listBackfillAnalysesForUser = internalQuery({
+	args: {
+		userId: v.id("users"),
+		cursor: v.optional(v.union(v.string(), v.null())),
+		limit: v.number(),
+	},
+	handler: async (ctx, args) => {
+		const result = await ctx.db
+			.query("analyses")
+			.withIndex("by_user_id_created_at", (index) => index.eq("userId", args.userId))
+			.paginate({
+				cursor: args.cursor ?? null,
+				numItems: args.limit,
+			});
+		return {
+			items: result.page.map((record) => ({
+				_id: record._id,
+				topic: record.topic,
+				summary: record.summary,
+				intent: record.intent,
+				novelConcepts: record.novelConcepts,
+			})),
+			nextCursor: toNextCursor(result),
+		};
+	},
+});
+
+export const listBackfillTakeawaySnapshotsForUser = internalQuery({
+	args: {
+		userId: v.id("users"),
+		cursor: v.optional(v.union(v.string(), v.null())),
+		limit: v.number(),
+	},
+	handler: async (ctx, args) => {
+		const result = await ctx.db
+			.query("takeawaySnapshots")
+			.withIndex("by_user_id_created_at", (index) => index.eq("userId", args.userId))
+			.paginate({
+				cursor: args.cursor ?? null,
+				numItems: args.limit,
+			});
+		return {
+			items: result.page.map((record) => ({
+				_id: record._id,
+				summary: record.summary,
+				takeaways: record.takeaways,
+			})),
+			nextCursor: toNextCursor(result),
+		};
+	},
+});
+
+export const getBackfillEmbeddingContentHash = internalQuery({
+	args: {
+		userId: v.id("users"),
+		sourceType: embeddingSourceType,
+		sourceId: v.string(),
+	},
+	handler: async (ctx, args) => {
+		const records = await listEmbeddingsForSource({
+			ctx,
+			userId: args.userId,
+			sourceType: args.sourceType,
+			sourceId: args.sourceId,
+		});
+		return pickLatestRecord(records)?.contentHash ?? null;
+	},
+});
+
+export const backfillUpsertEmbedding = internalMutation({
+	args: {
+		userId: v.id("users"),
+		sourceType: embeddingSourceType,
+		sourceId: v.string(),
+		text: v.string(),
+		contentHash: v.string(),
+		model: v.string(),
+		embedding: v.array(v.float64()),
+	},
+	handler: async (ctx, args) => {
+		const existingRecords = await listEmbeddingsForSource({
+			ctx,
+			userId: args.userId,
+			sourceType: args.sourceType,
+			sourceId: args.sourceId,
+		});
+		const existing = pickLatestRecord(existingRecords);
+		for (const duplicate of existingRecords) {
+			if (existing && duplicate._id !== existing._id) {
+				await ctx.db.delete(duplicate._id);
+			}
+		}
+
+		if (existing && existing.contentHash === args.contentHash) {
+			return toEmbeddingRecord(existing);
+		}
+
+		const now = Date.now();
+		if (existing) {
+			await ctx.db.patch(existing._id, {
+				text: args.text,
+				contentHash: args.contentHash,
+				model: args.model,
+				embedding: args.embedding,
+				updatedAt: now,
+			});
+			return toEmbeddingRecord({
+				...existing,
+				text: args.text,
+				contentHash: args.contentHash,
+				model: args.model,
+				embedding: args.embedding,
+				updatedAt: now,
+			});
+		}
+
+		const embeddingId = await ctx.db.insert("embeddings", {
+			userId: args.userId,
+			sourceType: args.sourceType,
+			sourceId: args.sourceId,
+			text: args.text,
+			contentHash: args.contentHash,
+			model: args.model,
+			embedding: args.embedding,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		return {
+			_id: embeddingId,
+			userId: args.userId,
+			sourceType: args.sourceType,
+			sourceId: args.sourceId,
+			text: args.text,
+			contentHash: args.contentHash,
+			model: args.model,
+			embedding: args.embedding,
+			createdAt: now,
+			updatedAt: now,
+		};
 	},
 });
 

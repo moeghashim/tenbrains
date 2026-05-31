@@ -1,11 +1,17 @@
-import { createHash } from "node:crypto";
-
 import { embedTexts } from "@tenbrains/ai";
-import type { AnalyzeTweetResult, AccountTakeawaySnapshot, SavedAnalysis, SavedBookmark } from "@tenbrains/contracts";
+import type { AccountTakeawaySnapshot, SavedAnalysis, SavedBookmark } from "@tenbrains/contracts";
 
 import { resolveEmbeddingKey } from "./resolve-key.js";
+import {
+	buildAnalysisEmbeddingText,
+	buildTakeawayEmbeddingText,
+	computeEmbeddingContentHash,
+	normalizeEmbeddingText,
+} from "./source-content.js";
 import { upsertEmbeddingForSession } from "../server/convex-admin.js";
 import { reportServerError } from "../telemetry/report-error.js";
+
+export { buildAnalysisEmbeddingText, buildTakeawayEmbeddingText, computeEmbeddingContentHash } from "./source-content.js";
 
 export type EmbeddingSourceType = "bookmark" | "analysis" | "takeaway";
 
@@ -67,14 +73,6 @@ export interface EmbedAndStoreSourceDependencies {
 	embedTexts?: EmbedTextsClient;
 	upsertEmbeddingForSession?: UpsertEmbeddingForSession;
 	reportServerError?: ReportServerError;
-}
-
-function normalizeEmbeddingText(text: string): string {
-	return text.replace(/\s+/g, " ").trim();
-}
-
-export function computeEmbeddingContentHash(text: string): string {
-	return createHash("sha256").update(normalizeEmbeddingText(text)).digest("hex");
 }
 
 function reportEmbeddingSkip({
@@ -163,19 +161,6 @@ export async function embedAndStoreSource(
 			},
 		});
 	}
-}
-
-export function buildAnalysisEmbeddingText(analysis: AnalyzeTweetResult): string {
-	return [
-		analysis.topic,
-		analysis.summary,
-		analysis.intent,
-		...analysis.novelConcepts.map((concept) => concept.name),
-	].join("\n");
-}
-
-export function buildTakeawayEmbeddingText(snapshot: Pick<AccountTakeawaySnapshot, "summary" | "takeaways">): string {
-	return [snapshot.summary, ...snapshot.takeaways].join("\n");
 }
 
 export async function embedBookmarkSource({
