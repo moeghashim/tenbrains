@@ -12,8 +12,12 @@ Tenbrains is an X research workspace for analyzing posts, importing bookmarks, t
 - Suggested posts in the web app and API:
   - Recommends posts from followed creators
   - Uses subject/tag-based search
-  - Uses takeaway themes as a light ranking signal
+  - Uses semantic affinity against saved bookmarks and takeaway themes when an OpenAI key is available
+  - Falls back to the original substring heuristic when no embedding key is configured or semantic ranking cannot run
   - Supports save and dismiss feedback loops
+- Semantic recall in the web app:
+  - `/app/search` searches across saved bookmarks, tweet analyses, and takeaway snapshots
+  - Results are grouped by source type and link back to the closest existing workspace
 - Account takeaways from followed X accounts:
   - Follow an account in the web app or CLI
   - Analyze the latest 20 posts into a concise summary plus bullet takeaways
@@ -37,6 +41,8 @@ Tenbrains is an X research workspace for analyzing posts, importing bookmarks, t
 - `xurl` installed and authenticated for X API access
 - OpenAI API key configured
 - X OAuth app configured for web sign-in
+
+Semantic suggestions, semantic search, and embeddings backfill require an OpenAI key for `text-embedding-3-small`. Users can add their own OpenAI key in `/account`; deployments may also set `PLATFORM_OPENAI_API_KEY` as an optional fallback.
 
 ## Setup
 
@@ -121,6 +127,7 @@ TENBRAINS_AUTH_COOKIE='next-auth.session-token=...' npm run xurl:suggestions -- 
 
 - `/app/bookmarks` now shows imported X bookmarks with source labeling and suggested tags
 - `/app/suggestions` is the workspace for ranked post recommendations
+- `/app/search` is the semantic recall workspace for bookmarks, analyses, and takeaway snapshots
 - `/app/takeaway` is the dedicated workspace for account takeaways
 - Daily X bookmark imports are triggered by `/api/internal/bookmarks/sync`
 - Daily account takeaway refreshes are triggered by `/api/internal/takeaways/refresh`
@@ -131,8 +138,9 @@ End-user workflow:
 2. Tenbrains stores the X OAuth credentials needed for bookmark sync.
 3. A daily cron imports new X bookmarks into `/app/bookmarks`.
 4. Imported bookmarks arrive with suggested tags that can be edited later.
-5. `/app/suggestions` recommends posts based on follows, bookmark patterns, and takeaway themes.
+5. `/app/suggestions` recommends posts based on follows, semantic bookmark affinity, and takeaway themes.
 6. Saving or dismissing a suggestion immediately feeds back into future ranking.
+7. `/app/search` searches the user's embedded bookmarks, analyses, and takeaway snapshots.
 
 ## Development
 
@@ -188,6 +196,8 @@ Flags:
   - `AUTH_X_SECRET`
   - `AUTH_SECRET`
   - `USER_SECRETS_ENCRYPTION_KEY`
+- Semantic ranking, search, and embeddings backfill use per-user OpenAI keys from `/account` first, then fall back to the optional `PLATFORM_OPENAI_API_KEY` when it is configured
+- Run the embeddings backfill after deploying the Convex embeddings schema/functions; see [Embeddings Backfill](#embeddings-backfill) for dry-run and execution commands
 - CLI takeaway state is stored locally in the Tenbrains config directory alongside provider config. Legacy `~/.config/rabbitbrain` state and `RABBITBRAIN_*` env vars are still read as migration fallbacks.
 
 Developer notes:
@@ -198,7 +208,7 @@ Developer notes:
 - Suggestions are built from:
   - followed creators’ recent posts
   - subject/tag-based recent search
-  - recent takeaway themes with light ranking weight
+  - semantic similarity to saved bookmarks and takeaway themes, with substring fallback when no embedding key is available
 - Suggestion save and dismiss actions write user feedback that immediately affects the next ranked suggestion set.
 
 ## Releases
