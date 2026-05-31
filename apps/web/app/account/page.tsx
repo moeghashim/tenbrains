@@ -8,7 +8,7 @@ import { SignOutButton } from "../../components/sign-out-button.js";
 export default function AccountPage() {
 	return (
 		<div className="min-h-screen bg-surface text-on-surface">
-			<AppWorkspaceNav ctaHref="/app" ctaLabel="Back to Workspace" />
+			<AppWorkspaceNav ctaHref="/app" ctaLabel="Back to Workspace" signedIn />
 			<main className="px-6 pb-16 pt-10 sm:px-10 lg:px-16">
 				<div className="mx-auto flex w-full max-w-[1440px] flex-col gap-10">
 					<section className="relative overflow-hidden border border-outline-variant/10 bg-surface-container-low">
