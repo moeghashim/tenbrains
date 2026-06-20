@@ -1,0 +1,42 @@
+{
+  "name": "tenbrains",
+  "version": "2.0.0",
+  "description": "Agent-first CLI for X research: analyze posts, track accounts, surface suggestions, and persist every outcome to a local database.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "tenbrains": "dist/bin/tenbrains.js",
+    "tb": "dist/bin/tenbrains.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "AGENTS.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/bin/tenbrains.ts",
+    "tenbrains": "tsx src/bin/tenbrains.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check src test",
+    "format": "biome format --write src test",
+    "test": "tsx --test \"test/**/*.test.ts\"",
+    "check": "npm run typecheck && npm run lint && npm run test"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.7.3"
+  }
+}

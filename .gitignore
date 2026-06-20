@@ -1,0 +1,20 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Local databases / scratch data produced by the CLI
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+/tmp-*/
+
+# Never commit secrets. The CLI persists credentials to the user's
+# config dir (see `tenbrains config path`), never into the repo.
+.env
+.env.*
+
+# OS / editor noise
+.DS_Store
+*.log
+coverage/
