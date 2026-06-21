@@ -148,6 +148,25 @@ tenbrains db stats
 Default is **Anthropic Claude**; `openai`, `google`, and `xai` are supported via `--provider`, and
 `mock` runs offline. See `tenbrains manifest` for the live catalog and default models.
 
+## Use as a Claude skill
+
+This repo ships an [Agent Skill](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills)
+in [`skill/`](skill/SKILL.md) so Claude (Claude Code, claude.ai, or the Agent SDK) can drive the CLI
+on your behalf — analyze a post, summarize an account, recall saved research — using the JSON
+contract above. The skill is thin: it points Claude at the CLI and at `tenbrains manifest` for live
+discovery.
+
+Install it for your own Claude Code (make the `tenbrains` command available first, then copy the
+skill in):
+
+```bash
+npm link                                   # puts `tenbrains` on PATH
+cp -r skill ~/.claude/skills/tenbrains     # personal skill, available in every project
+# or, project-scoped:  cp -r skill .claude/skills/tenbrains
+```
+
+After installing, ask Claude something like "analyze this X post: …" and it will use the skill.
+
 ## Development
 
 ```bash
