@@ -1,6 +1,6 @@
 import { createInterface } from "node:readline/promises";
 import { DEFAULT_PROVIDER, getProviderInfo, isProviderId } from "../ai/providers.js";
-import { REDACTED } from "../core/config.js";
+import { isSecretKey, redactValue } from "../core/config.js";
 import type { RunContext } from "../core/context.js";
 import { CliError } from "../core/errors.js";
 import { resolveTextInput } from "../core/input.js";
@@ -8,15 +8,8 @@ import { type Opts, optBool, optString, requireString } from "../core/opts.js";
 import type { CommandResult } from "../core/output.js";
 import { resolveDbPath } from "../core/paths.js";
 
-function isSecretKey(key: string): boolean {
-  return /(^|\.)(apikey|token|secret)$/i.test(key);
-}
-
 function maybeRedact(key: string, value: unknown, reveal: boolean): unknown {
-  if (reveal || !isSecretKey(key) || typeof value !== "string" || value.length === 0) {
-    return value;
-  }
-  return `${REDACTED}${value.slice(-4)}`;
+  return reveal || !isSecretKey(key) ? value : redactValue(value);
 }
 
 /**
@@ -67,17 +60,44 @@ export async function setupCommand(ctx: RunContext, opts: Opts): Promise<Command
     ctx.config.set("defaultModel", model);
   }
 
+  // Optionally collect an X (Twitter) API Bearer token in the same flow. It is
+  // used to fetch tweets/timelines; single-tweet `analyze` works without it via
+  // the free oEmbed path, so this is always optional.
+  let xBearerArg = optString(opts, "xBearer");
+  if (xBearerArg) {
+    xBearerArg = resolveTextInput(xBearerArg).trim();
+  }
+  const xInteractive =
+    xBearerArg === undefined &&
+    process.stdin.isTTY === true &&
+    optString(opts, "apiKey") === undefined;
+  if (xInteractive) {
+    const rl = createInterface({ input: process.stdin, output: process.stderr });
+    try {
+      const answer = (await rl.question("X API Bearer token (optional, Enter to skip): ")).trim();
+      if (answer) {
+        xBearerArg = answer;
+      }
+    } finally {
+      rl.close();
+    }
+  }
+  if (xBearerArg) {
+    ctx.config.set("x.bearerToken", xBearerArg);
+  }
+
   return {
     data: {
       provider,
       model,
       default: makeDefault,
       keyConfigured: Boolean(apiKeyArg) || !info.requiresKey,
+      xConfigured: Boolean(xBearerArg) || ctx.config.getXBearer() !== undefined,
       configPath: ctx.config.filePath,
     },
     meta: { persisted: true },
     human: () =>
-      `Configured ${info.label} (model ${model})${makeDefault ? " as default" : ""}. Saved to ${ctx.config.filePath}.`,
+      `Configured ${info.label} (model ${model})${makeDefault ? " as default" : ""}${xBearerArg ? " + X token" : ""}. Saved to ${ctx.config.filePath}.`,
   };
 }
 

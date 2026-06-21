@@ -8,6 +8,8 @@ import type { CommandResult } from "../core/output.js";
 import { parseOrThrow } from "../core/validate.js";
 import { TakeawayPostsInputSchema } from "../domain/schemas.js";
 import type { Account } from "../domain/types.js";
+import { fetchAccountTimeline } from "../x/client.js";
+import { resolveXBearer } from "./shared.js";
 
 function normalizeUsername(raw: string): string {
   return raw.trim().replace(/^@/, "");
@@ -84,13 +86,44 @@ export async function takeawayRefreshCommand(ctx: RunContext, opts: Opts): Promi
     apiKey: optString(opts, "apiKey"),
   });
 
-  const posts = parseOrThrow(
-    TakeawayPostsInputSchema,
-    resolveJsonInput(requireString(opts, "posts", "--posts")),
-    "Invalid posts input. Expected a JSON array of { text, externalId?, url?, postedAt? }.",
-  );
-
   const store = ctx.store();
+  const postsOpt = optString(opts, "posts");
+  let posts: Array<{
+    text: string;
+    externalId?: string | undefined;
+    url?: string | undefined;
+    postedAt?: string | undefined;
+  }>;
+  let source = "supplied";
+  if (postsOpt !== undefined) {
+    posts = parseOrThrow(
+      TakeawayPostsInputSchema,
+      resolveJsonInput(postsOpt),
+      "Invalid posts input. Expected a JSON array of { text, externalId?, url?, postedAt? }.",
+    );
+  } else {
+    const bearer = resolveXBearer(ctx, opts);
+    if (!bearer) {
+      throw new CliError(
+        "MISSING_CREDENTIALS",
+        "No --posts supplied and no X Bearer token configured. Provide --posts <json>, or run `tenbrains setup --x-bearer <token>` to fetch the timeline (a paid X API tier is usually required for timeline reads).",
+      );
+    }
+    const count = optNumber(opts, "count", 20);
+    ctx.logger.info(`Fetching up to ${count} recent posts for @${username} from X…`);
+    const fetched = await fetchAccountTimeline(account.username, bearer, count);
+    if (fetched.length === 0) {
+      throw new CliError("NOT_FOUND", `No recent original posts found for @${username}.`);
+    }
+    posts = fetched.map((tweet) => ({
+      text: tweet.text,
+      externalId: tweet.externalId,
+      url: tweet.url,
+      postedAt: tweet.postedAt,
+    }));
+    source = "x:api";
+  }
+
   const sourcePostIds: string[] = [];
   for (const input of posts) {
     const { post } = store.posts.ingest({
@@ -128,6 +161,7 @@ export async function takeawayRefreshCommand(ctx: RunContext, opts: Opts): Promi
       model: resolved.model,
       mock: outcome.mock,
       postCount: sourcePostIds.length,
+      source,
       persisted: true,
     },
     human: () =>

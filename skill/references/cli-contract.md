@@ -69,8 +69,11 @@ Any text/JSON flag (`--text`, `--posts`, `--ratings`, and config `<value>`) acce
 
 - `analyze` — analyze a post. Provider flags: `--provider`, `--model`, `--api-key`. Post input:
   `--text`, `--url`, `--id <externalId>`, `--author`, `--author-name`, `--posted-at`, or
-  `--post-id <id>` to re-analyze a stored post. Learning: `--learn`, `--minutes <n>`, `--ratings`.
-  Returns `{ post, analysis }` where `analysis = { topic, summary, intent, novelConcepts[5] }`.
+  `--post-id <id>` to re-analyze a stored post. If only `--url`/`--id` is given (no `--text`), the
+  tweet is fetched: `--fetch auto|oembed|api` (default `auto`, free-first — oEmbed needs no key;
+  `api` uses `--x-bearer`/config token). Learning: `--learn`, `--minutes <n>`, `--ratings`.
+  Returns `{ post, analysis }` where `analysis = { topic, summary, intent, novelConcepts[5] }`;
+  `meta.source` is `text` | `stored` | `x:oembed` | `x:api`.
 - `analyze list [--limit --offset --author]` — recent analyses.
 - `analyze get <id>` — one analysis with its post.
 
@@ -79,8 +82,10 @@ Any text/JSON flag (`--text`, `--posts`, `--ratings`, and config `<value>`) acce
 - `takeaway follow <username> [--name]` — follow an account.
 - `takeaway unfollow <username>` — stop following (deletes snapshots).
 - `takeaway list` — followed accounts + latest takeaway.
-- `takeaway refresh <username> --posts <json> [provider flags]` — summarize supplied recent posts
-  (`[{ text, externalId?, url?, postedAt? }]`) into a new snapshot `{ summary, takeaways[] }`.
+- `takeaway refresh <username> [--posts <json> | --count <n>] [--x-bearer <token>] [provider flags]`
+  — summarize recent posts into a snapshot `{ summary, takeaways[] }`. Supply posts via `--posts`
+  (`[{ text, externalId?, url?, postedAt? }]`), or omit `--posts` to fetch up to `--count` (default
+  20) from the X API (needs a Bearer token + usually a paid tier).
 - `takeaway show <username> [--history --limit]` — latest snapshot (or history) with source posts.
 
 ### suggest
@@ -113,8 +118,9 @@ Any text/JSON flag (`--text`, `--posts`, `--ratings`, and config `<value>`) acce
 
 ### setup / config
 
-- `setup [--provider --api-key --model --default]` — collect and store credentials (interactive on a
-  TTY, or fully via flags / `--api-key -`).
+- `setup [--provider --api-key --model --default --x-bearer]` — collect and store AI provider
+  credentials and an optional X API Bearer token (`x.bearerToken`), interactively on a TTY or via
+  flags (`--api-key -` / `--x-bearer -` read stdin).
 - `config set <key> <value>` — dot-path (e.g. `providers.openai.apiKey`); value may be `@file`/`-`.
 - `config get <key> [--reveal]` — secrets redacted unless `--reveal`.
 - `config list [--reveal]`, `config unset <key>`, `config path`.

@@ -48,11 +48,15 @@ npm run dev -- analyze --provider mock --text "hello world"
 
 ```bash
 # 1. Configure a provider once (stored in ~/.config/tenbrains/config.json, mode 0600).
+#    Optionally add an X API Bearer token in the same step (see "Fetching from X").
 tenbrains setup --provider anthropic --api-key sk-ant-... --default
 
-# 2. Analyze a post (agent supplies the content).
+# 2a. Analyze a post you already have (paste the content).
 tenbrains analyze --author levelsio --id 1790000000000000000 \
   --text "Shipping an agent-first CLI today. Everything persists to SQLite, nothing in env files."
+
+# 2b. Or analyze a tweet by URL — fetched free via X's oEmbed endpoint, no key needed.
+tenbrains analyze --url "https://x.com/jack/status/20"
 
 # 3. Read it back / explore.
 tenbrains analyze list --limit 5
@@ -97,9 +101,9 @@ Exit codes: `0` success · `2` usage · `3` not found · `4` missing credentials
 
 | Command | Purpose |
 | --- | --- |
-| `analyze` | Analyze a post into topic, summary, intent, 5 novel concepts. `--learn` also builds a track. |
+| `analyze` | Analyze a post (`--text`, or `--url`/`--id` to fetch) into topic, summary, intent, 5 novel concepts. `--learn` also builds a track. |
 | `analyze list` / `analyze get <id>` | Read stored analyses. |
-| `takeaway follow\|unfollow\|list\|refresh\|show` | Track accounts; summarize supplied recent posts into snapshots. |
+| `takeaway follow\|unfollow\|list\|refresh\|show` | Track accounts; summarize recent posts (supplied via `--posts` or fetched from X) into snapshots. |
 | `suggest generate\|list\|save\|dismiss\|add` | Rank un-saved posts against your saved signal; save/dismiss feedback. |
 | `bookmark add\|list\|show\|tag\|remove` | Save posts with tags (auto-suggested from analysis) and notes. |
 | `learn generate\|show\|list` | Build and review 7-day Feynman learning tracks. |
@@ -131,6 +135,29 @@ Values are written to a managed JSON file (`tenbrains config path` shows where) 
 permissions. Secrets are redacted in `config get`/`config list` unless `--reveal` is passed.
 Resolution precedence: CLI flag → config store. Environment variables are intentionally **not**
 consulted, keeping the credential source explicit and auditable.
+
+## Fetching from X
+
+By default the agent supplies content via `--text`, but the CLI can also pull tweets itself —
+designed **free-first**:
+
+- **Single tweets (`analyze`)** use X's public **oEmbed** endpoint by default: no API key, no paid
+  tier. `tenbrains analyze --url "https://x.com/user/status/123"` fetches the tweet text + author
+  and analyzes it. Control this with `--fetch auto|oembed|api` (default `auto`).
+- **Account timelines (`takeaway`)** have no free path, so they use the official X API v2 with a
+  Bearer token: `tenbrains takeaway refresh <user> --count 20` (omit `--posts` to fetch). Most
+  accounts need a **paid X API tier (Basic+)** to read timelines.
+
+Store the token (used for timelines and as the `--fetch api` fallback) during setup or config:
+
+```bash
+tenbrains setup --provider anthropic --api-key sk-ant-... --x-bearer "AAAA..."   # both at once
+tenbrains config set x.bearerToken "AAAA..."                                     # or just the X token
+tenbrains analyze --url https://x.com/jack/status/20 --x-bearer -  < token.txt   # or per-call (stdin)
+```
+
+If your tier can't read a tweet/timeline, the CLI returns a structured `PROVIDER_UNAUTHORIZED` /
+`PROVIDER_RATE_LIMITED` error (exit 5) rather than crashing — fall back to `--text` / `--posts`.
 
 ## Database
 
