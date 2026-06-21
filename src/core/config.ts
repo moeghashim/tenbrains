@@ -12,17 +12,23 @@ export interface TenbrainsConfig {
   defaultProvider?: ProviderId;
   defaultModel?: string;
   providers?: Partial<Record<ProviderId, ProviderConfig>>;
+  /** X (Twitter) API credentials, used for timeline reads and tweet fetches. */
+  x?: { bearerToken?: string };
   updatedAt?: string;
 }
 
-/** Config keys whose values are secrets and must be redacted by default. */
-function isSecretKey(key: string): boolean {
-  return /(^|\.)(apikey|token|secret)$/i.test(key);
+/**
+ * Whether a config key holds a secret and must be redacted by default. Matches
+ * the last dot-segment so compound names like `x.bearerToken` are caught too.
+ */
+export function isSecretKey(key: string): boolean {
+  const last = key.split(".").pop() ?? "";
+  return /(api_?key|token|secret|password|bearer)$/i.test(last);
 }
 
 export const REDACTED = "********";
 
-function redactValue(value: unknown): unknown {
+export function redactValue(value: unknown): unknown {
   if (typeof value !== "string" || value.length === 0) {
     return value;
   }
@@ -118,6 +124,11 @@ export class ConfigStore {
 
   getProviderConfig(provider: ProviderId): ProviderConfig {
     return this.read().providers?.[provider] ?? {};
+  }
+
+  getXBearer(): string | undefined {
+    const token = this.read().x?.bearerToken?.trim();
+    return token || undefined;
   }
 }
 

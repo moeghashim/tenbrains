@@ -9,6 +9,16 @@ import { parseOrThrow } from "../core/validate.js";
 import { buildFeynmanTrack } from "../domain/learn.js";
 import { PostInputSchema, RatingsInputSchema } from "../domain/schemas.js";
 import type { Analysis, LearningTrack, Post } from "../domain/types.js";
+import { type FetchMode, fetchTweet, isFetchMode } from "../x/client.js";
+import { resolveXBearer } from "./shared.js";
+
+function parseFetchMode(value: string | undefined): FetchMode {
+  const mode = value ?? "auto";
+  if (!isFetchMode(mode)) {
+    throw new CliError("USAGE", `Invalid --fetch "${mode}". Use auto|oembed|api.`);
+  }
+  return mode;
+}
 
 function postForAnalysis(post: Post) {
   return {
@@ -27,22 +37,26 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
   });
   const store = ctx.store();
 
-  // Either re-analyze an existing post by id, or ingest fresh content.
+  // Pick the content source: a stored post, inline text, or a fetched tweet.
   let post: Post;
   let deduped = false;
+  let source = "text";
   const postId = optString(opts, "postId");
+  const textOpt = optString(opts, "text");
+  const refInput = optString(opts, "url") ?? optString(opts, "id");
+
   if (postId) {
     const existing = store.posts.findById(postId);
     if (!existing) {
       throw new CliError("NOT_FOUND", `No post with id ${postId}.`, { details: { postId } });
     }
     post = existing;
-  } else {
-    const text = resolveTextInput(requireString(opts, "text", "--text"));
+    source = "stored";
+  } else if (textOpt !== undefined) {
     const input = parseOrThrow(
       PostInputSchema,
       {
-        text,
+        text: resolveTextInput(textOpt),
         url: optString(opts, "url"),
         externalId: optString(opts, "id"),
         authorUsername: optString(opts, "author"),
@@ -51,9 +65,30 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
       },
       "Invalid post input.",
     );
-    const ingested = store.posts.ingest(input);
-    post = ingested.post;
-    deduped = ingested.deduped;
+    ({ post, deduped } = store.posts.ingest(input));
+  } else if (refInput !== undefined) {
+    const mode = parseFetchMode(optString(opts, "fetch"));
+    ctx.logger.info(`Fetching tweet from X (${mode})…`);
+    const fetched = await fetchTweet(refInput, mode, resolveXBearer(ctx, opts));
+    source = fetched.source;
+    const input = parseOrThrow(
+      PostInputSchema,
+      {
+        text: fetched.tweet.text,
+        url: fetched.tweet.url ?? optString(opts, "url"),
+        externalId: fetched.tweet.externalId ?? optString(opts, "id"),
+        authorUsername: fetched.tweet.authorUsername ?? optString(opts, "author"),
+        authorName: fetched.tweet.authorName ?? optString(opts, "authorName"),
+        postedAt: fetched.tweet.postedAt ?? optString(opts, "postedAt"),
+      },
+      "Fetched tweet did not produce valid post input.",
+    );
+    ({ post, deduped } = store.posts.ingest(input));
+  } else {
+    throw new CliError(
+      "USAGE",
+      "Provide --text, --post-id, or --url/--id (to fetch the tweet from X).",
+    );
   }
 
   ctx.logger.info(`Analyzing post with ${resolved.provider}/${resolved.model}…`);
@@ -84,6 +119,7 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
       model: resolved.model,
       mock: outcome.mock,
       deduped,
+      source,
       persisted: true,
     },
     human: (data) => renderAnalysis((data as { analysis: Analysis }).analysis),

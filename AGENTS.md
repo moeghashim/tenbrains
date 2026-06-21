@@ -41,24 +41,28 @@ Error envelope:
 ## Conventions
 
 - **Output is JSON by default.** Do not pass `--pretty` (that's for humans).
-- **Pass content in.** This tool does not fetch from X. Provide post text via `--text`. Inputs accept
+- **Pass content in, or fetch it.** Provide post text via `--text`, or give `--url`/`--id` to fetch a
+  tweet — single tweets fetch free via oEmbed (no key), `--fetch auto|oembed|api`. Inputs accept
   inline strings, `@path` (read file), or `-` (read stdin). JSON inputs (`--posts`, `--ratings`) take
-  the same forms.
+  the same forms. `takeaway refresh` fetches a timeline when `--posts` is omitted (needs an X token,
+  usually a paid tier).
 - **Ids are prefixed and stable**: `post_`, `ana_`, `acc_`, `snap_`, `bm_`, `sug_`, `trk_`. Any id
   resolves via `tenbrains record get <id>`.
 - **Dedup is automatic.** Re-ingesting a post with the same `--id` (external X id) reuses the stored
   post (`meta.deduped: true`).
 - **Isolate state with `--db <path>`** if you want a per-task workspace.
 - **No environment variables.** Configure once with `tenbrains setup --provider <p> --api-key <k>`
-  (or `--api-key -` to pipe a secret without echo). Or test offline with `--provider mock`.
+  (add `--x-bearer <token>` for X timeline fetches; `-` pipes a secret without echo). Or test offline
+  with `--provider mock`.
 
 ## Recipes
 
-Analyze and capture the id:
+Analyze and capture the id (supply text, or fetch a tweet free by URL):
 
 ```bash
 tenbrains analyze --provider mock --id 123 --author levelsio \
-  --text "Agent-first CLIs persist outcomes to a database." 
+  --text "Agent-first CLIs persist outcomes to a database."
+tenbrains analyze --url "https://x.com/jack/status/20"   # fetched free via oEmbed; meta.source=x:oembed
 # -> .meta.analysisId, .data.analysis.{topic,summary,intent,novelConcepts[5]}
 ```
 
@@ -69,11 +73,12 @@ echo '[{"concept":"Agentic","familiarity":2,"interest":5}]' \
 | tenbrains analyze --provider mock --text "..." --learn --minutes 10 --ratings -
 ```
 
-Account takeaways (you supply the recent posts):
+Account takeaways (supply recent posts, or fetch from X with a token):
 
 ```bash
 tenbrains takeaway follow levelsio
-tenbrains takeaway refresh levelsio --provider mock --posts @recent.json
+tenbrains takeaway refresh levelsio --provider mock --posts @recent.json   # supplied
+tenbrains takeaway refresh levelsio --count 20                             # fetched (needs X token)
 tenbrains takeaway show levelsio --history
 ```
 

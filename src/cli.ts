@@ -179,6 +179,14 @@ export function buildProgram(): Command {
     description: "Analyze a post into topic, summary, intent, and 5 novel concepts.",
     options: [
       ...POST_INPUT_OPTIONS,
+      {
+        flags: "--fetch <mode>",
+        description: "With --url/--id and no --text: auto|oembed|api (default auto, free-first)",
+      },
+      {
+        flags: "--x-bearer <token>",
+        description: "X API Bearer token for --fetch api/fallback; - reads stdin",
+      },
       ...PROVIDER_OPTIONS,
       { flags: "--learn", description: "Also generate a 7-day Feynman learning track" },
       { flags: "--ratings <json>", description: "Concept ratings JSON for --learn (@file/- ok)" },
@@ -243,12 +251,20 @@ export function buildProgram(): Command {
   takeaway.addCommand(
     makeCommand({
       name: "refresh",
-      description: "Summarize supplied recent posts into a new takeaway snapshot.",
+      description: "Summarize an account's recent posts into a new takeaway snapshot.",
       args: [{ spec: "<username>" }],
       options: [
         {
           flags: "--posts <json>",
-          description: "JSON array of { text, externalId?, url?, postedAt? }; @file/- ok",
+          description: "Recent posts [{text,externalId?,...}] (@file/- ok); omit to fetch from X",
+        },
+        {
+          flags: "--count <n>",
+          description: "Posts to fetch from X when --posts is omitted (default 20)",
+        },
+        {
+          flags: "--x-bearer <token>",
+          description: "X API Bearer token for timeline fetch; - reads stdin",
         },
         ...PROVIDER_OPTIONS,
       ],
@@ -455,12 +471,14 @@ export function buildProgram(): Command {
   program.addCommand(
     makeCommand({
       name: "setup",
-      description: "Collect and store provider credentials (interactive or via flags).",
+      description:
+        "Collect and store AI provider + optional X credentials (interactive or via flags).",
       options: [
         { flags: "--provider <id>", description: "Provider to configure (default anthropic)" },
         { flags: "--api-key <key>", description: "API key; - reads stdin" },
         { flags: "--model <model>", description: "Default model for this provider" },
         { flags: "--default", description: "Make this the default provider" },
+        { flags: "--x-bearer <token>", description: "X API Bearer token to store; - reads stdin" },
       ],
       handler: setupCommand,
     }),

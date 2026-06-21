@@ -36,6 +36,16 @@ test("entries redact secret keys unless revealed", () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+test("compound secret keys like x.bearerToken are redacted", () => {
+  const { store, dir } = tempConfig();
+  store.set("x.bearerToken", "AAAAbbbbCCCC1234");
+  const entry = store.entries(false).find((e) => e.key === "x.bearerToken");
+  assert.ok(String(entry?.value).startsWith("********"));
+  assert.ok(String(entry?.value).endsWith("1234"));
+  assert.equal(store.getXBearer(), "AAAAbbbbCCCC1234");
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test("set validates known typed keys", () => {
   const { store, dir } = tempConfig();
   assert.throws(() => store.set("defaultProvider", "nope"), /Unknown provider/);

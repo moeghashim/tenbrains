@@ -28,6 +28,9 @@ It is built to be driven by an agent: each run prints one JSON object you can pa
   at mode 0600, never an env file): `tenbrains setup --provider anthropic --api-key sk-ant-...`.
   No key available? Add `--provider mock` to any analyzing command for deterministic, offline output
   — perfect for exercising the flow without network or credentials.
+- **Optional X (Twitter) Bearer token.** Only needed to fetch *timelines* for `takeaway` (usually a
+  paid X API tier). Fetching a *single* tweet for `analyze --url` is free via oEmbed and needs no
+  token. Store one with `tenbrains setup --x-bearer <token>` or `tenbrains config set x.bearerToken <token>`.
 
 ## Output contract — read this first
 
@@ -60,22 +63,27 @@ Text/JSON flags accept three forms, so you never fight shell quoting on large co
 
 ### Analyze a post
 
+Provide the text, or let the CLI fetch a tweet by URL/id (free, via X's oEmbed — no key needed):
+
 ```bash
-tenbrains analyze --author levelsio --id 1790000000000000000 \
-  --text "Shipping an agent-first CLI today. Everything persists to SQLite, nothing in env files."
-# data.analysis = { topic, summary, intent, novelConcepts[5] }; meta.analysisId, meta.postId
+tenbrains analyze --author levelsio --id 1790000000000000000 --text "..."   # you supply text
+tenbrains analyze --url "https://x.com/jack/status/20"                       # fetched free (oEmbed)
+# data.analysis = { topic, summary, intent, novelConcepts[5] }; meta.analysisId, meta.postId, meta.source
 ```
 
-Re-using the same `--id` (the external X post id) dedupes the stored post. Add `--learn` to also
-generate a 7-day Feynman learning track in the same call (`--minutes`, `--ratings` optional).
+`--fetch auto|oembed|api` controls fetching (default `auto`, free-first). Re-using the same `--id`
+dedupes the stored post. Add `--learn` to also generate a 7-day Feynman learning track in the same
+call (`--minutes`, `--ratings` optional).
 
-### Account takeaways (you supply the recent posts)
+### Account takeaways
 
-This CLI does not fetch from X — provide the posts you've already gathered.
+Supply the recent posts, or fetch them from X (needs a stored Bearer token and usually a paid X API
+tier — single-tweet `analyze` above stays free).
 
 ```bash
 tenbrains takeaway follow levelsio
-tenbrains takeaway refresh levelsio --posts @recent.json   # [{ "text": "...", "externalId": "..." }, ...]
+tenbrains takeaway refresh levelsio --posts @recent.json   # supplied: [{ "text": "...", "externalId": "..." }, ...]
+tenbrains takeaway refresh levelsio --count 20             # fetched from X (omit --posts)
 tenbrains takeaway show levelsio --history
 ```
 
