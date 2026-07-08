@@ -11,6 +11,7 @@ import type {
   Suggestion,
   SuggestionStatus,
   TakeawaySnapshot,
+  TrackDayProgress,
 } from "../domain/types.js";
 import { type Database, newId, nowIso } from "./database.js";
 
@@ -107,6 +108,12 @@ interface TrackRow {
   created_at: string;
 }
 
+interface ProgressRow {
+  day: number;
+  notes: string | null;
+  completed_at: string;
+}
+
 // --- mappers -----------------------------------------------------------------
 
 function mapPost(row: PostRow): Post {
@@ -186,13 +193,14 @@ function mapSuggestion(row: SuggestionRow): Suggestion {
   };
 }
 
-function mapTrack(row: TrackRow): LearningTrack {
+function mapTrack(row: TrackRow, progress: TrackDayProgress[]): LearningTrack {
   return {
     id: row.id,
     analysisId: row.analysis_id,
     minutesPerDay: row.minutes_per_day,
     ratings: parseJsonArray<ConceptRating>(row.ratings_json),
     days: parseJsonArray<LearningDay>(row.days_json),
+    progress,
     createdAt: row.created_at,
   };
 }
@@ -594,7 +602,7 @@ export class TracksRepo {
     const row = this.db.prepare("SELECT * FROM learning_tracks WHERE id = ?").get(id) as
       | TrackRow
       | undefined;
-    return row ? mapTrack(row) : null;
+    return row ? mapTrack(row, this.progressFor(row.id)) : null;
   }
 
   list(limit: number, analysisId?: string): LearningTrack[] {
@@ -604,12 +612,31 @@ export class TracksRepo {
           "SELECT * FROM learning_tracks WHERE analysis_id = ? ORDER BY created_at DESC LIMIT ?",
         )
         .all(analysisId, limit) as unknown as TrackRow[];
-      return rows.map(mapTrack);
+      return rows.map((row) => mapTrack(row, this.progressFor(row.id)));
     }
     const rows = this.db
       .prepare("SELECT * FROM learning_tracks ORDER BY created_at DESC LIMIT ?")
       .all(limit) as unknown as TrackRow[];
-    return rows.map(mapTrack);
+    return rows.map((row) => mapTrack(row, this.progressFor(row.id)));
+  }
+
+  progressFor(trackId: string): TrackDayProgress[] {
+    const rows = this.db
+      .prepare(
+        "SELECT day, notes, completed_at FROM track_progress WHERE track_id = ? ORDER BY day",
+      )
+      .all(trackId) as unknown as ProgressRow[];
+    return rows.map((row) => ({ day: row.day, notes: row.notes, completedAt: row.completed_at }));
+  }
+
+  /** Record a day as done. Caller guards against duplicates (PK would throw). */
+  markDone(trackId: string, day: number, notes?: string): LearningTrack {
+    this.db
+      .prepare(
+        "INSERT INTO track_progress (track_id, day, notes, completed_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(trackId, day, nn(notes), nowIso());
+    return this.findById(trackId) as LearningTrack;
   }
 }
 

@@ -73,7 +73,11 @@ Any text/JSON flag (`--text`, `--posts`, `--ratings`, and config `<value>`) acce
   tweet is fetched: `--fetch auto|oembed|api` (default `auto`, free-first — oEmbed needs no key;
   `api` uses `--x-bearer`/config token). Learning: `--learn`, `--minutes <n>`, `--ratings`.
   Returns `{ post, analysis }` where `analysis = { topic, summary, intent, novelConcepts[5] }`;
-  `meta.source` is `text` | `stored` | `x:oembed` | `x:api`.
+  `meta.source` is `text` | `stored` | `thread` | `x:oembed` | `x:api` | `x:thread`.
+- `analyze --thread <json>` — analyze a whole thread as one document; parts are strings or
+  `{text, externalId?}` objects (`@file`/`-` ok). Bare `--thread` with `--url`/`--id` fetches the
+  author's self-thread via the X API (needs a Bearer token; degrades to the root tweet when reply
+  search is unavailable). `meta.threadParts` reports how many parts were combined.
 - `analyze list [--limit --offset --author]` — recent analyses.
 - `analyze get <id>` — one analysis with its post.
 
@@ -90,7 +94,8 @@ Any text/JSON flag (`--text`, `--posts`, `--ratings`, and config `<value>`) acce
 
 ### suggest
 
-- `suggest generate [--limit]` — rank analyzed, un-bookmarked posts against your saved signal.
+- `suggest generate [--limit]` — rank analyzed, un-bookmarked posts against your saved signal
+  (recency-weighted: saves lose half their influence every ~60 days).
 - `suggest list [--status pending|saved|dismissed|all --limit]`.
 - `suggest save <id>` — mark saved and create a bookmark.
 - `suggest dismiss <id>` — suppress in future ranking.
@@ -108,13 +113,31 @@ Any text/JSON flag (`--text`, `--posts`, `--ratings`, and config `<value>`) acce
 ### learn
 
 - `learn generate --analysis <id> [--ratings <json> --minutes <n>]` — build a 7-day Feynman track.
-- `learn show <id>` — a track.
+- `learn today [id]` — the next pending day's task (defaults to the latest track with pending days;
+  errors NOT_FOUND when none). `data.day` is the next unfinished day — content is never skipped —
+  and `data.scheduledDay`/`data.behindBy` report where the calendar says the learner should be.
+- `learn done <id> [--day <n> --notes <text>]` — mark a day finished (default: next pending day).
+  Marking a day twice is a CONFLICT (exit 7). `meta.completed` flips true on the last day.
+- `learn show <id>` — a track (includes its `progress` entries).
 - `learn list [--analysis --limit]`.
 
 ### search
 
-- `search <query> [--type analysis,takeaway,bookmark|all --limit]` — keyword search across stored
-  analyses, takeaways, and bookmarks; results grouped by type and ranked by token overlap.
+- `search <query> [--type analysis,takeaway,bookmark|all --limit]` — full-text search (SQLite FTS5)
+  across stored analyses, takeaways, and bookmarks; results grouped by type and ranked by BM25
+  (higher `score` = better). Queries are stemmed, so "embedding" matches "embeddings".
+
+### digest
+
+- `digest [--days <n>]` — recap of the window (default 7 days). `data.markdown` is a ready-to-send
+  markdown report; `data.counts` has per-section totals. Useful for weekly summaries.
+
+### import
+
+- `import x-archive <path> [--likes | --tweets] [--limit <n>] [--no-bookmarks]` — bulk-import an
+  *extracted* official X account archive directory (the one containing `data/`). Likes become
+  posts + bookmarks (source `x:archive`); the account's own tweets become posts. Idempotent:
+  re-runs dedupe on tweet id. No API key needed.
 
 ### setup / config
 
@@ -128,7 +151,7 @@ Any text/JSON flag (`--text`, `--posts`, `--ratings`, and config `<value>`) acce
 ### record / db / manifest
 
 - `record get <id>` — resolve any prefixed id to its record.
-- `db stats | migrate | vacuum | reset --yes`.
+- `db stats | migrate | vacuum | reindex | reset --yes` (`reindex` rebuilds the search index).
 - `manifest` — full machine-readable description of the CLI.
 
 ## Providers

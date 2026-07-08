@@ -18,11 +18,20 @@ import {
 } from "./commands/config.js";
 import {
   dbMigrateCommand,
+  dbReindexCommand,
   dbResetCommand,
   dbStatsCommand,
   dbVacuumCommand,
 } from "./commands/db.js";
-import { learnGenerateCommand, learnListCommand, learnShowCommand } from "./commands/learn.js";
+import { digestCommand } from "./commands/digest.js";
+import { importXArchiveCommand } from "./commands/import.js";
+import {
+  learnDoneCommand,
+  learnGenerateCommand,
+  learnListCommand,
+  learnShowCommand,
+  learnTodayCommand,
+} from "./commands/learn.js";
 import { manifestCommand } from "./commands/manifest.js";
 import { recordGetCommand } from "./commands/record.js";
 import { searchCommand } from "./commands/search.js";
@@ -179,6 +188,11 @@ export function buildProgram(): Command {
     description: "Analyze a post into topic, summary, intent, and 5 novel concepts.",
     options: [
       ...POST_INPUT_OPTIONS,
+      {
+        flags: "--thread [json]",
+        description:
+          "Analyze a whole thread as one document: pass parts as JSON (@file/- ok), or bare with --url/--id to fetch the author's self-thread via the X API",
+      },
       {
         flags: "--fetch <mode>",
         description: "With --url/--id and no --text: auto|oembed|api (default auto, free-first)",
@@ -417,7 +431,7 @@ export function buildProgram(): Command {
     name: "learn",
     description: "Generate and review 7-day Feynman learning tracks from an analysis.",
     handler: () => {
-      throw new CliError("USAGE", "Specify a subcommand: generate|show|list.");
+      throw new CliError("USAGE", "Specify a subcommand: generate|today|done|show|list.");
     },
   });
   learn.addCommand(
@@ -430,6 +444,26 @@ export function buildProgram(): Command {
         { flags: "--minutes <n>", description: "Minutes per day (default 10)" },
       ],
       handler: learnGenerateCommand,
+    }),
+  );
+  learn.addCommand(
+    makeCommand({
+      name: "today",
+      description: "Show the next pending day's task (latest active track unless an id is given).",
+      args: [{ spec: "[id]", description: "Track id (trk_...); defaults to latest active track" }],
+      handler: learnTodayCommand,
+    }),
+  );
+  learn.addCommand(
+    makeCommand({
+      name: "done",
+      description: "Mark a track day finished (defaults to the next pending day).",
+      args: [{ spec: "<id>", description: "Track id (trk_...)" }],
+      options: [
+        { flags: "--day <n>", description: "Specific day to mark (default: next pending)" },
+        { flags: "--notes <text>", description: "What you learned / what's still fuzzy" },
+      ],
+      handler: learnDoneCommand,
     }),
   );
   learn.addCommand(
@@ -457,7 +491,8 @@ export function buildProgram(): Command {
   program.addCommand(
     makeCommand({
       name: "search",
-      description: "Keyword search across analyses, takeaways, and bookmarks.",
+      description:
+        "Full-text search (FTS5, BM25-ranked) across analyses, takeaways, and bookmarks.",
       args: [{ spec: "<query>", description: "Search query" }],
       options: [
         { flags: "--type <list>", description: "Limit types: analysis,takeaway,bookmark (or all)" },
@@ -466,6 +501,43 @@ export function buildProgram(): Command {
       handler: searchCommand,
     }),
   );
+
+  // --- digest ---------------------------------------------------------------
+  program.addCommand(
+    makeCommand({
+      name: "digest",
+      description: "Markdown recap of analyses, takeaways, and bookmarks saved recently.",
+      options: [{ flags: "--days <n>", description: "Window in days (default 7)" }],
+      handler: digestCommand,
+    }),
+  );
+
+  // --- import ---------------------------------------------------------------
+  const importCmd = makeCommand({
+    name: "import",
+    description: "Bulk-import external data into the local database.",
+    handler: () => {
+      throw new CliError("USAGE", "Specify a subcommand: x-archive <path>.");
+    },
+  });
+  importCmd.addCommand(
+    makeCommand({
+      name: "x-archive",
+      description:
+        "Import an extracted official X account archive: likes become bookmarked posts, your tweets become posts.",
+      args: [{ spec: "<path>", description: "Extracted archive directory (contains data/)" }],
+      options: [
+        { flags: "--likes", description: "Import only likes" },
+        { flags: "--tweets", description: "Import only your tweets" },
+        { flags: "--limit <n>", description: "Cap items imported per kind (default: all)" },
+      ],
+      negations: [
+        { flags: "--no-bookmarks", description: "Store likes as posts without bookmarking them" },
+      ],
+      handler: importXArchiveCommand,
+    }),
+  );
+  program.addCommand(importCmd);
 
   // --- config + setup -------------------------------------------------------
   program.addCommand(
@@ -555,7 +627,7 @@ export function buildProgram(): Command {
     name: "db",
     description: "Inspect and maintain the local database.",
     handler: () => {
-      throw new CliError("USAGE", "Specify a subcommand: stats|migrate|vacuum|reset.");
+      throw new CliError("USAGE", "Specify a subcommand: stats|migrate|vacuum|reindex|reset.");
     },
   });
   db.addCommand(
@@ -577,6 +649,13 @@ export function buildProgram(): Command {
       name: "vacuum",
       description: "Compact the database file.",
       handler: dbVacuumCommand,
+    }),
+  );
+  db.addCommand(
+    makeCommand({
+      name: "reindex",
+      description: "Rebuild the full-text search index from the source tables.",
+      handler: dbReindexCommand,
     }),
   );
   db.addCommand(

@@ -1,4 +1,4 @@
-import type { Concept, ConceptRating, LearningDay } from "./types.js";
+import type { Concept, ConceptRating, LearningDay, TrackDayProgress } from "./types.js";
 
 const TRACK_DAYS = 7;
 const DEFAULT_FAMILIARITY = 1; // assume novel when unrated
@@ -48,6 +48,31 @@ function splitMinutes(total: number): { learn: number; explain: number; check: n
  * Learn / Explain / Check steps. With fewer than 7 concepts, the top concepts
  * recur on later days for spaced repetition.
  */
+/**
+ * The next day to study: the first day without a progress entry. Progress is
+ * session-based, not calendar-based, so missing a calendar day never skips
+ * content. Returns null when every day is done.
+ */
+export function nextPendingDay(days: LearningDay[], progress: TrackDayProgress[]): number | null {
+  const done = new Set(progress.map((p) => p.day));
+  for (const day of days) {
+    if (!done.has(day.day)) {
+      return day.day;
+    }
+  }
+  return null;
+}
+
+/**
+ * Where the calendar says you should be: day 1 on the creation date, clamped
+ * to the track length. Reported alongside the pending day so callers can see
+ * whether the learner is behind schedule.
+ */
+export function scheduledDay(createdAt: string, now: Date, totalDays: number): number {
+  const elapsed = Math.floor((now.getTime() - new Date(createdAt).getTime()) / 86_400_000);
+  return Math.min(Math.max(elapsed + 1, 1), Math.max(totalDays, 1));
+}
+
 export function buildFeynmanTrack(
   concepts: Concept[],
   minutesPerDay: number,
