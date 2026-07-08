@@ -1,6 +1,4 @@
-import { tokenSet } from "../core/text.js";
 import type { Store } from "../db/repositories.js";
-import type { Account, Post } from "./types.js";
 
 export type SearchType = "analysis" | "takeaway" | "bookmark";
 
@@ -19,32 +17,31 @@ export interface SearchResult {
   groups: Record<SearchType, SearchHit[]>;
 }
 
-function snippet(text: string, max = 200): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
-}
-
-/** Token-overlap score in [0,1], with a bonus when the raw query appears verbatim. */
-function score(queryTokens: Set<string>, docText: string, rawQuery: string): number {
-  if (queryTokens.size === 0) {
-    return 0;
-  }
-  const docTokens = tokenSet(docText);
-  let overlap = 0;
-  for (const token of queryTokens) {
-    if (docTokens.has(token)) {
-      overlap += 1;
-    }
-  }
-  const base = overlap / queryTokens.size;
-  const phraseBonus = docText.toLowerCase().includes(rawQuery.toLowerCase()) ? 0.25 : 0;
-  return Math.min(1, base + phraseBonus);
+interface FtsRow {
+  ref_id: string;
+  title: string;
+  snip: string;
+  rank: number;
 }
 
 /**
- * Keyword search across stored analyses, account takeaways, and bookmarks.
- * Deterministic and fully local — no embeddings or network. Results are grouped
- * by source type and ranked by token overlap with the query.
+ * Turn a free-text query into an FTS5 MATCH expression. Each word is quoted
+ * (so FTS operators in user input are inert) and words are OR-ed, letting
+ * BM25 rank partial matches instead of dropping them.
+ */
+export function toMatchQuery(query: string): string | null {
+  const words = query.match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (words.length === 0) {
+    return null;
+  }
+  return words.map((w) => `"${w}"`).join(" OR ");
+}
+
+/**
+ * Full-text search across stored analyses, account takeaways, and bookmarks,
+ * backed by the trigger-maintained `search_fts` FTS5 table. Porter stemming
+ * matches inflected forms ("embedding" finds "embeddings"); ranking is BM25
+ * with the title column weighted double. Fully local and deterministic.
  */
 export function searchCorpus(
   store: Store,
@@ -53,76 +50,63 @@ export function searchCorpus(
 ): SearchResult {
   const types = new Set<SearchType>(options.types ?? ["analysis", "takeaway", "bookmark"]);
   const limit = options.limit ?? 10;
-  const queryTokens = tokenSet(query);
-
-  const postsById = new Map<string, Post>(store.posts.all().map((p) => [p.id, p]));
-  const accountsById = new Map<string, Account>(store.accounts.list().map((a) => [a.id, a]));
-
   const groups: Record<SearchType, SearchHit[]> = { analysis: [], takeaway: [], bookmark: [] };
+  const match = toMatchQuery(query);
 
-  if (types.has("analysis")) {
-    for (const analysis of store.analyses.all()) {
-      const post = postsById.get(analysis.postId);
-      const conceptText = analysis.concepts
-        .map((c) => `${c.name} ${c.whyItMattersInTweet}`)
-        .join(" ");
-      const docText = `${post?.text ?? ""} ${analysis.topic} ${analysis.summary} ${analysis.intent} ${conceptText}`;
-      const value = score(queryTokens, docText, query);
-      if (value > 0) {
-        groups.analysis.push({
-          type: "analysis",
-          id: analysis.id,
-          score: Number(value.toFixed(3)),
-          title: analysis.topic,
-          snippet: snippet(analysis.summary),
-          refs: { postId: analysis.postId, author: post?.authorUsername ?? null },
+  if (match) {
+    const stmt = store.database.handle.prepare(
+      `SELECT ref_id, title, snippet(search_fts, -1, '', '', '…', 24) AS snip,
+              bm25(search_fts, 0, 0, 2.0, 1.0) AS rank
+       FROM search_fts
+       WHERE search_fts MATCH ? AND type = ?
+       ORDER BY rank
+       LIMIT ?`,
+    );
+    for (const type of types) {
+      const rows = stmt.all(match, type, limit) as unknown as FtsRow[];
+      for (const row of rows) {
+        const refs = resolveRefs(store, type, row.ref_id);
+        if (refs === null) {
+          continue; // index row outlived its record; `db reindex` cleans these
+        }
+        groups[type].push({
+          type,
+          id: row.ref_id,
+          // bm25() returns "lower is better" negatives; flip so higher = better.
+          // BM25 magnitudes can be tiny in small corpora, so keep 6 decimals.
+          score: Number((-row.rank).toFixed(6)),
+          title: row.title,
+          snippet: row.snip,
+          refs,
         });
       }
     }
   }
 
-  if (types.has("takeaway")) {
-    for (const snap of store.snapshots.all()) {
-      const account = accountsById.get(snap.accountId);
-      const docText = `${account?.username ?? ""} ${snap.summary} ${snap.takeaways.join(" ")}`;
-      const value = score(queryTokens, docText, query);
-      if (value > 0) {
-        groups.takeaway.push({
-          type: "takeaway",
-          id: snap.id,
-          score: Number(value.toFixed(3)),
-          title: account ? `@${account.username}` : "account takeaway",
-          snippet: snippet(snap.summary),
-          refs: { accountId: snap.accountId, username: account?.username ?? null },
-        });
-      }
-    }
-  }
-
-  if (types.has("bookmark")) {
-    for (const bookmark of store.bookmarks.all()) {
-      const post = postsById.get(bookmark.postId);
-      const docText = `${post?.text ?? ""} ${bookmark.tags.join(" ")} ${bookmark.note ?? ""}`;
-      const value = score(queryTokens, docText, query);
-      if (value > 0) {
-        groups.bookmark.push({
-          type: "bookmark",
-          id: bookmark.id,
-          score: Number(value.toFixed(3)),
-          title: bookmark.tags[0] ? `#${bookmark.tags[0]}` : (post?.authorUsername ?? "bookmark"),
-          snippet: snippet(post?.text ?? bookmark.note ?? ""),
-          refs: { postId: bookmark.postId, tags: bookmark.tags },
-        });
-      }
-    }
-  }
-
-  let total = 0;
-  for (const type of Object.keys(groups) as SearchType[]) {
-    groups[type].sort((a, b) => b.score - a.score);
-    groups[type] = groups[type].slice(0, limit);
-    total += groups[type].length;
-  }
-
+  const total = groups.analysis.length + groups.takeaway.length + groups.bookmark.length;
   return { query, total, groups };
+}
+
+function resolveRefs(store: Store, type: SearchType, id: string): Record<string, unknown> | null {
+  if (type === "analysis") {
+    const analysis = store.analyses.findById(id);
+    if (!analysis) {
+      return null;
+    }
+    const post = store.posts.findById(analysis.postId);
+    return { postId: analysis.postId, author: post?.authorUsername ?? null };
+  }
+  if (type === "takeaway") {
+    const snap = store.snapshots.findById(id);
+    if (!snap) {
+      return null;
+    }
+    const account = store.accounts.findById(snap.accountId);
+    return { accountId: snap.accountId, username: account?.username ?? null };
+  }
+  const bookmark = store.bookmarks.findById(id);
+  if (!bookmark) {
+    return null;
+  }
+  return { postId: bookmark.postId, tags: bookmark.tags };
 }

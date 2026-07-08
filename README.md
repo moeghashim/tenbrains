@@ -101,16 +101,18 @@ Exit codes: `0` success · `2` usage · `3` not found · `4` missing credentials
 
 | Command | Purpose |
 | --- | --- |
-| `analyze` | Analyze a post (`--text`, or `--url`/`--id` to fetch) into topic, summary, intent, 5 novel concepts. `--learn` also builds a track. |
+| `analyze` | Analyze a post (`--text`, or `--url`/`--id` to fetch) into topic, summary, intent, 5 novel concepts. `--thread` analyzes a whole thread as one document; `--learn` also builds a track. |
 | `analyze list` / `analyze get <id>` | Read stored analyses. |
 | `takeaway follow\|unfollow\|list\|refresh\|show` | Track accounts; summarize recent posts (supplied via `--posts` or fetched from X) into snapshots. |
 | `suggest generate\|list\|save\|dismiss\|add` | Rank un-saved posts against your saved signal; save/dismiss feedback. |
 | `bookmark add\|list\|show\|tag\|remove` | Save posts with tags (auto-suggested from analysis) and notes. |
-| `learn generate\|show\|list` | Build and review 7-day Feynman learning tracks. |
-| `search <query>` | Keyword search across analyses, takeaways, and bookmarks. |
+| `learn generate\|today\|done\|show\|list` | Build 7-day Feynman learning tracks, get today's task, and check off progress. |
+| `search <query>` | Full-text search (SQLite FTS5, BM25-ranked, stemmed) across analyses, takeaways, and bookmarks. |
+| `import x-archive <path>` | Bulk-import your extracted official X archive: likes become bookmarked posts, your tweets become posts. Free, idempotent. |
+| `digest [--days N]` | Markdown recap of analyses, takeaways, and bookmarks saved in the window (default 7 days). |
 | `setup` / `config set\|get\|list\|unset\|path` | Collect and manage provider credentials and defaults. |
 | `record get <id>` | Resolve any record by its prefixed id (`post_`, `ana_`, `acc_`, ...). |
-| `db stats\|migrate\|vacuum\|reset` | Inspect and maintain the database. |
+| `db stats\|migrate\|vacuum\|reindex\|reset` | Inspect and maintain the database. |
 | `manifest` | Emit a machine-readable description of the whole CLI. |
 
 Global flags (valid on any command): `--json` (default), `--pretty`, `--quiet`,
@@ -147,6 +149,13 @@ designed **free-first**:
 - **Account timelines (`takeaway`)** have no free path, so they use the official X API v2 with a
   Bearer token: `tenbrains takeaway refresh <user> --count 20` (omit `--posts` to fetch). Most
   accounts need a **paid X API tier (Basic+)** to read timelines.
+- **Threads (`analyze --thread`)** are analyzed as one document. Supply the parts yourself for free
+  (`--thread '["part 1", "part 2"]'`, `@file`, or `-`), or pass bare `--thread` with `--url`/`--id`
+  to fetch the author's self-thread via the API (Bearer token; recent search covers ~7 days).
+- **Your own history (`import x-archive`)** needs no API at all: request your account archive at
+  X → Settings → "Download an archive of your data", extract the zip, and run
+  `tenbrains import x-archive <dir>`. Likes land as bookmarked posts (instant signal for
+  `suggest generate`), your tweets as posts. Re-running dedupes on tweet id.
 
 Store the token (used for timelines and as the `--fetch api` fallback) during setup or config:
 
@@ -163,7 +172,8 @@ If your tier can't read a tweet/timeline, the CLI returns a structured `PROVIDER
 
 A single SQLite file (default `~/.local/share/tenbrains/tenbrains.db`, override with `--db`). Schema
 is versioned and migrated automatically on open. Tables: `posts`, `analyses`, `accounts`,
-`takeaway_snapshots`, `bookmarks`, `suggestions`, `learning_tracks`.
+`takeaway_snapshots`, `bookmarks`, `suggestions`, `learning_tracks`, plus a trigger-maintained
+FTS5 index (`search_fts`) behind `search` — rebuild it anytime with `tenbrains db reindex`.
 
 ```bash
 tenbrains --db ./research.db analyze --provider mock --text "..."   # isolate a workspace

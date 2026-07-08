@@ -54,9 +54,18 @@ export const TakeawayPostInputSchema = z.object({
 
 export const TakeawayPostsInputSchema = z.array(TakeawayPostInputSchema).min(1);
 
+/**
+ * Input shape for `analyze --thread <json>`: the ordered parts of one thread,
+ * each either a bare string or a post object. Analyzed as a single document.
+ */
+export const ThreadInputSchema = z
+  .array(z.union([z.string().min(1), TakeawayPostInputSchema]))
+  .min(1);
+
 export type Concept = z.infer<typeof ConceptSchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 export type TakeawayResult = z.infer<typeof TakeawayResultSchema>;
 export type ConceptRating = z.infer<typeof ConceptRatingSchema>;
 export type PostInput = z.infer<typeof PostInputSchema>;
 export type TakeawayPostInput = z.infer<typeof TakeawayPostInputSchema>;
+export type ThreadInput = z.infer<typeof ThreadInputSchema>;

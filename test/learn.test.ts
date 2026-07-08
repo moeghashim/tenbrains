@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildFeynmanTrack, prioritizeConcepts } from "../src/domain/learn.js";
+import { Database } from "../src/db/database.js";
+import { Store } from "../src/db/repositories.js";
+import {
+  buildFeynmanTrack,
+  nextPendingDay,
+  prioritizeConcepts,
+  scheduledDay,
+} from "../src/domain/learn.js";
 import type { Concept } from "../src/domain/types.js";
 
 const CONCEPTS: Concept[] = [
@@ -42,4 +49,51 @@ test("buildFeynmanTrack splits minutes into the learn step proportionally", () =
 
 test("buildFeynmanTrack returns empty for no concepts", () => {
   assert.deepEqual(buildFeynmanTrack([], 10, []), []);
+});
+
+test("nextPendingDay skips done days and returns null when complete", () => {
+  const days = buildFeynmanTrack(CONCEPTS, 10, []);
+  assert.equal(nextPendingDay(days, []), 1);
+  const p = (day: number) => ({ day, notes: null, completedAt: "t" });
+  assert.equal(nextPendingDay(days, [p(1), p(2)]), 3);
+  // Out-of-order completion: day 2 pending even though 3 is done.
+  assert.equal(nextPendingDay(days, [p(1), p(3)]), 2);
+  assert.equal(nextPendingDay(days, [1, 2, 3, 4, 5, 6, 7].map(p)), null);
+});
+
+test("scheduledDay maps elapsed calendar time to a clamped day number", () => {
+  const created = "2026-07-01T12:00:00.000Z";
+  assert.equal(scheduledDay(created, new Date("2026-07-01T18:00:00Z"), 7), 1);
+  assert.equal(scheduledDay(created, new Date("2026-07-04T12:00:00Z"), 7), 4);
+  assert.equal(scheduledDay(created, new Date("2026-08-01T12:00:00Z"), 7), 7); // clamped
+});
+
+test("track progress persists via markDone and rides along on reads", () => {
+  const store = new Store(Database.open({ path: ":memory:" }));
+  const { post } = store.posts.ingest({ text: "track post" });
+  const analysis = store.analyses.create({
+    postId: post.id,
+    provider: "mock",
+    model: "m",
+    topic: "T",
+    summary: "S",
+    intent: "I",
+    concepts: CONCEPTS,
+    mock: true,
+  });
+  const days = buildFeynmanTrack(CONCEPTS, 10, []);
+  const track = store.tracks.create({
+    analysisId: analysis.id,
+    minutesPerDay: 10,
+    ratings: [],
+    days,
+  });
+  assert.deepEqual(track.progress, []);
+
+  const updated = store.tracks.markDone(track.id, 1, "clicked for me");
+  assert.equal(updated.progress.length, 1);
+  assert.equal(updated.progress[0]?.day, 1);
+  assert.equal(updated.progress[0]?.notes, "clicked for me");
+  assert.equal(store.tracks.list(10)[0]?.progress.length, 1);
+  store.database.close();
 });

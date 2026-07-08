@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Database } from "../src/db/database.js";
+import { currentSchemaVersion } from "../src/db/migrations.js";
 import { Store } from "../src/db/repositories.js";
 
 function freshStore(): Store {
@@ -9,7 +10,7 @@ function freshStore(): Store {
 
 test("schema migrates to the current version on open", () => {
   const store = freshStore();
-  assert.equal(store.database.schemaVersion(), 1);
+  assert.equal(store.database.schemaVersion(), currentSchemaVersion());
   store.database.close();
 });
 
@@ -84,5 +85,10 @@ test("cascading delete removes an account's snapshots", () => {
   assert.equal(store.snapshots.all().length, 1);
   store.accounts.delete(account.id);
   assert.equal(store.snapshots.all().length, 0);
+  // The cascade-deleted snapshot must also leave the search index.
+  const fts = store.database.handle
+    .prepare("SELECT COUNT(*) AS n FROM search_fts WHERE type = 'takeaway'")
+    .get() as { n: number };
+  assert.equal(fts.n, 0);
   store.database.close();
 });

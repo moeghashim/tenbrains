@@ -77,11 +77,18 @@ export interface LearningDay {
   check: string;
 }
 
+export interface TrackDayProgress {
+  day: number;
+  notes: string | null;
+  completedAt: string;
+}
+
 export interface LearningTrack {
   id: string;
   analysisId: string;
   minutesPerDay: number;
   ratings: ConceptRating[];
   days: LearningDay[];
+  progress: TrackDayProgress[];
   createdAt: string;
 }

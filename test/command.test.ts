@@ -63,6 +63,40 @@ test("analyzeCommand --learn also persists a 7-day track", async () => {
   }
 });
 
+test("analyzeCommand --thread combines supplied parts into one document", async () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    const thread = JSON.stringify([
+      "Thread on agent-first design. 1/3",
+      { text: "Every command returns one JSON envelope. 2/3", externalId: "th-2" },
+      "Persistence is not optional. 3/3",
+    ]);
+    const result = await analyzeCommand(ctx, { provider: "mock", thread, author: "neo" });
+    const data = result.data as { post: { text: string } };
+    assert.equal(result.meta?.threadParts, 3);
+    assert.equal(result.meta?.source, "thread");
+    assert.ok(data.post.text.includes("1/3"));
+    assert.ok(data.post.text.includes("3/3"));
+    assert.equal(ctx.store().database.stats().posts, 1); // one post, not three
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
+test("analyzeCommand bare --thread without --url/--id is a USAGE error", async () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    await assert.rejects(
+      analyzeCommand(ctx, { provider: "mock", thread: true }),
+      (error: unknown) => (error as { code?: string }).code === "USAGE",
+    );
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
 test("analyzeCommand surfaces MISSING_CREDENTIALS for a keyless real provider", async () => {
   const { ctx, cleanup } = ctxWithTempConfig();
   try {

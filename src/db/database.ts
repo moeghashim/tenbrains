@@ -77,6 +77,7 @@ export class Database {
       "bookmarks",
       "suggestions",
       "learning_tracks",
+      "track_progress",
     ];
     const out: Record<string, number> = {};
     for (const table of tables) {

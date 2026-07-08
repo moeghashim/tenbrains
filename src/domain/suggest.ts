@@ -5,18 +5,28 @@ import type { Suggestion } from "./types.js";
 const TAG_WEIGHT = 3;
 const TAKEAWAY_WEIGHT = 2;
 const BOOKMARK_TEXT_WEIGHT = 1;
+/** Interests drift: signal loses half its weight every ~2 months. */
+const HALF_LIFE_DAYS = 60;
 
 interface Profile {
   weights: Map<string, number>;
   empty: boolean;
 }
 
+/** Exponential decay in (0, 1] by age relative to `now`. */
+function decayFactor(createdAt: string, now: Date): number {
+  const ageDays = Math.max(0, (now.getTime() - new Date(createdAt).getTime()) / 86_400_000);
+  return 0.5 ** (ageDays / HALF_LIFE_DAYS);
+}
+
 /**
  * Build a weighted interest profile from saved signal: bookmark tags (strongest),
- * account-takeaway themes, and the text of bookmarked posts. This is the local,
- * deterministic stand-in for the original's semantic affinity ranking.
+ * account-takeaway themes, and the text of bookmarked posts, each discounted by
+ * an exponential recency decay so last week's saves outweigh last quarter's.
+ * This is the local, deterministic stand-in for the original's semantic
+ * affinity ranking.
  */
-function buildProfile(store: Store): Profile {
+function buildProfile(store: Store, now: Date): Profile {
   const weights = new Map<string, number>();
   const bump = (token: string, weight: number) => {
     weights.set(token, (weights.get(token) ?? 0) + weight);
@@ -25,22 +35,24 @@ function buildProfile(store: Store): Profile {
   const postsById = new Map(store.posts.all().map((p) => [p.id, p]));
 
   for (const bookmark of store.bookmarks.all()) {
+    const decay = decayFactor(bookmark.createdAt, now);
     for (const tag of bookmark.tags) {
       for (const token of tokenSet(tag)) {
-        bump(token, TAG_WEIGHT);
+        bump(token, TAG_WEIGHT * decay);
       }
     }
     const post = postsById.get(bookmark.postId);
     if (post) {
       for (const token of tokenSet(post.text)) {
-        bump(token, BOOKMARK_TEXT_WEIGHT);
+        bump(token, BOOKMARK_TEXT_WEIGHT * decay);
       }
     }
   }
 
   for (const snap of store.snapshots.all()) {
+    const decay = decayFactor(snap.createdAt, now);
     for (const token of tokenSet(`${snap.summary} ${snap.takeaways.join(" ")}`)) {
-      bump(token, TAKEAWAY_WEIGHT);
+      bump(token, TAKEAWAY_WEIGHT * decay);
     }
   }
 
@@ -77,10 +89,10 @@ export interface GenerateResult {
  */
 export function generateSuggestions(
   store: Store,
-  options: { limit?: number } = {},
+  options: { limit?: number; now?: Date } = {},
 ): GenerateResult {
   const limit = options.limit ?? 10;
-  const profile = buildProfile(store);
+  const profile = buildProfile(store, options.now ?? new Date());
   const bookmarkedPostIds = new Set(store.bookmarks.all().map((b) => b.postId));
 
   let created = 0;
@@ -113,7 +125,7 @@ export function generateSuggestions(
       if (scored.score <= 0) {
         continue;
       }
-      score = scored.score;
+      score = Number(scored.score.toFixed(4));
       reason = `Matches your saved interest in ${scored.matched.join(", ")}.`;
     }
 

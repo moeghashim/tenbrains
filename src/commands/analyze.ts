@@ -7,9 +7,9 @@ import { type Opts, optBool, optNumber, optString, requireString } from "../core
 import type { CommandResult } from "../core/output.js";
 import { parseOrThrow } from "../core/validate.js";
 import { buildFeynmanTrack } from "../domain/learn.js";
-import { PostInputSchema, RatingsInputSchema } from "../domain/schemas.js";
+import { PostInputSchema, RatingsInputSchema, ThreadInputSchema } from "../domain/schemas.js";
 import type { Analysis, LearningTrack, Post } from "../domain/types.js";
-import { type FetchMode, fetchTweet, isFetchMode } from "../x/client.js";
+import { type FetchMode, fetchThread, fetchTweet, isFetchMode } from "../x/client.js";
 import { resolveXBearer } from "./shared.js";
 
 function parseFetchMode(value: string | undefined): FetchMode {
@@ -37,13 +37,20 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
   });
   const store = ctx.store();
 
-  // Pick the content source: a stored post, inline text, or a fetched tweet.
+  // Pick the content source: a stored post, inline text, thread parts, or a fetched tweet/thread.
   let post: Post;
   let deduped = false;
   let source = "text";
+  let threadParts: number | undefined;
   const postId = optString(opts, "postId");
   const textOpt = optString(opts, "text");
   const refInput = optString(opts, "url") ?? optString(opts, "id");
+  // --thread [json]: a string is supplied parts; `true` means fetch via the API.
+  const threadOpt = opts.thread === true ? true : optString(opts, "thread");
+
+  if (typeof threadOpt === "string" && textOpt !== undefined) {
+    throw new CliError("USAGE", "Use either --text or --thread <json>, not both.");
+  }
 
   if (postId) {
     const existing = store.posts.findById(postId);
@@ -52,6 +59,61 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
     }
     post = existing;
     source = "stored";
+  } else if (typeof threadOpt === "string") {
+    const parts = parseOrThrow(
+      ThreadInputSchema,
+      resolveJsonInput(threadOpt),
+      "Invalid thread input.",
+    ).map((part) => (typeof part === "string" ? { text: part } : part));
+    const first = parts[0] as { text: string; externalId?: string; url?: string };
+    const input = parseOrThrow(
+      PostInputSchema,
+      {
+        text: parts.map((p) => p.text).join("\n\n"),
+        url: first.url ?? optString(opts, "url"),
+        externalId: first.externalId ?? optString(opts, "id"),
+        authorUsername: optString(opts, "author"),
+        authorName: optString(opts, "authorName"),
+        postedAt: optString(opts, "postedAt"),
+      },
+      "Invalid post input.",
+    );
+    ({ post, deduped } = store.posts.ingest(input));
+    source = "thread";
+    threadParts = parts.length;
+  } else if (threadOpt === true) {
+    if (!refInput) {
+      throw new CliError("USAGE", "Bare --thread needs --url or --id to fetch the thread from X.");
+    }
+    const bearer = resolveXBearer(ctx, opts);
+    if (!bearer) {
+      throw new CliError(
+        "MISSING_CREDENTIALS",
+        "Fetching a thread uses the X API and needs a Bearer token. Configure one with `tenbrains setup --x-bearer <token>`, or supply the parts yourself via --thread <json>.",
+      );
+    }
+    ctx.logger.info("Fetching thread from X (api)…");
+    const thread = await fetchThread(refInput, bearer);
+    if (!thread.complete) {
+      ctx.logger.warn(
+        "Could not search for thread replies (tier limits or thread older than ~7 days); analyzing the root tweet only.",
+      );
+    }
+    const input = parseOrThrow(
+      PostInputSchema,
+      {
+        text: thread.parts.map((p) => p.text).join("\n\n"),
+        url: thread.root.url ?? optString(opts, "url"),
+        externalId: thread.root.externalId ?? optString(opts, "id"),
+        authorUsername: thread.root.authorUsername ?? optString(opts, "author"),
+        authorName: thread.root.authorName ?? optString(opts, "authorName"),
+        postedAt: thread.root.postedAt ?? optString(opts, "postedAt"),
+      },
+      "Fetched thread did not produce valid post input.",
+    );
+    ({ post, deduped } = store.posts.ingest(input));
+    source = "x:thread";
+    threadParts = thread.parts.length;
   } else if (textOpt !== undefined) {
     const input = parseOrThrow(
       PostInputSchema,
@@ -87,7 +149,7 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
   } else {
     throw new CliError(
       "USAGE",
-      "Provide --text, --post-id, or --url/--id (to fetch the tweet from X).",
+      "Provide --text, --thread, --post-id, or --url/--id (to fetch the tweet from X).",
     );
   }
 
@@ -121,6 +183,8 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
       deduped,
       source,
       persisted: true,
+      ...(threadParts !== undefined ? { threadParts } : {}),
+      ...(track ? { trackId: track.id } : {}),
     },
     human: (data) => renderAnalysis((data as { analysis: Analysis }).analysis),
   };

@@ -95,11 +95,34 @@ tenbrains suggest save sug_...             # materializes the suggestion as a bo
 tenbrains suggest dismiss sug_...          # suppresses it in future ranking
 ```
 
+### Daily learning loop
+
+A track generated with `--learn` (or `learn generate`) is a 7-day plan you can coach the user
+through, one session at a time:
+
+```bash
+tenbrains learn today                      # next pending day's task (latest active track)
+tenbrains learn done trk_... --notes "..."  # check it off; meta.completed=true on the last day
+```
+
+`learn today` never skips content — it returns the first unfinished day, plus `behindBy` when the
+calendar has moved ahead of the learner.
+
 ### Bookmarks and recall
 
 ```bash
 tenbrains bookmark add --post-id post_... [--tags rag,agents]   # auto-tags from the analysis if omitted
 tenbrains search "vector databases" --type analysis,bookmark
+```
+
+### Bulk-import the user's X history (free)
+
+If the user has their official X account archive (Settings → "Download an archive of your data",
+then extract the zip), import it in one shot — likes become bookmarked posts, which immediately
+powers `suggest generate`:
+
+```bash
+tenbrains import x-archive ~/Downloads/twitter-archive
 ```
 
 ### Read anything back

@@ -3,6 +3,7 @@ import type { RunContext } from "../core/context.js";
 import { CliError } from "../core/errors.js";
 import { type Opts, optBool } from "../core/opts.js";
 import type { CommandResult } from "../core/output.js";
+import { rebuildSearchIndex } from "../db/fts.js";
 
 export function dbStatsCommand(ctx: RunContext, _opts: Opts): CommandResult {
   const store = ctx.store();
@@ -40,6 +41,16 @@ export function dbVacuumCommand(ctx: RunContext, _opts: Opts): CommandResult {
     data: { path: store.database.path, vacuumed: true },
     meta: { persisted: true },
     human: () => "Vacuumed database.",
+  };
+}
+
+export function dbReindexCommand(ctx: RunContext, _opts: Opts): CommandResult {
+  const store = ctx.store();
+  const { indexed } = rebuildSearchIndex(store.database.handle);
+  return {
+    data: { path: store.database.path, indexed },
+    meta: { persisted: true },
+    human: () => `Rebuilt search index (${indexed} documents).`,
   };
 }
 
