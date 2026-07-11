@@ -1,9 +1,24 @@
 {
   "name": "tenbrains",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Agent-first CLI for X research: analyze posts, track accounts, surface suggestions, and persist every outcome to a local database.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moeghashim/tenbrains.git"
+  },
+  "homepage": "https://github.com/moeghashim/tenbrains#readme",
+  "bugs": "https://github.com/moeghashim/tenbrains/issues",
+  "keywords": [
+    "cli",
+    "agent",
+    "x",
+    "twitter",
+    "research",
+    "sqlite",
+    "claude"
+  ],
   "engines": {
     "node": ">=24.0.0"
   },
@@ -27,7 +42,8 @@
     "lint": "biome check src test",
     "format": "biome format --write src test",
     "test": "tsx --test \"test/**/*.test.ts\"",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "prepublishOnly": "npm run check && npm run clean && npm run build"
   },
   "dependencies": {
     "commander": "^13.1.0",
