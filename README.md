@@ -33,6 +33,13 @@ machine-readable code and a deterministic exit status, and the entire surface is
 ## Install
 
 ```bash
+npm install -g tenbrains               # from npm — puts `tenbrains` (and `tb`) on PATH
+tenbrains --help
+```
+
+Or from a clone:
+
+```bash
 npm install
 npm run build
 node dist/bin/tenbrains.js --help      # or: npm link  ->  tenbrains --help

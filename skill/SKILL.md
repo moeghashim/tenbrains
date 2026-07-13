@@ -21,8 +21,8 @@ It is built to be driven by an agent: each run prints one JSON object you can pa
 ## Prerequisites
 
 - **The `tenbrains` command must be available.** If `tenbrains --version` fails, it is a Node CLI
-  (Node >= 24). Install it by running `npm link` inside the project, or `npm i -g tenbrains` once
-  published. As a fallback you can call the built entrypoint directly:
+  (Node >= 24). Install it with `npm i -g tenbrains` (published on npm), or run `npm link` inside
+  a clone of the project. As a fallback you can call the built entrypoint directly:
   `node <repo>/dist/bin/tenbrains.js`.
 - **A provider for real analysis.** Configure a key once (stored in `~/.config/tenbrains/config.json`
   at mode 0600, never an env file): `tenbrains setup --provider anthropic --api-key sk-ant-...`.

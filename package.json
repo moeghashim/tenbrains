@@ -35,7 +35,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/bin/tenbrains.js",
     "dev": "tsx src/bin/tenbrains.ts",
     "tenbrains": "tsx src/bin/tenbrains.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
