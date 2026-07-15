@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>tenbrains · YouTube transcription spec</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%B9%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#fbfbfa; --bg2:#f3f3f1; --card:#ffffff; --inset:#f6f6f4;
+    --line:#e7e6e2; --line2:#d9d8d2;
+    --ink:#16161a; --ink2:#33333a; --ink3:#5c5c66; --ink4:#8a8a94;
+    --accent:#c4302b; --accent2:#e0574f; --accent-tint:#fbe3e1;
+    --ok:#2f7d5b; --ok-tint:#d9ede3; --amber:#9a6b1f; --amber-tint:#f3e6cc;
+    --blue:#2f5ea8; --blue-tint:#dbe6f5;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f0f11; --bg2:#161619; --card:#17171b; --inset:#1c1c21;
+      --line:#26262c; --line2:#33333b;
+      --ink:#f3f3f5; --ink2:#d7d7dc; --ink3:#a3a3ad; --ink4:#70707a;
+      --accent:#f0655f; --accent2:#f0655f; --accent-tint:#2a1614;
+      --ok:#5cc08c; --ok-tint:#15271e; --amber:#d9ab5c; --amber-tint:#2a2214;
+      --blue:#7ea6e6; --blue-tint:#14203a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f0f11; --bg2:#161619; --card:#17171b; --inset:#1c1c21;
+    --line:#26262c; --line2:#33333b;
+    --ink:#f3f3f5; --ink2:#d7d7dc; --ink3:#a3a3ad; --ink4:#70707a;
+    --accent:#f0655f; --accent2:#f0655f; --accent-tint:#2a1614;
+    --ok:#5cc08c; --ok-tint:#15271e; --amber:#d9ab5c; --amber-tint:#2a2214;
+    --blue:#7ea6e6; --blue-tint:#14203a;
+  }
+  :root[data-theme="light"]{
+    --bg:#fbfbfa; --bg2:#f3f3f1; --card:#ffffff; --inset:#f6f6f4;
+    --line:#e7e6e2; --line2:#d9d8d2;
+    --ink:#16161a; --ink2:#33333a; --ink3:#5c5c66; --ink4:#8a8a94;
+    --accent:#c4302b; --accent2:#e0574f; --accent-tint:#fbe3e1;
+    --ok:#2f7d5b; --ok-tint:#d9ede3; --amber:#9a6b1f; --amber-tint:#f3e6cc;
+    --blue:#2f5ea8; --blue-tint:#dbe6f5;
+  }
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  body{margin:0;font-family:var(--sans);color:var(--ink2);line-height:1.62;font-size:15.5px;background:var(--bg);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 24px 100px}
+  a{color:var(--accent);text-underline-offset:3px}
+  code{font-family:var(--mono);font-size:.86em;background:var(--inset);border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ink)}
+  strong{color:var(--ink)}
+
+  /* masthead */
+  .kick{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 12px;display:flex;align-items:center;gap:9px}
+  .kick .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  h1{font-size:38px;line-height:1.1;letter-spacing:-.02em;color:var(--ink);margin:0 0 14px;font-weight:680}
+  .lede{font-size:18.5px;color:var(--ink3);margin:0 0 22px;max-width:64ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:30px}
+  .pill{font-family:var(--mono);font-size:11px;padding:4px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--card);color:var(--ink3);white-space:nowrap}
+  .pill.draft{background:var(--amber-tint);border-color:transparent;color:var(--amber);font-weight:600}
+
+  /* code block */
+  .code{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--ink2);overflow-x:auto;margin:6px 0 4px;box-shadow:0 18px 40px -32px rgba(0,0,0,.4)}
+  .code .c{color:var(--ink4)}
+  .code .p{color:var(--accent)}
+  .code .k{color:var(--blue)}
+
+  h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.11em;color:var(--ink4);margin:52px 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .n{font-family:var(--mono);color:var(--accent);font-size:12px}
+  .rule{height:1px;background:linear-gradient(90deg,var(--line2),transparent);margin:8px 0 20px}
+  h3{font-size:16px;color:var(--ink);margin:26px 0 8px;font-weight:640}
+  p{margin:0 0 14px;max-width:70ch}
+  ul{padding-left:20px;margin:0 0 14px;max-width:70ch}
+  li{margin-bottom:7px}
+  li::marker{color:var(--accent)}
+
+  /* cards */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+  .card{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:16px 18px}
+  .card h4{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);font-family:var(--mono)}
+  .card.goals h4{color:var(--ok)} .card.nogoals h4{color:var(--ink4)}
+  .card ul{margin:0;padding-left:18px} .card li{font-size:14px;color:var(--ink2)}
+
+  /* flow */
+  .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:16px 0 6px}
+  .step{flex:1 1 150px;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:12px 14px}
+  .step .s{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.05em}
+  .step b{display:block;color:var(--ink);font-size:14px;margin:3px 0 2px}
+  .step span{font-size:12.5px;color:var(--ink3)}
+
+  /* table */
+  .tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink4);text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--bg2);white-space:nowrap}
+  td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink2)}
+  tr:last-child td{border-bottom:none}
+  td code{white-space:nowrap}
+  .tag{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600}
+  .tag.err{background:var(--accent-tint);color:var(--accent)}
+  .tag.ok{background:var(--ok-tint);color:var(--ok)}
+
+  /* callout */
+  .callout{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--card);border-radius:0 10px 10px 0;padding:14px 18px;margin:18px 0}
+  .callout.blue{border-left-color:var(--blue)}
+  .callout .t{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+  .callout.blue .t{color:var(--blue)}
+  .callout p{margin:0;font-size:14.5px}
+
+  /* decisions */
+  .dec{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:15px 18px;margin:12px 0;display:flex;gap:14px;align-items:flex-start}
+  .dec .num{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent);flex:none;width:22px}
+  .dec b{color:var(--ink)}
+  .rec{display:inline-block;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;background:var(--ok-tint);color:var(--ok);padding:2px 7px;border-radius:5px;margin-left:6px;vertical-align:1px}
+
+  footer{margin-top:64px;border-top:1px solid var(--line);padding-top:18px;font-size:12.5px;color:var(--ink4);font-family:var(--mono);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  .toggle{position:fixed;top:16px;right:16px;font-family:var(--mono);font-size:11px;border:1px solid var(--line2);background:var(--card);color:var(--ink3);border-radius:999px;padding:6px 12px;cursor:pointer}
+  @media (max-width:640px){ h1{font-size:30px} .cols{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<button class="toggle" onclick="(function(){var r=document.documentElement;var d=r.getAttribute('data-theme')|| (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');r.setAttribute('data-theme', d==='dark'?'light':'dark')})()">◐ theme</button>
+
+<div class="wrap">
+
+  <p class="kick"><span class="dot"></span>tenbrains · design spec</p>
+  <h1>YouTube transcription</h1>
+  <p class="lede">Let <code>tenbrains analyze</code> take a YouTube URL, pull the caption track for free, and run the transcript through the pipeline that already analyses tweets — same topic/summary/intent/concepts, same persistence, same <code>--learn</code>, <code>search</code>, and <code>digest</code>.</p>
+
+  <div class="meta">
+    <span class="pill draft">Draft · for team review</span>
+    <span class="pill">Owner: @moeghashim</span>
+    <span class="pill">Target: tenbrains 2.2.0</span>
+    <span class="pill">No new dependency</span>
+    <span class="pill">No schema migration</span>
+  </div>
+
+  <div class="code"><span class="c"># A transcript is just long-form content — it enters the existing pipeline</span><br>
+tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtube.com/watch?v=…"</span><br>
+<span class="c"># → fetch captions · analyse transcript · persist post + analysis</span><br>
+<span class="c"># meta.source = "youtube" · --learn / search / digest all work unchanged</span></div>
+
+  <h2><span class="n">01</span> Motivation</h2>
+  <div class="rule"></div>
+  <ul>
+    <li>Long-form video is a major research surface tenbrains can't touch today.</li>
+    <li>The analysis pipeline is content-agnostic — topic/summary/intent/concepts fit a transcript as cleanly as a tweet.</li>
+    <li>Cheap to add: the fetch problem is the same shape as the tweet-oEmbed path already in the codebase.</li>
+  </ul>
+
+  <h2><span class="n">02</span> Goals &amp; non-goals</h2>
+  <div class="rule"></div>
+  <div class="cols">
+    <div class="card goals">
+      <h4>Goals</h4>
+      <ul>
+        <li>Fetch a public transcript with <strong>no API key, no paid tier, no new dependency</strong>.</li>
+        <li>Reuse the whole downstream pipeline (persist → learn → search → digest → suggest).</li>
+        <li>Structured errors + a manual fallback — never crash.</li>
+        <li>Pure, fixture-tested parsers so a markup change is a one-line fix.</li>
+      </ul>
+    </div>
+    <div class="card nogoals">
+      <h4>Non-goals (v1)</h4>
+      <ul>
+        <li>Audio transcription (Whisper / yt-dlp) for videos with no captions.</li>
+        <li>Chapter/timestamp segmentation or a transcript-viewer UI.</li>
+        <li>Playlist / channel bulk import.</li>
+        <li>Auto-translation beyond selecting an available track.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2><span class="n">03</span> Fetch — free-first caption scrape</h2>
+  <div class="rule"></div>
+  <p>Mirrors <code>src/x/client.ts</code> (the tweet oEmbed path): an undocumented-but-free endpoint, pure parsers split from the network layer, structured errors.</p>
+  <div class="flow">
+    <div class="step"><span class="s">STEP 1</span><b>Watch page</b><span>GET the video's HTML</span></div>
+    <div class="step"><span class="s">STEP 2</span><b>Player response</b><span>extract <code>ytInitialPlayerResponse</code></span></div>
+    <div class="step"><span class="s">STEP 3</span><b>Caption track</b><span>pick manual&gt;ASR, lang&gt;en&gt;first</span></div>
+    <div class="step"><span class="s">STEP 4</span><b>Timedtext</b><span>fetch baseUrl → flatten to text</span></div>
+  </div>
+  <div class="callout">
+    <div class="t">No new dependency</div>
+    <p><code>fetch</code> + regex/JSON parsing — the same toolkit the oEmbed path uses. Rejected: <code>youtube-transcript</code> (fragile, redundant), <code>yt-dlp</code> (external binary, breaks the self-contained stance), and the YouTube Data API <code>captions.download</code> (needs the owner's OAuth — the same dead end that makes X timelines a paid feature).</p>
+  </div>
+
+  <h2><span class="n">04</span> Integration — extend <code>analyze</code></h2>
+  <div class="rule"></div>
+  <p>No parallel command. <code>analyze</code> detects a YouTube URL in <code>--url</code> and routes to the transcript fetcher, exactly as <code>--thread</code> routes differently from a plain tweet. Everything after ingestion runs unchanged.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Field</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td><code>post.text</code></td><td>flattened transcript</td></tr>
+      <tr><td><code>post.externalId</code></td><td><code>yt:&lt;videoId&gt;</code> — distinct prefix, dedupes re-runs, no tweet-id collision</td></tr>
+      <tr><td><code>post.url</code></td><td>canonical <code>watch?v=&lt;id&gt;</code></td></tr>
+      <tr><td><code>post.authorUsername</code></td><td>channel</td></tr>
+      <tr><td><code>post.postedAt</code></td><td>upload date</td></tr>
+      <tr><td><code>post.raw</code></td><td>video metadata → existing <code>posts.raw_json</code> (<strong>no migration</strong>)</td></tr>
+      <tr><td><code>meta.source</code></td><td><code>"youtube"</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>The analyzer prompt is tweet-tuned; pass an optional <code>kind: "tweet" | "transcript"</code> and swap one sentence to <em>"You are analyzing a video transcript."</em> Output schema untouched.</p>
+
+  <h2><span class="n">05</span> Errors &amp; fallback</h2>
+  <div class="rule"></div>
+  <p>Reuses the existing <code>PROVIDER_*</code> scaffolding. Every "no captions" path points at the manual escape hatch <code>analyze --transcript @file</code>, which also makes the feature testable offline.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Condition</th><th>Code</th><th>Exit</th></tr></thead>
+    <tbody>
+      <tr><td>Not found / deleted / no caption tracks</td><td><span class="tag err">NOT_FOUND</span></td><td>3</td></tr>
+      <tr><td>Private / age-restricted / region-blocked</td><td><span class="tag err">PROVIDER_UNAUTHORIZED</span></td><td>5</td></tr>
+      <tr><td>Rate limited</td><td><span class="tag err">PROVIDER_RATE_LIMITED</span></td><td>5</td></tr>
+      <tr><td>Network / timeout</td><td><span class="tag err">PROVIDER_NETWORK</span></td><td>5</td></tr>
+      <tr><td>Markup changed, can't parse</td><td><span class="tag err">PROVIDER_BAD_OUTPUT</span></td><td>5</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2><span class="n">06</span> Surface, storage, testing</h2>
+  <div class="rule"></div>
+  <div class="code">analyze <span class="p">--url</span> &lt;youtube-url&gt;            <span class="c"># fetch + analyse captions</span><br>
+analyze <span class="p">--url</span> &lt;url&gt; <span class="p">--lang</span> es          <span class="c"># prefer a caption language</span><br>
+analyze <span class="p">--transcript</span> @file | -         <span class="c"># supply a transcript manually (no network)</span><br>
+analyze <span class="p">--url</span> &lt;url&gt; <span class="p">--learn</span>            <span class="c"># transcript → 7-day track (already works)</span></div>
+  <ul>
+    <li><strong>Storage:</strong> reuse <code>posts</code> + <code>analyses</code>; metadata in <code>raw_json</code> — no schema change (stays v3).</li>
+    <li><strong>Long transcripts:</strong> v1 sends as-is with a soft length warning; <code>--summarize-first</code> is a follow-up.</li>
+    <li><strong>Testing:</strong> fixture unit tests for the three pure parsers, one offline command test via <code>--transcript</code>, one live smoke — the same shape as the shipped thread feature.</li>
+  </ul>
+
+  <h2><span class="n">07</span> Risks</h2>
+  <div class="rule"></div>
+  <div class="tw"><table>
+    <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>YouTube changes watch-page markup</td><td>Pure, fixture-tested parsers → one-line fix. Same risk class as existing oEmbed HTML parsing.</td></tr>
+      <tr><td>Video genuinely has no captions</td><td>Structured <code>NOT_FOUND</code> → <code>--transcript @file</code>. Audio transcription deferred.</td></tr>
+      <tr><td>ToS / gray-area scraping</td><td>Same posture as tweet oEmbed + archive paths — public captions, personal research; noted in docs.</td></tr>
+      <tr><td>Token cost on long transcripts</td><td>Soft warning in v1; <code>--summarize-first</code> later.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2><span class="n">08</span> Open decisions — team input</h2>
+  <div class="rule"></div>
+  <div class="dec"><span class="num">1</span><div><b>Fold into <code>analyze</code><span class="rec">recommended</span></b> vs. a dedicated <code>tenbrains youtube</code> command. Folding in reuses everything and adds no surface; a separate command is only worth it if video-specific features (chapters, timestamps, a viewer) are expected to grow.</div></div>
+  <div class="dec"><span class="num">2</span><div><b>Caption-only v1<span class="rec">recommended</span></b> with <code>--transcript @file</code> as the manual fallback — defer audio/Whisper transcription entirely?</div></div>
+  <div class="dec"><span class="num">3</span><div><b>Ship as a minor — 2.2.0.</b> Purely additive; no breaking changes.</div></div>
+
+  <div class="callout blue">
+    <div class="t">Effort</div>
+    <p>Closely matches the already-shipped thread feature: a ~200-line client module (pure parsers + orchestration), a ~40-line <code>analyze</code> integration, fixture tests + one offline command test + a live smoke, and docs. One focused PR through the existing branch → PR → CI (DCO + typecheck/lint/test) flow.</p>
+  </div>
+
+  <footer>
+    <span>tenbrains — agent-first X research CLI</span>
+    <span>Draft spec · shareable copy</span>
+  </footer>
+</div>
+</body>
+</html>
