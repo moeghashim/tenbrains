@@ -11,12 +11,14 @@ Let `tenbrains analyze` accept a YouTube URL, fetch the video's caption track fo
 free, and run the transcript through the **existing** analysis pipeline — the
 same `{ topic, summary, intent, 5 concepts }` extraction, persistence, learning
 tracks, search, and digest that already work for tweets. A transcript is treated
-as one more kind of long-form content, not a new subsystem.
+as one more kind of long-form content, not a new subsystem. Two composable
+companion actions ride on top: `--summarize` (a fuller narrative digest) and
+`--learn` (a 7-day learning track).
 
 ```bash
-tenbrains analyze --url "https://youtube.com/watch?v=dQw4w9WgXcQ"
-# → fetches captions, analyses the transcript, persists post + analysis
-# meta.source = "youtube"; --learn, search, digest all work unchanged
+tenbrains analyze --url "https://youtube.com/watch?v=dQw4w9WgXcQ" --summarize --learn
+# → fetch captions · analyse · summarize · build a learning track — one call
+# meta.source = "youtube"; search, digest, record get see them together
 ```
 
 ## 2. Motivation
@@ -120,19 +122,53 @@ also makes the whole feature testable offline with no network — mirroring
 analyze --url <youtube-url>            # fetch + analyse a video's captions
 analyze --url <url> --lang es          # prefer a caption language
 analyze --transcript @file | -         # supply a transcript manually (no network)
-analyze --url <url> --learn            # transcript → 7-day learning track (already works)
+analyze --url <url> --summarize        # + a fuller narrative summary of the video
+analyze --url <url> --learn            # + a 7-day learning track
+analyze --url <url> --summarize --learn  # both, in one call
 ```
 
-New flags: `--lang <code>` (caption language preference) and
-`--transcript <text|@file|->`. `meta.source` gains `"youtube"`; the manifest
-contract test is updated to document both.
+New flags: `--lang <code>` (caption language preference), `--transcript
+<text|@file|->` (manual fallback), and `--summarize` (see §5.1). `--learn`
+already exists. `meta.source` gains `"youtube"`; the manifest contract test is
+updated to document all of them.
+
+### 5.1 Companion actions — `--summarize` and `--learn`
+
+Both flags run on the same fetched-and-analysed content in a single invocation
+and **compose** — pass either, both, or neither. They are general `analyze`
+options (not YouTube-only), but they earn their keep on long-form transcripts
+where the one-line analysis `summary` isn't enough.
+
+**`--summarize`** produces a fuller, readable digest of the transcript, distinct
+from the terse `summary` field the analysis already yields:
+
+- New `summarizeContent()` in `src/ai/analyzer.ts` with its own system/user
+  prompt and a `SummaryResult` zod schema — `{ summary: string (multi-paragraph),
+  keyPoints: string[] }`. Mock-provider support so it's offline-testable, same as
+  the other analyzer paths.
+- Returned under `data.summary` (the narrative) alongside the existing
+  `data.analysis`; `meta` gains `summarized: true`. Persisted in the post's
+  `raw_json` (no new table in v1; a first-class `summaries` table is a possible
+  follow-up if we want summary history/recall).
+- For very long transcripts, `--summarize` **doubles as the condense-first
+  pass** that feeds concept extraction — folding in the token-cost mitigation
+  from §6 rather than adding a separate `--summarize-first` flag.
+
+**`--learn`** is unchanged: it builds the 7-day Feynman track from the analysis'
+concepts (`--minutes`, `--ratings` still apply), and it already works for any
+analyzed content — a transcript included.
+
+Ordering in one call: fetch → analyse → (summarize) → (learn), all persisted
+against the same post so `search`, `digest`, and `record get` see them together.
 
 ## 6. Long transcripts
 
 A 40-minute video is thousands of words vs. a 280-char tweet — real token cost.
 v1 sends the transcript as-is (modern context windows absorb it) and emits a soft
-length warning past a threshold. A `--summarize-first` pre-pass is an easy
-follow-up, out of scope for v1.
+length warning past a threshold. When `--summarize` is set, the narrative
+summary is generated first and reused as the condensed input to concept
+extraction, so the expensive step sees a shorter document (§5.1) — no separate
+pre-pass flag needed.
 
 ## 7. Testing
 
@@ -153,7 +189,7 @@ one offline command test + a live smoke).
 | YouTube changes watch-page markup → extraction breaks | Isolate in pure, fixture-tested parsers; breakage is a one-line fix + updated fixture. Same risk class as the existing oEmbed HTML parsing. |
 | Video genuinely has no captions (no manual, no ASR) | Structured `NOT_FOUND` → `--transcript @file`. Audio transcription is explicitly deferred. |
 | ToS / gray-area scraping | Same posture as the tweet oEmbed and archive paths — public captions for personal research; noted in docs. |
-| Token cost on long transcripts | Soft warning in v1; `--summarize-first` later. |
+| Token cost on long transcripts | Soft warning in v1; `--summarize` condenses first (§5.1). |
 
 ## 9. Effort & rollout
 
@@ -161,7 +197,9 @@ Shape and size closely match the already-shipped thread feature:
 
 - `src/youtube/client.ts` (~200 lines, pure parsers + orchestration)
 - `analyze.ts` integration (~40 lines) + 2 schema lines + 1 prompt param
-- fixture unit tests + one offline command test + live smoke
+- `--summarize`: a `summarizeContent()` analyzer + prompt + `SummaryResult`
+  schema + mock (~50 lines); `--learn` is already built
+- fixture unit tests + one offline command test (covers `--summarize`/`--learn`) + live smoke
 - docs: README, `skill/SKILL.md`, `skill/references/cli-contract.md`; manifest test update
 
 One focused PR, through the existing branch → PR → CI (DCO + typecheck/lint/test) flow.

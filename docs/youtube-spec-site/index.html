@@ -136,9 +136,9 @@
   </div>
 
   <div class="code"><span class="c"># A transcript is just long-form content — it enters the existing pipeline</span><br>
-tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtube.com/watch?v=…"</span><br>
-<span class="c"># → fetch captions · analyse transcript · persist post + analysis</span><br>
-<span class="c"># meta.source = "youtube" · --learn / search / digest all work unchanged</span></div>
+tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtube.com/watch?v=…"</span> <span class="p">--summarize</span> <span class="p">--learn</span><br>
+<span class="c"># → fetch captions · analyse · summarize · build a learning track — one call</span><br>
+<span class="c"># meta.source = "youtube" · search / digest / record get see them together</span></div>
 
   <h2><span class="n">01</span> Motivation</h2>
   <div class="rule"></div>
@@ -202,6 +202,29 @@ tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtube.
   </table></div>
   <p>The analyzer prompt is tweet-tuned; pass an optional <code>kind: "tweet" | "transcript"</code> and swap one sentence to <em>"You are analyzing a video transcript."</em> Output schema untouched.</p>
 
+  <h3>Companion actions — <code>--summarize</code> &amp; <code>--learn</code></h3>
+  <p>Two composable follow-on actions run on the same fetched-and-analysed content in one call — pass either, both, or neither. General <code>analyze</code> options, but they earn their keep on long-form transcripts.</p>
+  <div class="cols">
+    <div class="card">
+      <h4>--summarize</h4>
+      <ul>
+        <li>A fuller narrative digest (<code>{ summary, keyPoints[] }</code>), distinct from the terse analysis <code>summary</code> field.</li>
+        <li>New <code>summarizeContent()</code> + prompt + schema + mock — offline-testable like the rest.</li>
+        <li>Returned under <code>data.summary</code>; <code>meta.summarized = true</code>; persisted in <code>raw_json</code>.</li>
+        <li>Doubles as the <strong>condense-first pass</strong> for long transcripts, so the expensive extraction sees a shorter document.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>--learn</h4>
+      <ul>
+        <li>Builds the 7-day Feynman track from the analysis' concepts (<code>--minutes</code>, <code>--ratings</code> apply).</li>
+        <li><strong>Already built</strong> — works for any analysed content, transcript included.</li>
+        <li>Track progress via the existing <code>learn today</code> / <code>learn done</code>.</li>
+      </ul>
+    </div>
+  </div>
+  <p>Order in one invocation: fetch → analyse → (summarize) → (learn), all persisted against the same post.</p>
+
   <h2><span class="n">05</span> Errors &amp; fallback</h2>
   <div class="rule"></div>
   <p>Reuses the existing <code>PROVIDER_*</code> scaffolding. Every "no captions" path points at the manual escape hatch <code>analyze --transcript @file</code>, which also makes the feature testable offline.</p>
@@ -221,10 +244,11 @@ tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtube.
   <div class="code">analyze <span class="p">--url</span> &lt;youtube-url&gt;            <span class="c"># fetch + analyse captions</span><br>
 analyze <span class="p">--url</span> &lt;url&gt; <span class="p">--lang</span> es          <span class="c"># prefer a caption language</span><br>
 analyze <span class="p">--transcript</span> @file | -         <span class="c"># supply a transcript manually (no network)</span><br>
-analyze <span class="p">--url</span> &lt;url&gt; <span class="p">--learn</span>            <span class="c"># transcript → 7-day track (already works)</span></div>
+analyze <span class="p">--url</span> &lt;url&gt; <span class="p">--summarize</span>        <span class="c"># + a fuller narrative summary</span><br>
+analyze <span class="p">--url</span> &lt;url&gt; <span class="p">--summarize</span> <span class="p">--learn</span>  <span class="c"># both, in one call</span></div>
   <ul>
-    <li><strong>Storage:</strong> reuse <code>posts</code> + <code>analyses</code>; metadata in <code>raw_json</code> — no schema change (stays v3).</li>
-    <li><strong>Long transcripts:</strong> v1 sends as-is with a soft length warning; <code>--summarize-first</code> is a follow-up.</li>
+    <li><strong>Storage:</strong> reuse <code>posts</code> + <code>analyses</code>; metadata + summary in <code>raw_json</code> — no schema change (stays v3).</li>
+    <li><strong>Long transcripts:</strong> v1 sends as-is with a soft length warning; <code>--summarize</code> condenses first when set.</li>
     <li><strong>Testing:</strong> fixture unit tests for the three pure parsers, one offline command test via <code>--transcript</code>, one live smoke — the same shape as the shipped thread feature.</li>
   </ul>
 
@@ -236,7 +260,7 @@ analyze <span class="p">--url</span> &lt;url&gt; <span class="p">--learn</span> 
       <tr><td>YouTube changes watch-page markup</td><td>Pure, fixture-tested parsers → one-line fix. Same risk class as existing oEmbed HTML parsing.</td></tr>
       <tr><td>Video genuinely has no captions</td><td>Structured <code>NOT_FOUND</code> → <code>--transcript @file</code>. Audio transcription deferred.</td></tr>
       <tr><td>ToS / gray-area scraping</td><td>Same posture as tweet oEmbed + archive paths — public captions, personal research; noted in docs.</td></tr>
-      <tr><td>Token cost on long transcripts</td><td>Soft warning in v1; <code>--summarize-first</code> later.</td></tr>
+      <tr><td>Token cost on long transcripts</td><td>Soft warning in v1; <code>--summarize</code> condenses first (§4).</td></tr>
     </tbody>
   </table></div>
 
