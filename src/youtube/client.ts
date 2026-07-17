@@ -233,7 +233,9 @@ function assertPlayable(player: unknown, ref: VideoRef): void {
   const reason = typeof playability.reason === "string" ? playability.reason : "";
   const combined = `${status} ${reason}`.toLowerCase();
   if (
-    /(private|age.?restricted|members.?only|not available in your country|region)/.test(combined)
+    /(private|login_required|confirm your age|age.?restricted|members.?only|not available in your country|region)/.test(
+      combined,
+    )
   ) {
     throw new CliError(
       "PROVIDER_UNAUTHORIZED",
@@ -300,6 +302,7 @@ export async function fetchTranscript(
     // WEB caption URLs increasingly require a proof-of-origin token and may
     // return 200 with an empty body. The key embedded in the same watch page
     // can request an equivalent, usable track for YouTube's Android client.
+    // Maintenance: update the Android client version if this player request stops returning tracks.
     const apiKey = html.match(/"INNERTUBE_API_KEY":"([^"]+)"/)?.[1];
     if (apiKey) {
       const apiResponse = await safeFetch(

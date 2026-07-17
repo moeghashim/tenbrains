@@ -152,6 +152,8 @@ tenbrains analyze --url "https://youtu.be/M7lc1UVf-VE" --transcript @captions.tx
 `raw` metadata, and uses that digest as the condensed input for concept extraction. It composes
 with `--learn`. If a video is unavailable or has no captions, supply an existing transcript with
 `--transcript <text|@file|->`. v1 is caption-only: it does not download audio or invoke Whisper.
+YouTube's WEB caption URLs can return empty bodies, so the client retries through the embedded
+Android player API; that undocumented client version is the primary maintenance surface.
 
 ## Configuration & credentials
 

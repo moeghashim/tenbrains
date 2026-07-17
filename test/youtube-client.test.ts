@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { parsePlayerResponse, parseTimedText, parseVideoRef } from "../src/youtube/client.js";
+import {
+  fetchTranscript,
+  parsePlayerResponse,
+  parseTimedText,
+  parseVideoRef,
+} from "../src/youtube/client.js";
 
 const fixture = (name: string): string =>
   readFileSync(new URL(`fixtures/${name}`, import.meta.url), "utf8");
@@ -62,4 +67,24 @@ test("parseTimedText flattens JSON3 segments and decodes entities", () => {
     parseTimedText(fixture("youtube-timedtext.json")),
     "Agents & tools emit JSON3. Unicode: 🧠",
   );
+});
+
+test("fetchTranscript classifies YouTube age confirmation as unauthorized", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      '<script>var ytInitialPlayerResponse = {"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm your age"},"videoDetails":{"videoId":"dQw4w9WgXcQ"}};</script>',
+      { status: 200 },
+    );
+  try {
+    await assert.rejects(
+      fetchTranscript("dQw4w9WgXcQ"),
+      (error: unknown) =>
+        typeof error === "object" &&
+        error !== null &&
+        (error as { code?: string }).code === "PROVIDER_UNAUTHORIZED",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
