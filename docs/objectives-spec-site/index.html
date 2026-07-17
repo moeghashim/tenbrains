@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>tenbrains · Learning objectives spec</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AF%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#fbfbfa; --bg2:#f3f3f1; --card:#ffffff; --inset:#f6f6f4;
+    --line:#e7e6e2; --line2:#d9d8d2;
+    --ink:#16161a; --ink2:#33333a; --ink3:#5c5c66; --ink4:#8a8a94;
+    --accent:#2f6f57; --accent2:#3c8a6c; --accent-tint:#dcece5;
+    --ok:#2f7d5b; --ok-tint:#d9ede3; --amber:#9a6b1f; --amber-tint:#f3e6cc;
+    --blue:#2f5ea8; --blue-tint:#dbe6f5;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f0f11; --bg2:#161619; --card:#17171b; --inset:#1c1c21;
+      --line:#26262c; --line2:#33333b;
+      --ink:#f3f3f5; --ink2:#d7d7dc; --ink3:#a3a3ad; --ink4:#70707a;
+      --accent:#5cc08c; --accent2:#5cc08c; --accent-tint:#14261d;
+      --ok:#5cc08c; --ok-tint:#15271e; --amber:#d9ab5c; --amber-tint:#2a2214;
+      --blue:#7ea6e6; --blue-tint:#14203a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f0f11; --bg2:#161619; --card:#17171b; --inset:#1c1c21;
+    --line:#26262c; --line2:#33333b;
+    --ink:#f3f3f5; --ink2:#d7d7dc; --ink3:#a3a3ad; --ink4:#70707a;
+    --accent:#5cc08c; --accent2:#5cc08c; --accent-tint:#14261d;
+    --ok:#5cc08c; --ok-tint:#15271e; --amber:#d9ab5c; --amber-tint:#2a2214;
+    --blue:#7ea6e6; --blue-tint:#14203a;
+  }
+  :root[data-theme="light"]{
+    --bg:#fbfbfa; --bg2:#f3f3f1; --card:#ffffff; --inset:#f6f6f4;
+    --line:#e7e6e2; --line2:#d9d8d2;
+    --ink:#16161a; --ink2:#33333a; --ink3:#5c5c66; --ink4:#8a8a94;
+    --accent:#2f6f57; --accent2:#3c8a6c; --accent-tint:#dcece5;
+    --ok:#2f7d5b; --ok-tint:#d9ede3; --amber:#9a6b1f; --amber-tint:#f3e6cc;
+    --blue:#2f5ea8; --blue-tint:#dbe6f5;
+  }
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  body{margin:0;font-family:var(--sans);color:var(--ink2);line-height:1.62;font-size:15.5px;background:var(--bg);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 24px 100px}
+  a{color:var(--accent);text-underline-offset:3px}
+  code{font-family:var(--mono);font-size:.86em;background:var(--inset);border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ink)}
+  strong{color:var(--ink)}
+  .kick{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 12px;display:flex;align-items:center;gap:9px}
+  .kick .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  h1{font-size:38px;line-height:1.1;letter-spacing:-.02em;color:var(--ink);margin:0 0 14px;font-weight:680}
+  .lede{font-size:18.5px;color:var(--ink3);margin:0 0 22px;max-width:64ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:30px}
+  .pill{font-family:var(--mono);font-size:11px;padding:4px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--card);color:var(--ink3);white-space:nowrap}
+  .pill.draft{background:var(--amber-tint);border-color:transparent;color:var(--amber);font-weight:600}
+  .code{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--ink2);overflow-x:auto;margin:6px 0 4px;box-shadow:0 18px 40px -32px rgba(0,0,0,.4)}
+  .code .c{color:var(--ink4)}
+  .code .p{color:var(--accent)}
+  .code .k{color:var(--blue)}
+  h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.11em;color:var(--ink4);margin:52px 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .n{font-family:var(--mono);color:var(--accent);font-size:12px}
+  .rule{height:1px;background:linear-gradient(90deg,var(--line2),transparent);margin:8px 0 20px}
+  h3{font-size:16px;color:var(--ink);margin:26px 0 8px;font-weight:640}
+  p{margin:0 0 14px;max-width:70ch}
+  ul{padding-left:20px;margin:0 0 14px;max-width:70ch}
+  li{margin-bottom:7px}
+  li::marker{color:var(--accent)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+  .card{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:16px 18px}
+  .card h4{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);font-family:var(--mono)}
+  .card.goals h4{color:var(--ok)}
+  .card ul{margin:0;padding-left:18px} .card li{font-size:14px;color:var(--ink2)}
+  .tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink4);text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--bg2);white-space:nowrap}
+  td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink2)}
+  tr:last-child td{border-bottom:none}
+  td code{white-space:nowrap}
+  .callout{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--card);border-radius:0 10px 10px 0;padding:14px 18px;margin:18px 0}
+  .callout.blue{border-left-color:var(--blue)}
+  .callout .t{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+  .callout.blue .t{color:var(--blue)}
+  .callout p{margin:0;font-size:14.5px}
+  .prs{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+  .pr{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:14px 18px;display:flex;gap:14px;align-items:flex-start}
+  .pr .num{font-family:var(--mono);font-size:12px;font-weight:700;color:#fff;background:var(--accent);border-radius:7px;padding:3px 9px;flex:none}
+  .pr b{color:var(--ink)}
+  .pr .then{display:block;font-size:13px;color:var(--ink3);margin-top:3px}
+  .dec{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:15px 18px;margin:12px 0;display:flex;gap:14px;align-items:flex-start}
+  .dec .num{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent);flex:none;width:22px}
+  .dec b{color:var(--ink)}
+  .rec{display:inline-block;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;background:var(--ok-tint);color:var(--ok);padding:2px 7px;border-radius:5px;margin-left:6px;vertical-align:1px}
+  footer{margin-top:64px;border-top:1px solid var(--line);padding-top:18px;font-size:12.5px;color:var(--ink4);font-family:var(--mono);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  .toggle{position:fixed;top:16px;right:16px;font-family:var(--mono);font-size:11px;border:1px solid var(--line2);background:var(--card);color:var(--ink3);border-radius:999px;padding:6px 12px;cursor:pointer}
+  @media (max-width:640px){ h1{font-size:30px} .cols{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<button class="toggle" onclick="(function(){var r=document.documentElement;var d=r.getAttribute('data-theme')|| (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');r.setAttribute('data-theme', d==='dark'?'light':'dark')})()">◐ theme</button>
+
+<div class="wrap">
+
+  <p class="kick"><span class="dot"></span>tenbrains · design spec</p>
+  <h1>Learning objectives</h1>
+  <p class="lede">A persistent goal like <em>"Stablecoins"</em> you tag things with — a followed account, an X post, a YouTube video, a learning track. The objective becomes a lens across the whole tool: everything you gather toward a goal links to it, untagged stays general, and progress accumulates per objective instead of scattering across one-off tracks.</p>
+
+  <div class="meta">
+    <span class="pill draft">Draft · for team review</span>
+    <span class="pill">Owner: @moeghashim</span>
+    <span class="pill">Target: tenbrains 2.3.0</span>
+    <span class="pill">One feature · 4 PRs</span>
+    <span class="pill">Migration v4</span>
+  </div>
+
+  <div class="code"><span class="c"># set a goal, then tag what you gather toward it — across follows, posts, videos</span><br>
+tenbrains objective add <span class="k">"Stablecoins"</span> <span class="p">--focus</span><br>
+tenbrains takeaway follow maker <span class="p">--objective</span> stablecoins   <span class="c"># I follow them to learn this</span><br>
+tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtu.be/…"</span> <span class="p">--objective</span> stablecoins <span class="p">--learn</span><br>
+tenbrains objective show stablecoins            <span class="c"># every tagged account/post/track + progress</span></div>
+
+  <h2><span class="n">01</span> Motivation</h2>
+  <div class="rule"></div>
+  <ul>
+    <li>Today a learning track is built from <strong>one</strong> post's concepts and stands alone — no way to say "these ten posts, two accounts, and three videos are all me working toward stablecoins."</li>
+    <li>A goal is a natural spine: it ties <code>follow</code>, <code>analyze</code> (X + YouTube), <code>bookmark</code>, and <code>learn</code> together and gives <code>suggest</code>/<code>digest</code> a direction to point at.</li>
+    <li>It's the difference between a pile of analyses and a <strong>curriculum</strong>.</li>
+  </ul>
+
+  <h2><span class="n">02</span> Locked decisions</h2>
+  <div class="rule"></div>
+  <div class="dec"><span class="num">1</span><div><b>First-class &amp; separate from bookmark tags<span class="rec">locked</span></b> — objectives carry goal semantics (description, active/archived lifecycle, a current focus, mixed-type tagged records, progress) that a loose tag can't. Tags stay for labeling; objectives are for direction. They coexist.</div></div>
+  <div class="dec"><span class="num">2</span><div><b>Multiple objectives, one current focus<span class="rec">locked</span></b> — pursue several goals at once; at most one is the focus. Focus is the default view/bias target and <strong>never auto-tags</strong> — tagging is always explicit, so untagged stays general.</div></div>
+  <div class="dec"><span class="num">3</span><div><b>Manual tagging<span class="rec">locked</span></b> — attach objectives explicitly via <code>--objective</code> or <code>objective link</code>. Inferring an objective from content is out of scope.</div></div>
+
+  <h2><span class="n">03</span> Data model — migration v4</h2>
+  <div class="rule"></div>
+  <p>Schema is at v3 today (YouTube added none); objectives add <strong>v4</strong>. Two tables — a first-class entity plus a polymorphic many-to-many join, so a post can serve two goals and an objective can span record types.</p>
+  <div class="code">objectives(<span class="k">id</span> obj_…, slug UNIQUE, name, description, status, is_focus, …)<br>
+objective_links(objective_id → objectives, record_type, record_id)<br>
+<span class="c"># record_type ∈ post | account | bookmark | track · reverse index for `record get`</span></div>
+
+  <h2><span class="n">04</span> CLI surface</h2>
+  <div class="rule"></div>
+  <h3>Manage</h3>
+  <div class="code">objective add &lt;name&gt; [<span class="p">--description</span> &lt;t&gt;] [<span class="p">--focus</span>]   <span class="c"># create; derives slug</span><br>
+objective list [<span class="p">--status</span> active|archived|all]<br>
+objective show [&lt;slug&gt;]                          <span class="c"># detail + tagged records + progress (defaults to focus)</span><br>
+objective focus &lt;slug&gt; | <span class="p">--clear</span><br>
+objective archive &lt;slug&gt;<br>
+objective link | unlink <span class="p">--objective</span> &lt;slug&gt; &lt;recordId&gt;  <span class="c"># tag an existing record</span></div>
+  <h3>Tag at creation — <code>--objective &lt;slug&gt;</code> (repeatable)</h3>
+  <div class="code">analyze … <span class="p">--objective</span> stablecoins                <span class="c"># tag the post (X/thread/YouTube/text)</span><br>
+takeaway follow &lt;user&gt; <span class="p">--objective</span> stablecoins   <span class="c"># tag the account</span><br>
+bookmark add … <span class="p">--objective</span> stablecoins           <span class="c"># tag the bookmark's post</span><br>
+learn generate <span class="p">--objective</span> stablecoins           <span class="c"># track belongs to the objective</span></div>
+  <p>Unknown slug → structured <code>NOT_FOUND</code> pointing at <code>objective add</code> (no silent auto-create). <code>learn</code> inherits the objective from a tagged source post. Tagging commands add <code>meta.objectives</code> to the envelope.</p>
+
+  <h2><span class="n">05</span> Impact map</h2>
+  <div class="rule"></div>
+  <div class="tw"><table>
+    <thead><tr><th>Surface</th><th>Change</th></tr></thead>
+    <tbody>
+      <tr><td>Data model</td><td><code>objectives</code> + <code>objective_links</code>; <code>obj_</code> id; migration v4.</td></tr>
+      <tr><td>New <code>objective</code> cmd</td><td>add / list / show / focus / archive / link / unlink.</td></tr>
+      <tr><td><code>analyze</code> (X, thread, YouTube, text)</td><td><code>--objective</code> tags the post — one flag covers every source (all route through <code>analyze</code>).</td></tr>
+      <tr><td><code>takeaway follow</code></td><td><code>--objective</code> tags the account.</td></tr>
+      <tr><td><code>bookmark add</code></td><td><code>--objective</code> tags the post.</td></tr>
+      <tr><td><code>learn</code></td><td>Track tagged (explicit or inherited); counts toward progress; concept order reweighted by the goal.</td></tr>
+      <tr><td><code>record get</code></td><td>Shows a record's objective tags.</td></tr>
+      <tr><td><code>suggest</code> / <code>digest</code> / <code>search</code></td><td>Bias / filter by objective (final PR).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2><span class="n">06</span> Delivery — one feature, four PRs</h2>
+  <div class="rule"></div>
+  <p>The complete feature ships as one release (<strong>2.3.0</strong>), built as review-sized PRs. Each is independently CI-green and builds on the last; Codex opens one, hands a review prompt back to Claude for sign-off, then proceeds.</p>
+  <div class="prs">
+    <div class="pr"><span class="num">PR 1</span><div><b>Core.</b> Tables (migration v4), repository, <code>obj_</code> id, <code>objective add/list/show/focus/archive</code>, <code>record get</code> tags.<span class="then">→ create, focus, and inspect objectives</span></div></div>
+    <div class="pr"><span class="num">PR 2</span><div><b>Tagging.</b> <code>objective link/unlink</code> + <code>--objective</code> on <code>analyze</code>/<code>follow</code>/<code>bookmark</code>/<code>learn</code> (learn inherits).<span class="then">→ attach records to a goal; <code>objective show</code> lists them</span></div></div>
+    <div class="pr"><span class="num">PR 3</span><div><b>Learn lens.</b> Reweight track concept ordering by the objective's description (deterministic token overlap); richer progress.<span class="then">→ study plans aimed at the goal</span></div></div>
+    <div class="pr"><span class="num">PR 4</span><div><b>Bias.</b> <code>suggest</code> ranks toward the focus; <code>digest</code>/<code>search</code> gain an <code>--objective</code> filter; bump to 2.3.0.<span class="then">→ point the whole tool at the goal</span></div></div>
+  </div>
+
+  <div class="callout blue">
+    <div class="t">Composes with YouTube (PR #8)</div>
+    <p>Non-blocking. YouTube ships without objective-awareness; because it routes through <code>analyze</code>, <code>--objective</code> covers YouTube transcripts uniformly the moment this lands — no YouTube-specific work. The only shared file is <code>analyze.ts</code> (one added flag).</p>
+  </div>
+
+  <footer>
+    <span>tenbrains — agent-first X &amp; YouTube research CLI</span>
+    <span>Draft spec · shareable copy</span>
+  </footer>
+</div>
+</body>
+</html>
