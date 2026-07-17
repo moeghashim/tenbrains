@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>tenbrains · YouTube transcription spec</title>
+<title>tenbrains · YouTube transcription implementation</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%B9%3C/text%3E%3C/svg%3E">
 <style>
   :root{
@@ -59,6 +59,7 @@
   .meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:30px}
   .pill{font-family:var(--mono);font-size:11px;padding:4px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--card);color:var(--ink3);white-space:nowrap}
   .pill.draft{background:var(--amber-tint);border-color:transparent;color:var(--amber);font-weight:600}
+  .pill.shipped{background:var(--ok-tint);border-color:transparent;color:var(--ok);font-weight:600}
 
   /* code block */
   .code{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--ink2);overflow-x:auto;margin:6px 0 4px;box-shadow:0 18px 40px -32px rgba(0,0,0,.4)}
@@ -123,14 +124,15 @@
 
 <div class="wrap">
 
-  <p class="kick"><span class="dot"></span>tenbrains · design spec</p>
+  <p class="kick"><span class="dot"></span>tenbrains · implementation report</p>
   <h1>YouTube transcription</h1>
-  <p class="lede">Let <code>tenbrains analyze</code> take a YouTube URL, pull the caption track for free, and run the transcript through the pipeline that already analyses tweets — same topic/summary/intent/concepts, same persistence, same <code>--learn</code>, <code>search</code>, and <code>digest</code>.</p>
+  <p class="lede"><code>tenbrains analyze</code> now accepts a YouTube URL, fetches public captions for free, and runs the transcript through the existing research pipeline — including narrative summaries, persistence, learning tracks, search, and digest.</p>
 
   <div class="meta">
-    <span class="pill draft">Draft · for team review</span>
+    <span class="pill shipped">Implemented · merged</span>
     <span class="pill">Owner: @moeghashim</span>
-    <span class="pill">Target: tenbrains 2.2.0</span>
+    <span class="pill">Version: tenbrains 2.2.0</span>
+    <span class="pill">PR: #8</span>
     <span class="pill">No new dependency</span>
     <span class="pill">No schema migration</span>
   </div>
@@ -140,28 +142,30 @@ tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtube.
 <span class="c"># → fetch captions · analyse · summarize · build a learning track — one call</span><br>
 <span class="c"># meta.source = "youtube" · search / digest / record get see them together</span></div>
 
-  <h2><span class="n">01</span> Motivation</h2>
+  <h2><span class="n">01</span> What shipped</h2>
   <div class="rule"></div>
   <ul>
-    <li>Long-form video is a major research surface tenbrains can't touch today.</li>
-    <li>The analysis pipeline is content-agnostic — topic/summary/intent/concepts fit a transcript as cleanly as a tweet.</li>
-    <li>Cheap to add: the fetch problem is the same shape as the tweet-oEmbed path already in the codebase.</li>
+    <li>YouTube watch, short, embed, and <code>youtu.be</code> URLs route through the existing <code>analyze</code> command.</li>
+    <li>Public captions are fetched without an API key and flattened from XML or JSON3 into plain text.</li>
+    <li><code>--summarize</code> produces a narrative digest with key points; <code>--learn</code> builds the existing 7-day Feynman track. The flags compose in one call.</li>
+    <li>Video metadata and summaries persist in <code>posts.raw_json</code>; analyses and tracks use the existing tables.</li>
+    <li>Manual transcripts remain available through <code>--transcript &lt;text|@file|-&gt;</code>.</li>
   </ul>
 
-  <h2><span class="n">02</span> Goals &amp; non-goals</h2>
+  <h2><span class="n">02</span> Delivered scope</h2>
   <div class="rule"></div>
   <div class="cols">
     <div class="card goals">
-      <h4>Goals</h4>
+      <h4>Included in 2.2.0</h4>
       <ul>
         <li>Fetch a public transcript with <strong>no API key, no paid tier, no new dependency</strong>.</li>
         <li>Reuse the whole downstream pipeline (persist → learn → search → digest → suggest).</li>
         <li>Structured errors + a manual fallback — never crash.</li>
-        <li>Pure, fixture-tested parsers so a markup change is a one-line fix.</li>
+        <li>Pure, fixture-tested URL, player-response, and timed-text parsers.</li>
       </ul>
     </div>
     <div class="card nogoals">
-      <h4>Non-goals (v1)</h4>
+      <h4>Still out of scope</h4>
       <ul>
         <li>Audio transcription (Whisper / yt-dlp) for videos with no captions.</li>
         <li>Chapter/timestamp segmentation or a transcript-viewer UI.</li>
@@ -173,7 +177,7 @@ tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtube.
 
   <h2><span class="n">03</span> Fetch — free-first caption scrape</h2>
   <div class="rule"></div>
-  <p>Mirrors <code>src/x/client.ts</code> (the tweet oEmbed path): an undocumented-but-free endpoint, pure parsers split from the network layer, structured errors.</p>
+  <p>The implementation in <code>src/youtube/client.ts</code> mirrors <code>src/x/client.ts</code>: dependency-free network orchestration around pure parsers, with structured errors at every boundary.</p>
   <div class="flow">
     <div class="step"><span class="s">STEP 1</span><b>Watch page</b><span>GET the video's HTML</span></div>
     <div class="step"><span class="s">STEP 2</span><b>Player response</b><span>extract <code>ytInitialPlayerResponse</code></span></div>
@@ -184,10 +188,14 @@ tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtube.
     <div class="t">No new dependency</div>
     <p><code>fetch</code> + regex/JSON parsing — the same toolkit the oEmbed path uses. Rejected: <code>youtube-transcript</code> (fragile, redundant), <code>yt-dlp</code> (external binary, breaks the self-contained stance), and the YouTube Data API <code>captions.download</code> (needs the owner's OAuth — the same dead end that makes X timelines a paid feature).</p>
   </div>
+  <div class="callout blue">
+    <div class="t">Production compatibility fallback</div>
+    <p>YouTube's WEB timed-text URL can return HTTP 200 with an empty body. When that happens, tenbrains requests an equivalent caption track through the embedded Android player API and feeds it into the same pure timed-text parser. The Android client version is isolated and documented as a maintenance surface.</p>
+  </div>
 
   <h2><span class="n">04</span> Integration — extend <code>analyze</code></h2>
   <div class="rule"></div>
-  <p>No parallel command. <code>analyze</code> detects a YouTube URL in <code>--url</code> and routes to the transcript fetcher, exactly as <code>--thread</code> routes differently from a plain tweet. Everything after ingestion runs unchanged.</p>
+  <p>No parallel command was added. <code>analyze</code> detects a YouTube URL in <code>--url</code> and routes to the transcript fetcher, exactly as <code>--thread</code> routes differently from a plain tweet.</p>
   <div class="tw"><table>
     <thead><tr><th>Field</th><th>Source</th></tr></thead>
     <tbody>
@@ -200,10 +208,10 @@ tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtube.
       <tr><td><code>meta.source</code></td><td><code>"youtube"</code></td></tr>
     </tbody>
   </table></div>
-  <p>The analyzer prompt is tweet-tuned; pass an optional <code>kind: "tweet" | "transcript"</code> and swap one sentence to <em>"You are analyzing a video transcript."</em> Output schema untouched.</p>
+  <p>The analyzer now receives <code>kind: "tweet" | "transcript"</code> and uses <em>"You are analyzing a video transcript."</em> for video content. The analysis output schema remains unchanged.</p>
 
   <h3>Companion actions — <code>--summarize</code> &amp; <code>--learn</code></h3>
-  <p>Two composable follow-on actions run on the same fetched-and-analysed content in one call — pass either, both, or neither. General <code>analyze</code> options, but they earn their keep on long-form transcripts.</p>
+  <p>Two composable companion actions run on the same fetched content in one call — pass either, both, or neither. They are general <code>analyze</code> options and especially useful for long-form transcripts.</p>
   <div class="cols">
     <div class="card">
       <h4>--summarize</h4>
@@ -223,16 +231,16 @@ tenbrains analyze <span class="p">--url</span> <span class="k">"https://youtube.
       </ul>
     </div>
   </div>
-  <p>Order in one invocation: fetch → analyse → (summarize) → (learn), all persisted against the same post.</p>
+  <p>When requested, summarization is the condense-first pass: fetch → summarize → analyse the digest → learn. All outcomes persist against the same post.</p>
 
   <h2><span class="n">05</span> Errors &amp; fallback</h2>
   <div class="rule"></div>
-  <p>Reuses the existing <code>PROVIDER_*</code> scaffolding. Every "no captions" path points at the manual escape hatch <code>analyze --transcript @file</code>, which also makes the feature testable offline.</p>
+  <p>The implementation reuses the existing <code>PROVIDER_*</code> scaffolding. Every "no captions" path points at the manual escape hatch <code>analyze --transcript @file</code>, which also keeps the complete workflow testable offline.</p>
   <div class="tw"><table>
     <thead><tr><th>Condition</th><th>Code</th><th>Exit</th></tr></thead>
     <tbody>
       <tr><td>Not found / deleted / no caption tracks</td><td><span class="tag err">NOT_FOUND</span></td><td>3</td></tr>
-      <tr><td>Private / age-restricted / region-blocked</td><td><span class="tag err">PROVIDER_UNAUTHORIZED</span></td><td>5</td></tr>
+      <tr><td>Private / members-only / age-gated (<code>LOGIN_REQUIRED</code>) / region-blocked</td><td><span class="tag err">PROVIDER_UNAUTHORIZED</span></td><td>5</td></tr>
       <tr><td>Rate limited</td><td><span class="tag err">PROVIDER_RATE_LIMITED</span></td><td>5</td></tr>
       <tr><td>Network / timeout</td><td><span class="tag err">PROVIDER_NETWORK</span></td><td>5</td></tr>
       <tr><td>Markup changed, can't parse</td><td><span class="tag err">PROVIDER_BAD_OUTPUT</span></td><td>5</td></tr>
@@ -249,7 +257,8 @@ analyze <span class="p">--url</span> &lt;url&gt; <span class="p">--summarize</sp
   <ul>
     <li><strong>Storage:</strong> reuse <code>posts</code> + <code>analyses</code>; metadata + summary in <code>raw_json</code> — no schema change (stays v3).</li>
     <li><strong>Long transcripts:</strong> v1 sends as-is with a soft length warning; <code>--summarize</code> condenses first when set.</li>
-    <li><strong>Testing:</strong> fixture unit tests for the three pure parsers, one offline command test via <code>--transcript</code>, one live smoke — the same shape as the shipped thread feature.</li>
+    <li><strong>Testing:</strong> fixture tests for the three pure parsers, an age-gate error regression, an offline <code>--transcript --summarize --learn</code> command test, and a live caption smoke.</li>
+    <li><strong>Validation:</strong> 78 tests passed, production build passed, package dry-run reported <code>tenbrains@2.2.0</code>, and both required GitHub checks were green.</li>
   </ul>
 
   <h2><span class="n">07</span> Risks</h2>
@@ -258,26 +267,28 @@ analyze <span class="p">--url</span> &lt;url&gt; <span class="p">--summarize</sp
     <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
     <tbody>
       <tr><td>YouTube changes watch-page markup</td><td>Pure, fixture-tested parsers → one-line fix. Same risk class as existing oEmbed HTML parsing.</td></tr>
+      <tr><td>Android player client version expires</td><td>One isolated version marker and documented fallback path; update it when the endpoint stops returning tracks.</td></tr>
       <tr><td>Video genuinely has no captions</td><td>Structured <code>NOT_FOUND</code> → <code>--transcript @file</code>. Audio transcription deferred.</td></tr>
       <tr><td>ToS / gray-area scraping</td><td>Same posture as tweet oEmbed + archive paths — public captions, personal research; noted in docs.</td></tr>
       <tr><td>Token cost on long transcripts</td><td>Soft warning in v1; <code>--summarize</code> condenses first (§4).</td></tr>
     </tbody>
   </table></div>
 
-  <h2><span class="n">08</span> Open decisions — team input</h2>
+  <h2><span class="n">08</span> Decisions shipped</h2>
   <div class="rule"></div>
-  <div class="dec"><span class="num">1</span><div><b>Fold into <code>analyze</code><span class="rec">recommended</span></b> vs. a dedicated <code>tenbrains youtube</code> command. Folding in reuses everything and adds no surface; a separate command is only worth it if video-specific features (chapters, timestamps, a viewer) are expected to grow.</div></div>
-  <div class="dec"><span class="num">2</span><div><b>Caption-only v1<span class="rec">recommended</span></b> with <code>--transcript @file</code> as the manual fallback — defer audio/Whisper transcription entirely?</div></div>
-  <div class="dec"><span class="num">3</span><div><b>Ship as a minor — 2.2.0.</b> Purely additive; no breaking changes.</div></div>
+  <div class="dec"><span class="num">1</span><div><b>Folded into <code>analyze</code><span class="rec">shipped</span></b> rather than adding a separate YouTube command.</div></div>
+  <div class="dec"><span class="num">2</span><div><b>Caption-only v1<span class="rec">shipped</span></b> with <code>--transcript @file|-</code> as the manual fallback. Audio and Whisper remain deferred.</div></div>
+  <div class="dec"><span class="num">3</span><div><b>Versioned as 2.2.0.</b> The feature is additive, with no database migration or runtime dependency.</div></div>
+  <div class="dec"><span class="num">4</span><div><b>Manual captions outrank ASR, then language preference applies.</b> This preserves the design-of-record behavior, including manual English winning over ASR Spanish for <code>--lang es</code>.</div></div>
 
   <div class="callout blue">
-    <div class="t">Effort</div>
-    <p>Closely matches the already-shipped thread feature: a ~200-line client module (pure parsers + orchestration), a ~40-line <code>analyze</code> integration, fixture tests + one offline command test + a live smoke, and docs. One focused PR through the existing branch → PR → CI (DCO + typecheck/lint/test) flow.</p>
+    <div class="t">Delivery</div>
+    <p>Implemented in <a href="https://github.com/moeghashim/tenbrains/pull/8">PR #8</a> and merged to <code>main</code> with signed-off commits. DCO and the full typecheck, lint, test, and build workflow passed before merge.</p>
   </div>
 
   <footer>
-    <span>tenbrains — agent-first X research CLI</span>
-    <span>Draft spec · shareable copy</span>
+    <span>tenbrains — agent-first X + YouTube research CLI</span>
+    <span>Implementation report · 2.2.0 · July 17, 2026</span>
   </footer>
 </div>
 </body>
