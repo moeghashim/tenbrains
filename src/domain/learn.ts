@@ -1,3 +1,4 @@
+import { tokenSet } from "../core/text.js";
 import type { Concept, ConceptRating, LearningDay, TrackDayProgress } from "./types.js";
 
 const TRACK_DAYS = 7;
@@ -16,13 +17,31 @@ function ratingFor(
 }
 
 /**
- * Order concepts for study: highest interest first, then most novel (lowest
- * familiarity), preserving original order as a stable tiebreaker.
+ * Order concepts for study. When an objective description is supplied, token
+ * overlap with the concept name/explanation is the primary lens; ratings retain
+ * their existing interest/novelty order as deterministic tiebreakers.
  */
-export function prioritizeConcepts(concepts: Concept[], ratings: ConceptRating[]): Concept[] {
+export function prioritizeConcepts(
+  concepts: Concept[],
+  ratings: ConceptRating[],
+  objectiveDescription?: string,
+): Concept[] {
+  const objectiveTokens = tokenSet(objectiveDescription ?? "");
   return concepts
-    .map((concept, index) => ({ concept, index, ...ratingFor(concept, ratings) }))
+    .map((concept, index) => {
+      const conceptTokens = tokenSet(`${concept.name} ${concept.whyItMattersInTweet}`);
+      let relevance = 0;
+      for (const token of conceptTokens) {
+        if (objectiveTokens.has(token)) {
+          relevance += 1;
+        }
+      }
+      return { concept, index, relevance, ...ratingFor(concept, ratings) };
+    })
     .sort((a, b) => {
+      if (b.relevance !== a.relevance) {
+        return b.relevance - a.relevance;
+      }
       if (b.interest !== a.interest) {
         return b.interest - a.interest;
       }
@@ -77,8 +96,9 @@ export function buildFeynmanTrack(
   concepts: Concept[],
   minutesPerDay: number,
   ratings: ConceptRating[],
+  objectiveDescription?: string,
 ): LearningDay[] {
-  const ordered = prioritizeConcepts(concepts, ratings);
+  const ordered = prioritizeConcepts(concepts, ratings, objectiveDescription);
   if (ordered.length === 0) {
     return [];
   }

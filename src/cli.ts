@@ -484,7 +484,7 @@ export function buildProgram(): Command {
   learn.addCommand(
     makeCommand({
       name: "generate",
-      description: "Build a learning track from an analysis' concepts.",
+      description: "Build a learning track, lensed by any selected objective descriptions.",
       options: [
         { flags: "--analysis <id>", description: "Analysis id to build from" },
         { flags: "--ratings <json>", description: "Concept ratings JSON (@file/- ok)" },
@@ -575,7 +575,8 @@ export function buildProgram(): Command {
   objective.addCommand(
     makeCommand({
       name: "show",
-      description: "Show an objective, tagged counts, and records (defaults to the current focus).",
+      description:
+        "Show an objective, tagged records, and descriptive progress (defaults to the current focus).",
       args: [{ spec: "[slug]", description: "Objective slug or obj_ id" }],
       handler: objectiveShowCommand,
     }),

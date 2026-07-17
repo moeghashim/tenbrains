@@ -11,7 +11,11 @@ import { PostInputSchema, RatingsInputSchema, ThreadInputSchema } from "../domai
 import type { Analysis, LearningTrack, Post } from "../domain/types.js";
 import { type FetchMode, fetchThread, fetchTweet, isFetchMode } from "../x/client.js";
 import { fetchTranscript, isYouTubeUrl, parseVideoRef } from "../youtube/client.js";
-import { linkObjectives, resolveObjectiveOptions } from "./objective-tags.js";
+import {
+  linkObjectives,
+  objectiveLensDescription,
+  resolveObjectiveOptions,
+} from "./objective-tags.js";
 import { resolveXBearer } from "./shared.js";
 
 function parseFetchMode(value: string | undefined): FetchMode {
@@ -259,10 +263,10 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
   let track: LearningTrack | undefined;
   let trackObjectives = explicitObjectives;
   if (optBool(opts, "learn")) {
-    track = buildAndPersistTrack(ctx, analysis, opts);
     if (trackObjectives.length === 0) {
       trackObjectives = store.objectives.forRecord("post", post.id);
     }
+    track = buildAndPersistTrack(ctx, analysis, opts, objectiveLensDescription(trackObjectives));
     linkObjectives(store, trackObjectives, "track", track.id);
   }
   const objectiveSlugs = (track ? trackObjectives : explicitObjectives).map(
@@ -294,13 +298,18 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
   };
 }
 
-function buildAndPersistTrack(ctx: RunContext, analysis: Analysis, opts: Opts): LearningTrack {
+function buildAndPersistTrack(
+  ctx: RunContext,
+  analysis: Analysis,
+  opts: Opts,
+  objectiveDescription?: string,
+): LearningTrack {
   const ratingsOpt = optString(opts, "ratings");
   const ratings = ratingsOpt
     ? parseOrThrow(RatingsInputSchema, resolveJsonInput(ratingsOpt), "Invalid ratings input.")
     : [];
   const minutes = optNumber(opts, "minutes", 10);
-  const days = buildFeynmanTrack(analysis.concepts, minutes, ratings);
+  const days = buildFeynmanTrack(analysis.concepts, minutes, ratings, objectiveDescription);
   return ctx.store().tracks.create({
     analysisId: analysis.id,
     minutesPerDay: minutes,

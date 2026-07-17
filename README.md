@@ -171,6 +171,12 @@ Every referenced objective must already exist or the command returns `NOT_FOUND`
 creating one. Focus never tags records automatically. `objective show` groups tagged posts,
 accounts, bookmarks, and tracks; `record get` includes an `objectives` array for linkable records.
 
+When a selected or inherited objective has a description, learning tracks rank concepts first by
+deterministic token overlap with that description, then by the existing interest and familiarity
+ratings. `objective show` also returns descriptive progress counts under `data.progress`:
+accounts followed, posts and transcripts analyzed, bookmarks saved, tracks completed, and learning
+days completed/total. It never fabricates a completion percentage.
+
 ## YouTube transcripts
 
 Pass a public YouTube watch, `youtu.be`, Shorts, or embed URL to `analyze`. tenbrains selects a

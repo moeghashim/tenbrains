@@ -148,6 +148,12 @@ its analysis' source post only when no explicit objective is supplied; explicit 
 inheritance. The referenced objectives must already exist (`NOT_FOUND` otherwise). Never infer,
 auto-create, or copy the current focus into tags.
 
+An objective with a description lenses its learning tracks deterministically: concepts with more
+description-token overlap come first, with interest/familiarity ratings breaking ties. Inspect
+`objective show <slug>` for grouped records and raw `data.progress` counts covering accounts,
+analyzed posts/transcripts, saved bookmarks, tracks completed, and learning days completed/total.
+Do not turn those counts into a made-up percentage.
+
 ### Bookmarks and recall
 
 ```bash

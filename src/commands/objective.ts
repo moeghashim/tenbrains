@@ -45,6 +45,17 @@ interface ObjectiveRecords {
   tracks: LearningTrack[];
 }
 
+interface ObjectiveProgress {
+  accountsFollowed: number;
+  postsAnalyzed: number;
+  transcriptsAnalyzed: number;
+  bookmarksSaved: number;
+  learningTracks: number;
+  learningTracksCompleted: number;
+  learningDaysCompleted: number;
+  learningDaysTotal: number;
+}
+
 function recordsByType(store: Store, links: ObjectiveLink[]): ObjectiveRecords {
   const records: ObjectiveRecords = {
     posts: [],
@@ -77,6 +88,45 @@ function recordsByType(store: Store, links: ObjectiveLink[]): ObjectiveRecords {
     }
   }
   return records;
+}
+
+function isTranscript(post: Post): boolean {
+  return (
+    typeof post.raw === "object" &&
+    post.raw !== null &&
+    !Array.isArray(post.raw) &&
+    (post.raw as Record<string, unknown>).source === "youtube"
+  );
+}
+
+function progressForRecords(store: Store, records: ObjectiveRecords): ObjectiveProgress {
+  const analyzedPosts = records.posts.filter(
+    (post) => store.analyses.latestForPost(post.id) !== null,
+  );
+  const bookmarkIds = new Set(records.bookmarks.map((bookmark) => bookmark.id));
+  for (const post of records.posts) {
+    const bookmark = store.bookmarks.findByPostId(post.id);
+    if (bookmark) {
+      bookmarkIds.add(bookmark.id);
+    }
+  }
+  const learningDaysTotal = records.tracks.reduce((total, track) => total + track.days.length, 0);
+  const learningDaysCompleted = records.tracks.reduce(
+    (total, track) => total + Math.min(track.progress.length, track.days.length),
+    0,
+  );
+  return {
+    accountsFollowed: records.accounts.length,
+    postsAnalyzed: analyzedPosts.filter((post) => !isTranscript(post)).length,
+    transcriptsAnalyzed: analyzedPosts.filter(isTranscript).length,
+    bookmarksSaved: bookmarkIds.size,
+    learningTracks: records.tracks.length,
+    learningTracksCompleted: records.tracks.filter(
+      (track) => track.days.length > 0 && track.progress.length >= track.days.length,
+    ).length,
+    learningDaysCompleted,
+    learningDaysTotal,
+  };
 }
 
 export function objectiveAddCommand(ctx: RunContext, opts: Opts): CommandResult {
@@ -132,14 +182,16 @@ export function objectiveShowCommand(ctx: RunContext, opts: Opts): CommandResult
   const links = store.objectives.links(objective.id);
   const counts = countsByType(links);
   const records = recordsByType(store, links);
+  const progress = progressForRecords(store, records);
   return {
-    data: { objective, counts, records },
+    data: { objective, counts, records, progress },
     meta: { objectiveId: objective.id, slug: objective.slug },
     human: () =>
       [
         `${objective.name} (${objective.slug})${objective.isFocus ? " — current focus" : ""}`,
         objective.description ?? "(no description)",
         `${counts.total} tagged: ${counts.post} posts, ${counts.account} accounts, ${counts.bookmark} bookmarks, ${counts.track} tracks`,
+        `Progress: ${progress.accountsFollowed} accounts followed; ${progress.postsAnalyzed} posts and ${progress.transcriptsAnalyzed} transcripts analyzed; ${progress.bookmarksSaved} bookmarks; ${progress.learningTracks} tracks (${progress.learningTracksCompleted} complete), ${progress.learningDaysCompleted}/${progress.learningDaysTotal} days done`,
       ].join("\n"),
   };
 }

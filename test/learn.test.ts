@@ -33,6 +33,40 @@ test("prioritizeConcepts breaks interest ties by novelty (low familiarity first)
   assert.equal(ordered[0]?.name, "Beta");
 });
 
+test("objective token overlap takes precedence while ratings break relevance ties", () => {
+  const concepts: Concept[] = [
+    {
+      name: "Consensus Validators",
+      whyItMattersInTweet: "Secures the network.",
+    },
+    {
+      name: "Reserve Audits",
+      whyItMattersInTweet: "Checks reserve backing and transparency.",
+    },
+  ];
+  const ordered = prioritizeConcepts(
+    concepts,
+    [
+      { concept: "Consensus Validators", familiarity: 1, interest: 5 },
+      { concept: "Reserve Audits", familiarity: 5, interest: 1 },
+    ],
+    "Understand reserve backing and audit transparency.",
+  );
+  assert.equal(ordered[0]?.name, "Reserve Audits");
+});
+
+test("an unrelated objective description preserves the existing rating order", () => {
+  const ordered = prioritizeConcepts(
+    CONCEPTS,
+    [
+      { concept: "Gamma", familiarity: 1, interest: 5 },
+      { concept: "Alpha", familiarity: 1, interest: 2 },
+    ],
+    "Reserve backing transparency",
+  );
+  assert.equal(ordered[0]?.name, "Gamma");
+});
+
 test("buildFeynmanTrack always yields 7 days with all step fields", () => {
   const days = buildFeynmanTrack(CONCEPTS, 10, []);
   assert.equal(days.length, 7);

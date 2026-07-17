@@ -8,7 +8,12 @@ import type { Store } from "../db/repositories.js";
 import { buildFeynmanTrack, nextPendingDay, scheduledDay } from "../domain/learn.js";
 import { RatingsInputSchema } from "../domain/schemas.js";
 import type { LearningTrack } from "../domain/types.js";
-import { linkObjectives, objectiveRefs, resolveObjectiveRefs } from "./objective-tags.js";
+import {
+  linkObjectives,
+  objectiveLensDescription,
+  objectiveRefs,
+  resolveObjectiveRefs,
+} from "./objective-tags.js";
 
 export function learnGenerateCommand(ctx: RunContext, opts: Opts): CommandResult {
   const store = ctx.store();
@@ -27,13 +32,18 @@ export function learnGenerateCommand(ctx: RunContext, opts: Opts): CommandResult
     ? parseOrThrow(RatingsInputSchema, resolveJsonInput(ratingsOpt), "Invalid ratings input.")
     : [];
   const minutes = optNumber(opts, "minutes", 10);
-
-  const days = buildFeynmanTrack(analysis.concepts, minutes, ratings);
-  const track = store.tracks.create({ analysisId, minutesPerDay: minutes, ratings, days });
   const objectives =
     requestedRefs.length > 0
       ? explicitObjectives
       : store.objectives.forRecord("post", analysis.postId);
+
+  const days = buildFeynmanTrack(
+    analysis.concepts,
+    minutes,
+    ratings,
+    objectiveLensDescription(objectives),
+  );
+  const track = store.tracks.create({ analysisId, minutesPerDay: minutes, ratings, days });
   const objectiveSlugs = linkObjectives(store, objectives, "track", track.id);
 
   return {
