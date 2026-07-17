@@ -30,7 +30,8 @@ Failure:
 ```
 
 `meta` commonly carries: `analysisId`, `postId`, `snapshotId`, `bookmarkId`, `suggestionId`,
-`trackId`, `provider`, `model`, `mock`, `deduped`, `persisted`. Branch on `ok`, then `error.code`.
+`trackId`, `objectiveId`, `provider`, `model`, `mock`, `deduped`, `persisted`. Branch on `ok`, then
+`error.code`.
 
 ## Error codes and exit codes
 
@@ -127,6 +128,25 @@ Any text/JSON flag (`--text`, `--transcript`, `--posts`, `--ratings`, and config
 - `learn show <id>` — a track (includes its `progress` entries).
 - `learn list [--analysis --limit]`.
 
+### objective
+
+Objectives are first-class learning goals and remain separate from bookmark tags. Multiple
+objectives can be active, but the repository enforces at most one current focus. Focus never
+auto-tags content.
+
+- `objective add <name> [--description <text> --focus]` — derive a kebab-case slug and create an
+  active objective. Duplicate slugs return `CONFLICT`.
+- `objective list [--status active|archived|all]` — objectives with tagged-record counts and focus
+  marker (default: active).
+- `objective show [slug]` — objective detail and counts; without a slug, defaults to the current
+  focus and returns `NOT_FOUND` when none is set.
+- `objective focus <slug>` / `objective focus --clear` — atomically set or clear the current focus.
+- `objective archive <slug>` — archive while preserving record links; archiving the focus clears it.
+
+Objective records use `obj_` ids. `record get` returns an `objectives` array for linkable record
+types. Public link/tagging commands are not part of this core PR; tagging remains explicit when that
+surface lands.
+
 ### search
 
 - `search <query> [--type analysis,takeaway,bookmark|all --limit]` — full-text search (SQLite FTS5)
@@ -156,7 +176,8 @@ Any text/JSON flag (`--text`, `--transcript`, `--posts`, `--ratings`, and config
 
 ### record / db / manifest
 
-- `record get <id>` — resolve any prefixed id to its record.
+- `record get <id>` — resolve any prefixed id, including `obj_`, and return objective tags alongside
+  linkable records.
 - `db stats | migrate | vacuum | reindex | reset --yes` (`reindex` rebuilds the search index).
 - `manifest` — full machine-readable description of the CLI.
 
@@ -169,5 +190,6 @@ or passed with `--api-key`. Run `tenbrains manifest` for the live catalog and de
 ## Database
 
 One SQLite file, versioned schema migrated automatically on open. Tables: `posts`, `analyses`,
-`accounts`, `takeaway_snapshots`, `bookmarks`, `suggestions`, `learning_tracks`. Point a task at an
-isolated file with `--db <path>`.
+`accounts`, `takeaway_snapshots`, `bookmarks`, `suggestions`, `learning_tracks`, `objectives`, and
+`objective_links`. Schema v4 introduces objectives. Point a task at an isolated file with
+`--db <path>`.

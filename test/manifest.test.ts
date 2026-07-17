@@ -55,6 +55,12 @@ test("manifest command tree matches the published contract", () => {
     "learn show",
     "learn today",
     "manifest",
+    "objective",
+    "objective add",
+    "objective archive",
+    "objective focus",
+    "objective list",
+    "objective show",
     "record",
     "record get",
     "search",
@@ -72,6 +78,26 @@ test("manifest command tree matches the published contract", () => {
     "takeaway show",
     "takeaway unfollow",
   ]);
+});
+
+test("manifest publishes objective flags and the obj_ id prefix", () => {
+  const manifest = buildManifest(buildProgram());
+  assert.ok(
+    (manifest.ids as { prefixes: string[] }).prefixes.includes("obj"),
+    "manifest is missing obj_ ids",
+  );
+  const objective = (
+    manifest.commands as Array<{
+      name: string;
+      commands: Array<{ name: string; options: Array<{ flags: string }> }>;
+    }>
+  ).find((command) => command.name === "objective");
+  const optionsFor = (name: string) =>
+    objective?.commands.find((command) => command.name === name)?.options.map((o) => o.flags) ?? [];
+  assert.ok(optionsFor("add").includes("--description <text>"));
+  assert.ok(optionsFor("add").includes("--focus"));
+  assert.ok(optionsFor("list").includes("--status <status>"));
+  assert.ok(optionsFor("focus").includes("--clear"));
 });
 
 test("manifest error and exit codes are stable", () => {

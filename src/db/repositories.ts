@@ -1,4 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
+import { CliError } from "../core/errors.js";
+import { slugify } from "../core/text.js";
 import type {
   Account,
   Analysis,
@@ -7,6 +9,11 @@ import type {
   ConceptRating,
   LearningDay,
   LearningTrack,
+  Objective,
+  ObjectiveLink,
+  ObjectiveRecordType,
+  ObjectiveStatus,
+  ObjectiveWithCount,
   Post,
   Suggestion,
   SuggestionStatus,
@@ -126,6 +133,25 @@ interface ProgressRow {
   completed_at: string;
 }
 
+interface ObjectiveRow {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  status: string;
+  is_focus: number;
+  created_at: string;
+  updated_at: string;
+  link_count?: number | undefined;
+}
+
+interface ObjectiveLinkRow {
+  objective_id: string;
+  record_type: string;
+  record_id: string;
+  created_at: string;
+}
+
 // --- mappers -----------------------------------------------------------------
 
 function mapPost(row: PostRow): Post {
@@ -214,6 +240,28 @@ function mapTrack(row: TrackRow, progress: TrackDayProgress[]): LearningTrack {
     ratings: parseJsonArray<ConceptRating>(row.ratings_json),
     days: parseJsonArray<LearningDay>(row.days_json),
     progress,
+    createdAt: row.created_at,
+  };
+}
+
+function mapObjective(row: ObjectiveRow): Objective {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    status: row.status as ObjectiveStatus,
+    isFocus: row.is_focus === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapObjectiveLink(row: ObjectiveLinkRow): ObjectiveLink {
+  return {
+    objectiveId: row.objective_id,
+    recordType: row.record_type as ObjectiveRecordType,
+    recordId: row.record_id,
     createdAt: row.created_at,
   };
 }
@@ -668,6 +716,202 @@ export class TracksRepo {
   }
 }
 
+const OBJECTIVE_RECORD_TYPES = ["post", "account", "bookmark", "track"] as const;
+
+function isObjectiveRecordType(value: string): value is ObjectiveRecordType {
+  return OBJECTIVE_RECORD_TYPES.some((type) => type === value);
+}
+
+export class ObjectivesRepo {
+  constructor(private readonly db: DatabaseSync) {}
+
+  create(data: { name: string; description?: string | undefined; focus?: boolean }): Objective {
+    const name = data.name.trim();
+    const slug = slugify(name);
+    if (!name || !slug) {
+      throw new CliError("VALIDATION", "Objective name must contain letters or numbers.");
+    }
+    if (this.get(slug)) {
+      throw new CliError("CONFLICT", `Objective "${slug}" already exists.`, {
+        details: { slug },
+      });
+    }
+
+    const id = newId("obj");
+    const timestamp = nowIso();
+    this.db.exec("BEGIN");
+    try {
+      if (data.focus) {
+        this.db
+          .prepare("UPDATE objectives SET is_focus = 0, updated_at = ? WHERE is_focus = 1")
+          .run(timestamp);
+      }
+      this.db
+        .prepare(
+          `INSERT INTO objectives
+           (id, slug, name, description, status, is_focus, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 'active', ?, ?, ?)`,
+        )
+        .run(
+          id,
+          slug,
+          name,
+          nn(data.description?.trim() || undefined),
+          data.focus ? 1 : 0,
+          timestamp,
+          timestamp,
+        );
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return this.get(id) as Objective;
+  }
+
+  get(ref: string): Objective | null {
+    const row = (
+      ref.startsWith("obj_")
+        ? this.db.prepare("SELECT * FROM objectives WHERE id = ?")
+        : this.db.prepare("SELECT * FROM objectives WHERE slug = ?")
+    ).get(ref) as ObjectiveRow | undefined;
+    return row ? mapObjective(row) : null;
+  }
+
+  list(status: ObjectiveStatus | "all" = "active"): ObjectiveWithCount[] {
+    const where = status === "all" ? "" : "WHERE o.status = ?";
+    const statement = this.db.prepare(
+      `SELECT o.*, COUNT(l.objective_id) AS link_count
+       FROM objectives o
+       LEFT JOIN objective_links l ON l.objective_id = o.id
+       ${where}
+       GROUP BY o.id
+       ORDER BY o.is_focus DESC, o.name COLLATE NOCASE ASC`,
+    );
+    const rows = (status === "all"
+      ? statement.all()
+      : statement.all(status)) as unknown as ObjectiveRow[];
+    return rows.map((row) => ({ ...mapObjective(row), linkCount: Number(row.link_count ?? 0) }));
+  }
+
+  focus(): Objective | null {
+    const row = this.db.prepare("SELECT * FROM objectives WHERE is_focus = 1 LIMIT 1").get() as
+      | ObjectiveRow
+      | undefined;
+    return row ? mapObjective(row) : null;
+  }
+
+  setFocus(ref: string | null): Objective | null {
+    const objective = ref === null ? null : this.get(ref);
+    if (ref !== null && !objective) {
+      throw new CliError("NOT_FOUND", `No objective with slug or id "${ref}".`, {
+        details: { objective: ref },
+      });
+    }
+    if (objective?.status === "archived") {
+      throw new CliError("CONFLICT", `Archived objective "${objective.slug}" cannot be focused.`, {
+        details: { slug: objective.slug },
+      });
+    }
+
+    const timestamp = nowIso();
+    this.db.exec("BEGIN");
+    try {
+      this.db
+        .prepare("UPDATE objectives SET is_focus = 0, updated_at = ? WHERE is_focus = 1")
+        .run(timestamp);
+      if (objective) {
+        this.db
+          .prepare("UPDATE objectives SET is_focus = 1, updated_at = ? WHERE id = ?")
+          .run(timestamp, objective.id);
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return objective ? (this.get(objective.id) as Objective) : null;
+  }
+
+  archive(ref: string): Objective {
+    const objective = this.get(ref);
+    if (!objective) {
+      throw new CliError("NOT_FOUND", `No objective with slug or id "${ref}".`, {
+        details: { objective: ref },
+      });
+    }
+    this.db
+      .prepare(
+        "UPDATE objectives SET status = 'archived', is_focus = 0, updated_at = ? WHERE id = ?",
+      )
+      .run(nowIso(), objective.id);
+    return this.get(objective.id) as Objective;
+  }
+
+  link(ref: string, recordType: ObjectiveRecordType, recordId: string): boolean {
+    const objective = this.get(ref);
+    if (!objective) {
+      throw new CliError("NOT_FOUND", `No objective with slug or id "${ref}".`, {
+        details: { objective: ref },
+      });
+    }
+    if (!isObjectiveRecordType(recordType)) {
+      throw new CliError("VALIDATION", `Unsupported objective record type "${recordType}".`);
+    }
+    const result = this.db
+      .prepare(
+        `INSERT OR IGNORE INTO objective_links
+         (objective_id, record_type, record_id, created_at) VALUES (?, ?, ?, ?)`,
+      )
+      .run(objective.id, recordType, recordId, nowIso());
+    return Number(result.changes) > 0;
+  }
+
+  unlink(ref: string, recordType: ObjectiveRecordType, recordId: string): boolean {
+    const objective = this.get(ref);
+    if (!objective) {
+      throw new CliError("NOT_FOUND", `No objective with slug or id "${ref}".`, {
+        details: { objective: ref },
+      });
+    }
+    const result = this.db
+      .prepare(
+        `DELETE FROM objective_links
+         WHERE objective_id = ? AND record_type = ? AND record_id = ?`,
+      )
+      .run(objective.id, recordType, recordId);
+    return Number(result.changes) > 0;
+  }
+
+  links(ref: string): ObjectiveLink[] {
+    const objective = this.get(ref);
+    if (!objective) {
+      throw new CliError("NOT_FOUND", `No objective with slug or id "${ref}".`, {
+        details: { objective: ref },
+      });
+    }
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM objective_links
+         WHERE objective_id = ? ORDER BY record_type, created_at, record_id`,
+      )
+      .all(objective.id) as unknown as ObjectiveLinkRow[];
+    return rows.map(mapObjectiveLink);
+  }
+
+  forRecord(recordType: ObjectiveRecordType, recordId: string): Objective[] {
+    const rows = this.db
+      .prepare(
+        `SELECT o.* FROM objectives o
+         JOIN objective_links l ON l.objective_id = o.id
+         WHERE l.record_type = ? AND l.record_id = ?
+         ORDER BY o.is_focus DESC, o.name COLLATE NOCASE ASC`,
+      )
+      .all(recordType, recordId) as unknown as ObjectiveRow[];
+    return rows.map(mapObjective);
+  }
+}
+
 /** Facade exposing every repository over a single Database. */
 export class Store {
   readonly posts: PostsRepo;
@@ -677,6 +921,7 @@ export class Store {
   readonly bookmarks: BookmarksRepo;
   readonly suggestions: SuggestionsRepo;
   readonly tracks: TracksRepo;
+  readonly objectives: ObjectivesRepo;
 
   constructor(readonly database: Database) {
     const handle = database.handle;
@@ -687,6 +932,7 @@ export class Store {
     this.bookmarks = new BookmarksRepo(handle);
     this.suggestions = new SuggestionsRepo(handle);
     this.tracks = new TracksRepo(handle);
+    this.objectives = new ObjectivesRepo(handle);
   }
 
   transaction<T>(fn: () => T): T {

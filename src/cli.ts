@@ -33,6 +33,13 @@ import {
   learnTodayCommand,
 } from "./commands/learn.js";
 import { manifestCommand } from "./commands/manifest.js";
+import {
+  objectiveAddCommand,
+  objectiveArchiveCommand,
+  objectiveFocusCommand,
+  objectiveListCommand,
+  objectiveShowCommand,
+} from "./commands/objective.js";
 import { recordGetCommand } from "./commands/record.js";
 import { searchCommand } from "./commands/search.js";
 import {
@@ -499,6 +506,66 @@ export function buildProgram(): Command {
   );
   program.addCommand(learn);
 
+  // --- objective ------------------------------------------------------------
+  const objective = makeCommand({
+    name: "objective",
+    description: "Manage first-class learning objectives and the current focus.",
+    handler: () => {
+      throw new CliError("USAGE", "Specify a subcommand: add|list|show|focus|archive.");
+    },
+  });
+  objective.addCommand(
+    makeCommand({
+      name: "add",
+      description: "Create a learning objective; its kebab-case slug is derived from the name.",
+      args: [{ spec: "<name>", description: "Objective name" }],
+      options: [
+        { flags: "--description <text>", description: "Fuller statement of the learning goal" },
+        { flags: "--focus", description: "Make this objective the current focus" },
+      ],
+      handler: objectiveAddCommand,
+    }),
+  );
+  objective.addCommand(
+    makeCommand({
+      name: "list",
+      description: "List objectives with tagged counts and the current-focus marker.",
+      options: [
+        {
+          flags: "--status <status>",
+          description: "Filter active|archived|all (default active)",
+        },
+      ],
+      handler: objectiveListCommand,
+    }),
+  );
+  objective.addCommand(
+    makeCommand({
+      name: "show",
+      description: "Show an objective and tagged counts (defaults to the current focus).",
+      args: [{ spec: "[slug]", description: "Objective slug or obj_ id" }],
+      handler: objectiveShowCommand,
+    }),
+  );
+  objective.addCommand(
+    makeCommand({
+      name: "focus",
+      description: "Set or clear the one current objective focus.",
+      args: [{ spec: "[slug]", description: "Active objective slug or obj_ id" }],
+      options: [{ flags: "--clear", description: "Clear the current focus" }],
+      handler: objectiveFocusCommand,
+    }),
+  );
+  objective.addCommand(
+    makeCommand({
+      name: "archive",
+      description: "Archive an objective while preserving its record links.",
+      args: [{ spec: "<slug>", description: "Objective slug or obj_ id" }],
+      handler: objectiveArchiveCommand,
+    }),
+  );
+  program.addCommand(objective);
+
   // --- search ---------------------------------------------------------------
   program.addCommand(
     makeCommand({
@@ -627,7 +694,7 @@ export function buildProgram(): Command {
   record.addCommand(
     makeCommand({
       name: "get",
-      description: "Fetch any record by id (post_/ana_/acc_/snap_/bm_/sug_/trk_).",
+      description: "Fetch any record by id, including obj_, with its objective tags.",
       args: [{ spec: "<id>" }],
       handler: recordGetCommand,
     }),

@@ -4,6 +4,7 @@ import type { RunContext } from "../core/context.js";
 import { ERROR_CODES, exitCodeMap } from "../core/errors.js";
 import type { Opts } from "../core/opts.js";
 import type { CommandResult } from "../core/output.js";
+import { ID_PREFIXES } from "../db/database.js";
 import { currentSchemaVersion } from "../db/migrations.js";
 
 interface OptionSpec {
@@ -75,6 +76,10 @@ export function buildManifest(program: Command): Record<string, unknown> {
     },
     errorCodes: ERROR_CODES,
     exitCodes: exitCodeMap(),
+    ids: {
+      format: "<prefix>_<sortable>",
+      prefixes: ID_PREFIXES,
+    },
     providers: Object.values(PROVIDER_CATALOG).map((p) => ({
       id: p.id,
       label: p.label,

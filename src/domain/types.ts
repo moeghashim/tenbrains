@@ -93,3 +93,28 @@ export interface LearningTrack {
   progress: TrackDayProgress[];
   createdAt: string;
 }
+
+export type ObjectiveStatus = "active" | "archived";
+export type ObjectiveRecordType = "post" | "account" | "bookmark" | "track";
+
+export interface Objective {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  status: ObjectiveStatus;
+  isFocus: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ObjectiveWithCount extends Objective {
+  linkCount: number;
+}
+
+export interface ObjectiveLink {
+  objectiveId: string;
+  recordType: ObjectiveRecordType;
+  recordId: string;
+  createdAt: string;
+}
