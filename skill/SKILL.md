@@ -1,20 +1,20 @@
 ---
 name: tenbrains
 description: >-
-  Do X/Twitter research with the local `tenbrains` CLI and persist every result
-  to a SQLite database. Analyze a post into topic/summary/intent/key concepts,
+  Do X/Twitter and YouTube research with the local `tenbrains` CLI and persist every result
+  to a SQLite database. Analyze a post or video transcript into topic/summary/intent/key concepts,
   summarize a followed account's recent posts into takeaways, manage research
   bookmarks and ranked suggestions, recall past analyses with search, and build
   a 7-day learning track from a post. Use this skill whenever the user wants to
   analyze a tweet or X post, research or summarize an X/Twitter account, save or
   recall X research, triage saved posts, or turn a post into a study plan — even
   if they don't say "tenbrains" explicitly. Do not use it for posting/replying
-  on X or for non-X content.
+  on X or for unrelated non-X/non-YouTube content.
 ---
 
-# tenbrains — agent-first X research CLI
+# tenbrains — agent-first X and YouTube research CLI
 
-`tenbrains` analyzes X/Twitter content with an AI provider and stores every outcome (posts,
+`tenbrains` analyzes X/Twitter content and YouTube transcripts with an AI provider and stores every outcome (posts,
 analyses, account takeaways, bookmarks, suggestions, learning tracks) in a local SQLite database.
 It is built to be driven by an agent: each run prints one JSON object you can parse directly.
 
@@ -74,6 +74,20 @@ tenbrains analyze --url "https://x.com/jack/status/20"                       # f
 `--fetch auto|oembed|api` controls fetching (default `auto`, free-first). Re-using the same `--id`
 dedupes the stored post. Add `--learn` to also generate a 7-day Feynman learning track in the same
 call (`--minutes`, `--ratings` optional).
+
+### Analyze a YouTube video
+
+Public captioned videos need no API key. `--summarize` and `--learn` can be used independently or
+together. If captions are unavailable, use the manual transcript fallback:
+
+```bash
+tenbrains analyze --url "https://youtu.be/M7lc1UVf-VE" --lang en --summarize --learn
+tenbrains analyze --url "https://youtu.be/M7lc1UVf-VE" --transcript @captions.txt
+```
+
+The result includes the usual `data.analysis`, optional `data.summary = { summary, keyPoints[] }`,
+and optional `data.track`; `meta.source` is `youtube`. Do not add audio download or transcription
+steps: this release is caption-only.
 
 ### Account takeaways
 
@@ -146,5 +160,5 @@ tenbrains db stats             # row counts + schema version
 
 ## When this skill does not apply
 
-Posting, replying, or DMing on X; fetching live tweets (the agent supplies the content); and any
-non-X research. For those, use the appropriate tool instead.
+Posting, replying, or DMing on X, and unrelated research outside X or YouTube. For those, use the
+appropriate tool instead.

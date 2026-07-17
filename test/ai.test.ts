@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { extractJsonObject } from "../src/ai/json.js";
-import { mockAnalysis, mockTakeaway } from "../src/ai/mock.js";
-import { AnalysisResultSchema, TakeawayResultSchema } from "../src/domain/schemas.js";
+import { mockAnalysis, mockSummary, mockTakeaway } from "../src/ai/mock.js";
+import {
+  AnalysisResultSchema,
+  SummaryResultSchema,
+  TakeawayResultSchema,
+} from "../src/domain/schemas.js";
 
 test("mockAnalysis returns a schema-valid result with 5 concepts", () => {
   const result = mockAnalysis(
@@ -16,6 +20,15 @@ test("mockAnalysis returns a schema-valid result with 5 concepts", () => {
 test("mockAnalysis is deterministic", () => {
   const text = "Prompt caching reduces token costs for repeated agent context windows.";
   assert.deepEqual(mockAnalysis(text), mockAnalysis(text));
+});
+
+test("mockSummary returns a deterministic schema-valid narrative", () => {
+  const text =
+    "Agents ingest transcripts. Summaries condense long content. Concepts become learning tracks.";
+  const result = mockSummary(text);
+  assert.doesNotThrow(() => SummaryResultSchema.parse(result));
+  assert.deepEqual(result, mockSummary(text));
+  assert.ok(result.keyPoints.length > 0);
 });
 
 test("mockTakeaway returns 3-5 takeaways and is schema-valid", () => {

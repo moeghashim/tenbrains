@@ -1,6 +1,6 @@
 # tenbrains
 
-An **agent-first** CLI for X research. It analyzes posts, tracks followed accounts, surfaces
+An **agent-first** CLI for X and YouTube research. It analyzes posts and video transcripts, tracks followed accounts, surfaces
 suggestions, and **persists every outcome to a local SQLite database** — all from the command line,
 with no `.env` files and no hosted backend.
 
@@ -65,6 +65,9 @@ tenbrains analyze --author levelsio --id 1790000000000000000 \
 # 2b. Or analyze a tweet by URL — fetched free via X's oEmbed endpoint, no key needed.
 tenbrains analyze --url "https://x.com/jack/status/20"
 
+# 2c. Or fetch and analyze public YouTube captions, then add a narrative digest and study plan.
+tenbrains analyze --url "https://www.youtube.com/watch?v=M7lc1UVf-VE" --summarize --learn
+
 # 3. Read it back / explore.
 tenbrains analyze list --limit 5
 tenbrains search "agent cli"
@@ -108,7 +111,7 @@ Exit codes: `0` success · `2` usage · `3` not found · `4` missing credentials
 
 | Command | Purpose |
 | --- | --- |
-| `analyze` | Analyze a post (`--text`, or `--url`/`--id` to fetch) into topic, summary, intent, 5 novel concepts. `--thread` analyzes a whole thread as one document; `--learn` also builds a track. |
+| `analyze` | Analyze a post or YouTube transcript (`--text`, `--transcript`, or `--url` to fetch) into topic, summary, intent, and concepts. `--summarize` adds a narrative digest; `--learn` builds a track. |
 | `analyze list` / `analyze get <id>` | Read stored analyses. |
 | `takeaway follow\|unfollow\|list\|refresh\|show` | Track accounts; summarize recent posts (supplied via `--posts` or fetched from X) into snapshots. |
 | `suggest generate\|list\|save\|dismiss\|add` | Rank un-saved posts against your saved signal; save/dismiss feedback. |
@@ -131,6 +134,26 @@ Input flags accept inline text, `@path` to read a file, or `-` to read stdin:
 echo "long post text..." | tenbrains analyze --provider mock --text -
 tenbrains takeaway refresh levelsio --provider mock --posts @recent.json
 ```
+
+## YouTube transcripts
+
+Pass a public YouTube watch, `youtu.be`, Shorts, or embed URL to `analyze`. tenbrains selects a
+caption track without an API key (manual before auto-generated; `--lang`, then English, then the
+first available), stores the transcript and video metadata with the post, and runs the normal
+analysis pipeline:
+
+```bash
+tenbrains analyze --url "https://youtu.be/M7lc1UVf-VE" --lang en
+tenbrains analyze --url "https://youtu.be/M7lc1UVf-VE" --summarize --learn
+tenbrains analyze --url "https://youtu.be/M7lc1UVf-VE" --transcript @captions.txt
+```
+
+`--summarize` returns `{ summary, keyPoints[] }` under `data.summary`, persists it in the post's
+`raw` metadata, and uses that digest as the condensed input for concept extraction. It composes
+with `--learn`. If a video is unavailable or has no captions, supply an existing transcript with
+`--transcript <text|@file|->`. v1 is caption-only: it does not download audio or invoke Whisper.
+YouTube's WEB caption URLs can return empty bodies, so the client retries through the embedded
+Android player API; that undocumented client version is the primary maintenance surface.
 
 ## Configuration & credentials
 

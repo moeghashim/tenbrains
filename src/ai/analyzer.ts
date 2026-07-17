@@ -2,15 +2,19 @@ import { parseOrThrow } from "../core/validate.js";
 import {
   type AnalysisResult,
   AnalysisResultSchema,
+  type SummaryResult,
+  SummaryResultSchema,
   type TakeawayResult,
   TakeawayResultSchema,
 } from "../domain/schemas.js";
 import { complete } from "./client.js";
 import { extractJsonObject } from "./json.js";
-import { mockAnalysis, mockTakeaway } from "./mock.js";
+import { mockAnalysis, mockSummary, mockTakeaway } from "./mock.js";
 import {
   accountTakeawaySystemPrompt,
   accountTakeawayUserPrompt,
+  contentSummarySystemPrompt,
+  contentSummaryUserPrompt,
   tweetAnalysisSystemPrompt,
   tweetAnalysisUserPrompt,
 } from "./prompts.js";
@@ -31,6 +35,7 @@ export interface PostForAnalysis {
 export async function analyzePost(
   resolved: ResolvedProvider,
   post: PostForAnalysis,
+  kind: "tweet" | "transcript" = "tweet",
 ): Promise<AnalysisOutcome> {
   if (resolved.provider === "mock") {
     return { result: mockAnalysis(post.text), mock: true };
@@ -39,13 +44,41 @@ export async function analyzePost(
     provider: resolved.provider,
     model: resolved.model,
     apiKey: resolved.apiKey as string,
-    system: tweetAnalysisSystemPrompt(),
+    system: tweetAnalysisSystemPrompt(kind),
     user: tweetAnalysisUserPrompt(post),
   });
   const result = parseOrThrow(
     AnalysisResultSchema,
     extractJsonObject(text),
     "Provider response did not match the expected analysis shape.",
+    "PROVIDER_BAD_OUTPUT",
+  );
+  return { result, mock: false };
+}
+
+export interface SummaryOutcome {
+  result: SummaryResult;
+  mock: boolean;
+}
+
+export async function summarizeContent(
+  resolved: ResolvedProvider,
+  content: string,
+): Promise<SummaryOutcome> {
+  if (resolved.provider === "mock") {
+    return { result: mockSummary(content), mock: true };
+  }
+  const text = await complete({
+    provider: resolved.provider,
+    model: resolved.model,
+    apiKey: resolved.apiKey as string,
+    system: contentSummarySystemPrompt(),
+    user: contentSummaryUserPrompt(content),
+  });
+  const result = parseOrThrow(
+    SummaryResultSchema,
+    extractJsonObject(text),
+    "Provider response did not match the expected summary shape.",
     "PROVIDER_BAD_OUTPUT",
   );
   return { result, mock: false };

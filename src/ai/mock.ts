@@ -1,5 +1,5 @@
 import { significantTerms } from "../core/text.js";
-import type { AnalysisResult, TakeawayResult } from "../domain/schemas.js";
+import type { AnalysisResult, SummaryResult, TakeawayResult } from "../domain/schemas.js";
 
 /**
  * Deterministic, offline analysis used by the `mock` provider. It performs no
@@ -59,6 +59,19 @@ export function mockAnalysis(text: string): AnalysisResult {
   });
 
   return { topic, summary, intent, novelConcepts };
+}
+
+export function mockSummary(text: string): SummaryResult {
+  const sentences = text
+    .trim()
+    .split(/(?<=[.!?])\s+/)
+    .filter(Boolean);
+  const summary = (sentences.slice(0, 4).join(" ") || firstSentence(text)).slice(0, 1200);
+  const terms = significantTerms(text, 5);
+  const keyPoints = terms.length
+    ? terms.map((term) => `${titleCase(term)} is a recurring theme in the content.`)
+    : ["The supplied content does not contain enough detail for additional key points."];
+  return { summary, keyPoints };
 }
 
 export function mockTakeaway(posts: Array<{ text: string }>): TakeawayResult {

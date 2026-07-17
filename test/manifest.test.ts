@@ -95,6 +95,20 @@ test("manifest error and exit codes are stable", () => {
   assert.ok(codes.includes("CONFLICT"));
 });
 
+test("analyze manifest exposes YouTube and companion-action flags", () => {
+  const manifest = buildManifest(buildProgram());
+  const analyze = (
+    manifest.commands as Array<{
+      name: string;
+      options: Array<{ flags: string }>;
+    }>
+  ).find((command) => command.name === "analyze");
+  const flags = analyze?.options.map((option) => option.flags) ?? [];
+  for (const expected of ["--lang <code>", "--transcript <text>", "--summarize", "--learn"]) {
+    assert.ok(flags.includes(expected), `analyze is missing ${expected}`);
+  }
+});
+
 test("every command exposes the common output/storage flags", () => {
   const manifest = buildManifest(buildProgram());
   const check = (spec: { name: string; options: Array<{ flags: string }>; commands: never[] }) => {

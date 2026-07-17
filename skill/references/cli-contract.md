@@ -57,7 +57,7 @@ Valid on every command, in any position:
 
 ## Input forms
 
-Any text/JSON flag (`--text`, `--posts`, `--ratings`, and config `<value>`) accepts:
+Any text/JSON flag (`--text`, `--transcript`, `--posts`, `--ratings`, and config `<value>`) accepts:
 
 - inline string: `--text "hello"`
 - `@path` to read a file: `--posts @recent.json`
@@ -72,8 +72,14 @@ Any text/JSON flag (`--text`, `--posts`, `--ratings`, and config `<value>`) acce
   `--post-id <id>` to re-analyze a stored post. If only `--url`/`--id` is given (no `--text`), the
   tweet is fetched: `--fetch auto|oembed|api` (default `auto`, free-first — oEmbed needs no key;
   `api` uses `--x-bearer`/config token). Learning: `--learn`, `--minutes <n>`, `--ratings`.
-  Returns `{ post, analysis }` where `analysis = { topic, summary, intent, novelConcepts[5] }`;
-  `meta.source` is `text` | `stored` | `thread` | `x:oembed` | `x:api` | `x:thread`.
+  `--summarize` also returns `data.summary = { summary, keyPoints[] }` and persists it in post
+  metadata. Returns `{ post, analysis, summary?, track? }`; `meta.source` is `text` | `stored` |
+  `thread` | `x:oembed` | `x:api` | `x:thread` | `youtube`.
+- `analyze --url <youtube-url> [--lang <code>]` — fetch public captions and analyze the transcript.
+  Manual captions are preferred over ASR; language preference is requested code, English, then
+  first available. `--transcript <text|@file|->` supplies a transcript without network and may be
+  paired with a YouTube URL for canonical metadata/dedup. No-caption videos return `NOT_FOUND`;
+  restricted videos return `PROVIDER_UNAUTHORIZED`.
 - `analyze --thread <json>` — analyze a whole thread as one document; parts are strings or
   `{text, externalId?}` objects (`@file`/`-` ok). Bare `--thread` with `--url`/`--id` fetches the
   author's self-thread via the X API (needs a Bearer token; degrades to the root tweet when reply

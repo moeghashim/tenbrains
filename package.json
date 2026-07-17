@@ -1,7 +1,7 @@
 {
   "name": "tenbrains",
-  "version": "2.1.0",
-  "description": "Agent-first CLI for X research: analyze posts, track accounts, surface suggestions, and persist every outcome to a local database.",
+  "version": "2.2.0",
+  "description": "Agent-first CLI for X and YouTube research: analyze content, track accounts, surface suggestions, and persist every outcome locally.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -15,6 +15,8 @@
     "agent",
     "x",
     "twitter",
+    "youtube",
+    "transcript",
     "research",
     "sqlite",
     "claude"
