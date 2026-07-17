@@ -37,8 +37,10 @@ import {
   objectiveAddCommand,
   objectiveArchiveCommand,
   objectiveFocusCommand,
+  objectiveLinkCommand,
   objectiveListCommand,
   objectiveShowCommand,
+  objectiveUnlinkCommand,
 } from "./commands/objective.js";
 import { recordGetCommand } from "./commands/record.js";
 import { searchCommand } from "./commands/search.js";
@@ -139,7 +141,7 @@ interface Registration {
   description: string;
   args?: Array<{ spec: string; description?: string }>;
   aliases?: string[];
-  options?: Array<{ flags: string; description: string }>;
+  options?: Array<{ flags: string; description: string; repeatable?: boolean }>;
   negations?: Array<{ flags: string; description: string }>;
   handler: Handler;
 }
@@ -155,7 +157,16 @@ function makeCommand(reg: Registration): Command {
     cmd.argument(arg.spec, arg.description ?? "");
   }
   for (const option of reg.options ?? []) {
-    cmd.option(option.flags, option.description);
+    if (option.repeatable) {
+      cmd.option(
+        option.flags,
+        option.description,
+        (value: string, previous: string[]) => [...previous, value],
+        [],
+      );
+    } else {
+      cmd.option(option.flags, option.description);
+    }
   }
   for (const negation of reg.negations ?? []) {
     cmd.option(negation.flags, negation.description);
@@ -221,6 +232,11 @@ export function buildProgram(): Command {
         description: "X API Bearer token for --fetch api/fallback; - reads stdin",
       },
       ...PROVIDER_OPTIONS,
+      {
+        flags: "--objective <slug>",
+        description: "Tag the resulting post; repeat for multiple existing objectives",
+        repeatable: true,
+      },
       { flags: "--learn", description: "Also generate a 7-day Feynman learning track" },
       { flags: "--ratings <json>", description: "Concept ratings JSON for --learn (@file/- ok)" },
       { flags: "--minutes <n>", description: "Minutes per day for --learn (default 10)" },
@@ -262,7 +278,14 @@ export function buildProgram(): Command {
       name: "follow",
       description: "Follow an account for takeaway tracking.",
       args: [{ spec: "<username>", description: "X username (with or without @)" }],
-      options: [{ flags: "--name <name>", description: "Display name" }],
+      options: [
+        { flags: "--name <name>", description: "Display name" },
+        {
+          flags: "--objective <slug>",
+          description: "Tag the followed account; repeat for multiple existing objectives",
+          repeatable: true,
+        },
+      ],
       handler: takeawayFollowCommand,
     }),
   );
@@ -397,6 +420,11 @@ export function buildProgram(): Command {
         { flags: "--tags <list>", description: "Comma-separated tags" },
         { flags: "--note <note>", description: "Freeform note" },
         { flags: "--source <source>", description: "Source label (default cli)" },
+        {
+          flags: "--objective <slug>",
+          description: "Tag the bookmarked post; repeat for multiple existing objectives",
+          repeatable: true,
+        },
       ],
       negations: [{ flags: "--no-auto-tags", description: "Disable automatic tag suggestion" }],
       handler: bookmarkAddCommand,
@@ -461,6 +489,11 @@ export function buildProgram(): Command {
         { flags: "--analysis <id>", description: "Analysis id to build from" },
         { flags: "--ratings <json>", description: "Concept ratings JSON (@file/- ok)" },
         { flags: "--minutes <n>", description: "Minutes per day (default 10)" },
+        {
+          flags: "--objective <slug>",
+          description: "Tag the track; repeat to override inherited objectives",
+          repeatable: true,
+        },
       ],
       handler: learnGenerateCommand,
     }),
@@ -511,7 +544,7 @@ export function buildProgram(): Command {
     name: "objective",
     description: "Manage first-class learning objectives and the current focus.",
     handler: () => {
-      throw new CliError("USAGE", "Specify a subcommand: add|list|show|focus|archive.");
+      throw new CliError("USAGE", "Specify a subcommand: add|list|show|focus|archive|link|unlink.");
     },
   });
   objective.addCommand(
@@ -542,7 +575,7 @@ export function buildProgram(): Command {
   objective.addCommand(
     makeCommand({
       name: "show",
-      description: "Show an objective and tagged counts (defaults to the current focus).",
+      description: "Show an objective, tagged counts, and records (defaults to the current focus).",
       args: [{ spec: "[slug]", description: "Objective slug or obj_ id" }],
       handler: objectiveShowCommand,
     }),
@@ -562,6 +595,24 @@ export function buildProgram(): Command {
       description: "Archive an objective while preserving its record links.",
       args: [{ spec: "<slug>", description: "Objective slug or obj_ id" }],
       handler: objectiveArchiveCommand,
+    }),
+  );
+  objective.addCommand(
+    makeCommand({
+      name: "link",
+      description: "Tag an existing post, account, bookmark, or track with an objective.",
+      args: [{ spec: "<recordId>", description: "Existing post_, acc_, bm_, or trk_ id" }],
+      options: [{ flags: "--objective <slug>", description: "Existing objective slug or obj_ id" }],
+      handler: objectiveLinkCommand,
+    }),
+  );
+  objective.addCommand(
+    makeCommand({
+      name: "unlink",
+      description: "Remove an objective tag from an existing record.",
+      args: [{ spec: "<recordId>", description: "Existing post_, acc_, bm_, or trk_ id" }],
+      options: [{ flags: "--objective <slug>", description: "Existing objective slug or obj_ id" }],
+      handler: objectiveUnlinkCommand,
     }),
   );
   program.addCommand(objective);

@@ -113,7 +113,7 @@ Exit codes: `0` success · `2` usage · `3` not found · `4` missing credentials
 | --- | --- |
 | `analyze` | Analyze a post or YouTube transcript (`--text`, `--transcript`, or `--url` to fetch) into topic, summary, intent, and concepts. `--summarize` adds a narrative digest; `--learn` builds a track. |
 | `analyze list` / `analyze get <id>` | Read stored analyses. |
-| `objective add\|list\|show\|focus\|archive` | Manage first-class learning goals and one optional current focus. |
+| `objective add\|list\|show\|focus\|archive\|link\|unlink` | Manage first-class learning goals, one optional current focus, and explicit record tags. |
 | `takeaway follow\|unfollow\|list\|refresh\|show` | Track accounts; summarize recent posts (supplied via `--posts` or fetched from X) into snapshots. |
 | `suggest generate\|list\|save\|dismiss\|add` | Rank un-saved posts against your saved signal; save/dismiss feedback. |
 | `bookmark add\|list\|show\|tag\|remove` | Save posts with tags (auto-suggested from analysis) and notes. |
@@ -150,13 +150,26 @@ tenbrains objective list
 tenbrains objective show                 # defaults to the current focus
 tenbrains objective focus ai-agents
 tenbrains objective focus --clear
+tenbrains objective link post_... --objective stablecoins
+tenbrains objective unlink post_... --objective stablecoins
 tenbrains objective archive stablecoins
 ```
 
-Focus never tags records automatically. Objective tagging remains explicit; the core repository
-already stores polymorphic post/account/bookmark/track links, while the public link/tagging commands
-land in the next review-sized objectives change. Objective records use `obj_...` ids, and
-`record get` includes an `objectives` array for records that support objective links.
+Tag at creation time with a repeatable `--objective` flag:
+
+```bash
+tenbrains analyze --provider mock --text "..." \
+  --objective stablecoins --objective ai-agents
+tenbrains takeaway follow levelsio --objective ai-agents
+tenbrains bookmark add --post-id post_... --objective stablecoins
+tenbrains learn generate --analysis ana_... --objective stablecoins
+```
+
+`bookmark add` tags the bookmark's post. Without an explicit `--objective`, `learn generate` inherits
+the objective tags on its source analysis' post; supplying the flag overrides that inheritance.
+Every referenced objective must already exist or the command returns `NOT_FOUND` without silently
+creating one. Focus never tags records automatically. `objective show` groups tagged posts,
+accounts, bookmarks, and tracks; `record get` includes an `objectives` array for linkable records.
 
 ## YouTube transcripts
 

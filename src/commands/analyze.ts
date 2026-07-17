@@ -11,6 +11,7 @@ import { PostInputSchema, RatingsInputSchema, ThreadInputSchema } from "../domai
 import type { Analysis, LearningTrack, Post } from "../domain/types.js";
 import { type FetchMode, fetchThread, fetchTweet, isFetchMode } from "../x/client.js";
 import { fetchTranscript, isYouTubeUrl, parseVideoRef } from "../youtube/client.js";
+import { linkObjectives, resolveObjectiveOptions } from "./objective-tags.js";
 import { resolveXBearer } from "./shared.js";
 
 function parseFetchMode(value: string | undefined): FetchMode {
@@ -40,12 +41,13 @@ function isTranscriptPost(post: Post): boolean {
 }
 
 export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<CommandResult> {
+  const store = ctx.store();
+  const explicitObjectives = resolveObjectiveOptions(store, opts);
   const resolved = resolveProvider(ctx.config, {
     provider: optString(opts, "provider"),
     model: optString(opts, "model"),
     apiKey: optString(opts, "apiKey"),
   });
-  const store = ctx.store();
 
   // Pick the content source: a stored post, inline text, thread parts, or a fetched tweet/thread.
   let post: Post;
@@ -252,11 +254,20 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
     concepts: outcome.result.novelConcepts,
     mock: outcome.mock,
   });
+  linkObjectives(store, explicitObjectives, "post", post.id);
 
   let track: LearningTrack | undefined;
+  let trackObjectives = explicitObjectives;
   if (optBool(opts, "learn")) {
     track = buildAndPersistTrack(ctx, analysis, opts);
+    if (trackObjectives.length === 0) {
+      trackObjectives = store.objectives.forRecord("post", post.id);
+    }
+    linkObjectives(store, trackObjectives, "track", track.id);
   }
+  const objectiveSlugs = (track ? trackObjectives : explicitObjectives).map(
+    (objective) => objective.slug,
+  );
 
   return {
     data: {
@@ -274,6 +285,7 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
       deduped,
       source,
       persisted: true,
+      objectives: objectiveSlugs,
       ...(narrativeSummary ? { summarized: true } : {}),
       ...(threadParts !== undefined ? { threadParts } : {}),
       ...(track ? { trackId: track.id } : {}),

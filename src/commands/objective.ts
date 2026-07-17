@@ -2,7 +2,17 @@ import type { RunContext } from "../core/context.js";
 import { CliError } from "../core/errors.js";
 import { type Opts, optBool, optString, requireString } from "../core/opts.js";
 import type { CommandResult } from "../core/output.js";
-import type { ObjectiveRecordType, ObjectiveStatus } from "../domain/types.js";
+import type { Store } from "../db/repositories.js";
+import type {
+  Account,
+  Bookmark,
+  LearningTrack,
+  ObjectiveLink,
+  ObjectiveRecordType,
+  ObjectiveStatus,
+  Post,
+} from "../domain/types.js";
+import { resolveObjectiveRecord, resolveObjectiveRef } from "./objective-tags.js";
 
 function parseStatus(value: string | undefined): ObjectiveStatus | "all" {
   const status = value ?? "active";
@@ -26,6 +36,47 @@ function countsByType(links: Array<{ recordType: ObjectiveRecordType }>) {
     counts[link.recordType] += 1;
   }
   return counts;
+}
+
+interface ObjectiveRecords {
+  posts: Post[];
+  accounts: Account[];
+  bookmarks: Bookmark[];
+  tracks: LearningTrack[];
+}
+
+function recordsByType(store: Store, links: ObjectiveLink[]): ObjectiveRecords {
+  const records: ObjectiveRecords = {
+    posts: [],
+    accounts: [],
+    bookmarks: [],
+    tracks: [],
+  };
+  for (const link of links) {
+    switch (link.recordType) {
+      case "post": {
+        const post = store.posts.findById(link.recordId);
+        if (post) records.posts.push(post);
+        break;
+      }
+      case "account": {
+        const account = store.accounts.findById(link.recordId);
+        if (account) records.accounts.push(account);
+        break;
+      }
+      case "bookmark": {
+        const bookmark = store.bookmarks.findById(link.recordId);
+        if (bookmark) records.bookmarks.push(bookmark);
+        break;
+      }
+      case "track": {
+        const track = store.tracks.findById(link.recordId);
+        if (track) records.tracks.push(track);
+        break;
+      }
+    }
+  }
+  return records;
 }
 
 export function objectiveAddCommand(ctx: RunContext, opts: Opts): CommandResult {
@@ -78,9 +129,11 @@ export function objectiveShowCommand(ctx: RunContext, opts: Opts): CommandResult
       { details: slug ? { objective: slug } : { focus: null } },
     );
   }
-  const counts = countsByType(store.objectives.links(objective.id));
+  const links = store.objectives.links(objective.id);
+  const counts = countsByType(links);
+  const records = recordsByType(store, links);
   return {
-    data: { objective, counts },
+    data: { objective, counts, records },
     meta: { objectiveId: objective.id, slug: objective.slug },
     human: () =>
       [
@@ -88,6 +141,46 @@ export function objectiveShowCommand(ctx: RunContext, opts: Opts): CommandResult
         objective.description ?? "(no description)",
         `${counts.total} tagged: ${counts.post} posts, ${counts.account} accounts, ${counts.bookmark} bookmarks, ${counts.track} tracks`,
       ].join("\n"),
+  };
+}
+
+export function objectiveLinkCommand(ctx: RunContext, opts: Opts): CommandResult {
+  const store = ctx.store();
+  const objective = resolveObjectiveRef(store, requireString(opts, "objective", "--objective"));
+  const target = resolveObjectiveRecord(store, requireString(opts, "recordId", "<recordId>"));
+  const linked = store.objectives.link(objective.id, target.type, target.id);
+  const objectives = store.objectives.forRecord(target.type, target.id).map((item) => item.slug);
+  return {
+    data: {
+      objective,
+      record: { type: target.type, value: target.value },
+      linked,
+    },
+    meta: { objectives, persisted: true },
+    human: () =>
+      linked
+        ? `Linked ${target.id} to objective "${objective.slug}".`
+        : `${target.id} is already linked to objective "${objective.slug}".`,
+  };
+}
+
+export function objectiveUnlinkCommand(ctx: RunContext, opts: Opts): CommandResult {
+  const store = ctx.store();
+  const objective = resolveObjectiveRef(store, requireString(opts, "objective", "--objective"));
+  const target = resolveObjectiveRecord(store, requireString(opts, "recordId", "<recordId>"));
+  const unlinked = store.objectives.unlink(objective.id, target.type, target.id);
+  const objectives = store.objectives.forRecord(target.type, target.id).map((item) => item.slug);
+  return {
+    data: {
+      objective,
+      record: { type: target.type, value: target.value },
+      unlinked,
+    },
+    meta: { objectives, persisted: true },
+    human: () =>
+      unlinked
+        ? `Unlinked ${target.id} from objective "${objective.slug}".`
+        : `${target.id} was not linked to objective "${objective.slug}".`,
   };
 }
 

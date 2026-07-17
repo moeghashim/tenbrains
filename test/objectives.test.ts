@@ -4,14 +4,20 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import { analyzeCommand } from "../src/commands/analyze.js";
+import { bookmarkAddCommand } from "../src/commands/bookmark.js";
+import { learnGenerateCommand } from "../src/commands/learn.js";
 import {
   objectiveAddCommand,
   objectiveArchiveCommand,
   objectiveFocusCommand,
+  objectiveLinkCommand,
   objectiveListCommand,
   objectiveShowCommand,
+  objectiveUnlinkCommand,
 } from "../src/commands/objective.js";
 import { recordGetCommand } from "../src/commands/record.js";
+import { takeawayFollowCommand } from "../src/commands/takeaway.js";
 import { RunContext } from "../src/core/context.js";
 import { Database } from "../src/db/database.js";
 import { MIGRATIONS, runMigrations } from "../src/db/migrations.js";
@@ -223,6 +229,216 @@ test("record get resolves obj_ ids and includes reverse objective tags", () => {
 
     const objectiveResult = recordGetCommand(ctx, { id: objective.id });
     assert.equal((objectiveResult.data as { type: string }).type, "objective");
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
+test("objective link/unlink validates records and show groups hydrated records by type", () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    const store = ctx.store();
+    const objective = store.objectives.create({ name: "Stablecoins" });
+    const post = store.posts.create({ text: "Stablecoin reserve design" });
+    const account = store.accounts.create("payments");
+    const bookmark = store.bookmarks.create({ postId: post.id, tags: [], source: "test" });
+    const analysis = store.analyses.create({
+      postId: post.id,
+      provider: "mock",
+      model: "mock",
+      topic: "Stablecoins",
+      summary: "Reserve design",
+      intent: "Explain",
+      concepts: [],
+      mock: true,
+    });
+    const track = store.tracks.create({
+      analysisId: analysis.id,
+      minutesPerDay: 10,
+      ratings: [],
+      days: [],
+    });
+
+    for (const recordId of [post.id, account.id, bookmark.id, track.id]) {
+      const result = objectiveLinkCommand(ctx, {
+        objective: objective.slug,
+        recordId,
+      });
+      assert.equal((result.data as { linked: boolean }).linked, true);
+      assert.deepEqual(result.meta?.objectives, ["stablecoins"]);
+    }
+
+    const shown = objectiveShowCommand(ctx, { slug: objective.slug });
+    const records = (
+      shown.data as {
+        records: {
+          posts: unknown[];
+          accounts: unknown[];
+          bookmarks: unknown[];
+          tracks: unknown[];
+        };
+      }
+    ).records;
+    assert.deepEqual(
+      Object.fromEntries(Object.entries(records).map(([type, values]) => [type, values.length])),
+      { posts: 1, accounts: 1, bookmarks: 1, tracks: 1 },
+    );
+
+    const unlinked = objectiveUnlinkCommand(ctx, {
+      objective: objective.slug,
+      recordId: post.id,
+    });
+    assert.equal((unlinked.data as { unlinked: boolean }).unlinked, true);
+    assert.deepEqual(unlinked.meta?.objectives, []);
+    assert.throws(
+      () =>
+        objectiveLinkCommand(ctx, {
+          objective: objective.slug,
+          recordId: "post_missing",
+        }),
+      (error: unknown) => (error as { code?: string }).code === "NOT_FOUND",
+    );
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
+test("analyze tags a post and generated track with repeatable explicit objectives", async () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    const store = ctx.store();
+    store.objectives.create({ name: "Stablecoins" });
+    store.objectives.create({ name: "Payments" });
+    const result = await analyzeCommand(ctx, {
+      provider: "mock",
+      text: "Stablecoin settlement and payment rails need resilient reserve designs.",
+      learn: true,
+      objective: ["stablecoins", "payments"],
+    });
+    const data = result.data as {
+      post: { id: string };
+      track: { id: string };
+    };
+    assert.deepEqual(result.meta?.objectives, ["stablecoins", "payments"]);
+    assert.deepEqual(
+      store.objectives.forRecord("post", data.post.id).map((objective) => objective.slug),
+      ["payments", "stablecoins"],
+    );
+    assert.deepEqual(
+      store.objectives.forRecord("track", data.track.id).map((objective) => objective.slug),
+      ["payments", "stablecoins"],
+    );
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
+test("follow and bookmark tagging stay explicit and report meta.objectives", () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    const store = ctx.store();
+    store.objectives.create({ name: "Stablecoins" });
+    const followed = takeawayFollowCommand(ctx, {
+      username: "payments",
+      objective: ["stablecoins"],
+    });
+    const account = (followed.data as { account: { id: string } }).account;
+    assert.deepEqual(followed.meta?.objectives, ["stablecoins"]);
+    assert.deepEqual(
+      store.objectives.forRecord("account", account.id).map((objective) => objective.slug),
+      ["stablecoins"],
+    );
+
+    const bookmarked = bookmarkAddCommand(ctx, {
+      text: "Stablecoin payment rails",
+      objective: ["stablecoins"],
+    });
+    const data = bookmarked.data as { bookmark: { id: string }; post: { id: string } };
+    assert.deepEqual(bookmarked.meta?.objectives, ["stablecoins"]);
+    assert.deepEqual(
+      store.objectives.forRecord("post", data.post.id).map((objective) => objective.slug),
+      ["stablecoins"],
+    );
+    assert.deepEqual(store.objectives.forRecord("bookmark", data.bookmark.id), []);
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
+test("learn inherits source-post objectives unless explicit objectives override them", async () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    const store = ctx.store();
+    store.objectives.create({ name: "Inherited Goal" });
+    store.objectives.create({ name: "Explicit Goal" });
+    const analyzed = await analyzeCommand(ctx, {
+      provider: "mock",
+      text: "A source post for an inherited learning objective.",
+      objective: ["inherited-goal"],
+    });
+    const analysis = (analyzed.data as { analysis: { id: string } }).analysis;
+
+    const inherited = learnGenerateCommand(ctx, { analysis: analysis.id });
+    const inheritedTrack = (inherited.data as { track: { id: string } }).track;
+    assert.deepEqual(inherited.meta?.objectives, ["inherited-goal"]);
+    assert.deepEqual(
+      store.objectives.forRecord("track", inheritedTrack.id).map((objective) => objective.slug),
+      ["inherited-goal"],
+    );
+
+    const overridden = learnGenerateCommand(ctx, {
+      analysis: analysis.id,
+      objective: ["explicit-goal"],
+    });
+    const overriddenTrack = (overridden.data as { track: { id: string } }).track;
+    assert.deepEqual(overridden.meta?.objectives, ["explicit-goal"]);
+    assert.deepEqual(
+      store.objectives.forRecord("track", overriddenTrack.id).map((objective) => objective.slug),
+      ["explicit-goal"],
+    );
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
+test("unknown objective returns NOT_FOUND before a tagging command writes", async () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    await assert.rejects(
+      analyzeCommand(ctx, {
+        provider: "mock",
+        text: "This should not persist.",
+        objective: ["missing-objective"],
+      }),
+      (error: unknown) =>
+        (error as { code?: string; message?: string }).code === "NOT_FOUND" &&
+        (error as { message?: string }).message?.includes("objective add") === true,
+    );
+    assert.equal(ctx.store().database.stats().posts, 0);
+    assert.equal(ctx.store().database.stats().analyses, 0);
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
+test("current focus never tags content without an explicit objective", async () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    const store = ctx.store();
+    store.objectives.create({ name: "Focused Goal", focus: true });
+    const result = await analyzeCommand(ctx, {
+      provider: "mock",
+      text: "Focus is a view, not an implicit tag.",
+    });
+    const post = (result.data as { post: { id: string } }).post;
+    assert.deepEqual(result.meta?.objectives, []);
+    assert.deepEqual(store.objectives.forRecord("post", post.id), []);
   } finally {
     ctx.close();
     cleanup();

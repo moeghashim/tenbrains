@@ -9,6 +9,7 @@ import { parseOrThrow } from "../core/validate.js";
 import { TakeawayPostsInputSchema } from "../domain/schemas.js";
 import type { Account } from "../domain/types.js";
 import { fetchAccountTimeline } from "../x/client.js";
+import { linkObjectives, resolveObjectiveOptions } from "./objective-tags.js";
 import { resolveXBearer } from "./shared.js";
 
 function normalizeUsername(raw: string): string {
@@ -30,13 +31,15 @@ function requireAccount(ctx: RunContext, username: string): Account {
 export function takeawayFollowCommand(ctx: RunContext, opts: Opts): CommandResult {
   const username = normalizeUsername(requireString(opts, "username", "<username>"));
   const store = ctx.store();
+  const objectives = resolveObjectiveOptions(store, opts);
   if (store.accounts.findByUsername(username)) {
     throw new CliError("CONFLICT", `Already following @${username}.`, { details: { username } });
   }
   const account = store.accounts.create(username, optString(opts, "name"));
+  const objectiveSlugs = linkObjectives(store, objectives, "account", account.id);
   return {
     data: { account },
-    meta: { accountId: account.id, persisted: true },
+    meta: { accountId: account.id, objectives: objectiveSlugs, persisted: true },
     human: () => `Following @${account.username} (${account.id}).`,
   };
 }
