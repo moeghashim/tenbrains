@@ -1,4 +1,4 @@
-import { analyzePost } from "../ai/analyzer.js";
+import { analyzePost, summarizeContent } from "../ai/analyzer.js";
 import { resolveProvider } from "../ai/resolve.js";
 import type { RunContext } from "../core/context.js";
 import { CliError } from "../core/errors.js";
@@ -10,6 +10,7 @@ import { buildFeynmanTrack } from "../domain/learn.js";
 import { PostInputSchema, RatingsInputSchema, ThreadInputSchema } from "../domain/schemas.js";
 import type { Analysis, LearningTrack, Post } from "../domain/types.js";
 import { type FetchMode, fetchThread, fetchTweet, isFetchMode } from "../x/client.js";
+import { fetchTranscript, isYouTubeUrl, parseVideoRef } from "../youtube/client.js";
 import { resolveXBearer } from "./shared.js";
 
 function parseFetchMode(value: string | undefined): FetchMode {
@@ -29,6 +30,15 @@ function postForAnalysis(post: Post) {
   };
 }
 
+function isTranscriptPost(post: Post): boolean {
+  return (
+    typeof post.raw === "object" &&
+    post.raw !== null &&
+    !Array.isArray(post.raw) &&
+    (post.raw as Record<string, unknown>).source === "youtube"
+  );
+}
+
 export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<CommandResult> {
   const resolved = resolveProvider(ctx.config, {
     provider: optString(opts, "provider"),
@@ -41,15 +51,22 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
   let post: Post;
   let deduped = false;
   let source = "text";
+  let contentKind: "tweet" | "transcript" = "tweet";
   let threadParts: number | undefined;
   const postId = optString(opts, "postId");
   const textOpt = optString(opts, "text");
+  const transcriptOpt = optString(opts, "transcript");
   const refInput = optString(opts, "url") ?? optString(opts, "id");
   // --thread [json]: a string is supplied parts; `true` means fetch via the API.
   const threadOpt = opts.thread === true ? true : optString(opts, "thread");
 
-  if (typeof threadOpt === "string" && textOpt !== undefined) {
-    throw new CliError("USAGE", "Use either --text or --thread <json>, not both.");
+  const explicitSources = [
+    textOpt !== undefined,
+    transcriptOpt !== undefined,
+    typeof threadOpt === "string",
+  ].filter(Boolean).length;
+  if (explicitSources > 1) {
+    throw new CliError("USAGE", "Use only one of --text, --transcript, or --thread <json>.");
   }
 
   if (postId) {
@@ -59,6 +76,7 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
     }
     post = existing;
     source = "stored";
+    contentKind = isTranscriptPost(post) ? "transcript" : "tweet";
   } else if (typeof threadOpt === "string") {
     const parts = parseOrThrow(
       ThreadInputSchema,
@@ -114,6 +132,32 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
     ({ post, deduped } = store.posts.ingest(input));
     source = "x:thread";
     threadParts = thread.parts.length;
+  } else if (transcriptOpt !== undefined) {
+    const suppliedUrl = optString(opts, "url");
+    const videoRef = suppliedUrl && isYouTubeUrl(suppliedUrl) ? parseVideoRef(suppliedUrl) : null;
+    const input = parseOrThrow(
+      PostInputSchema,
+      {
+        text: resolveTextInput(transcriptOpt),
+        url: videoRef?.url ?? suppliedUrl,
+        externalId: videoRef ? `yt:${videoRef.id}` : optString(opts, "id"),
+        authorUsername: optString(opts, "author"),
+        authorName: optString(opts, "authorName"),
+        postedAt: optString(opts, "postedAt"),
+        raw: {
+          source: "youtube",
+          ...(videoRef ? { videoId: videoRef.id } : {}),
+          transcript: {
+            supplied: true,
+            ...(optString(opts, "lang") ? { lang: optString(opts, "lang") } : {}),
+          },
+        },
+      },
+      "Invalid transcript input.",
+    );
+    ({ post, deduped } = store.posts.ingest(input));
+    source = "youtube";
+    contentKind = "transcript";
   } else if (textOpt !== undefined) {
     const input = parseOrThrow(
       PostInputSchema,
@@ -128,6 +172,32 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
       "Invalid post input.",
     );
     ({ post, deduped } = store.posts.ingest(input));
+  } else if (refInput !== undefined && isYouTubeUrl(refInput)) {
+    ctx.logger.info("Fetching transcript from YouTube…");
+    const fetched = await fetchTranscript(refInput, { lang: optString(opts, "lang") });
+    const input = parseOrThrow(
+      PostInputSchema,
+      {
+        text: fetched.text,
+        url: fetched.url,
+        externalId: `yt:${fetched.videoId}`,
+        authorUsername: fetched.author,
+        authorName: fetched.author,
+        postedAt: fetched.uploadDate,
+        raw: {
+          source: "youtube",
+          videoId: fetched.videoId,
+          title: fetched.title,
+          channel: fetched.author,
+          durationSeconds: fetched.durationSeconds,
+          caption: { lang: fetched.captionLang, kind: fetched.captionKind },
+        },
+      },
+      "Fetched YouTube transcript did not produce valid post input.",
+    );
+    ({ post, deduped } = store.posts.ingest(input));
+    source = "youtube";
+    contentKind = "transcript";
   } else if (refInput !== undefined) {
     const mode = parseFetchMode(optString(opts, "fetch"));
     ctx.logger.info(`Fetching tweet from X (${mode})…`);
@@ -149,12 +219,28 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
   } else {
     throw new CliError(
       "USAGE",
-      "Provide --text, --thread, --post-id, or --url/--id (to fetch the tweet from X).",
+      "Provide --text, --transcript, --thread, --post-id, or --url/--id to fetch content.",
     );
   }
 
-  ctx.logger.info(`Analyzing post with ${resolved.provider}/${resolved.model}…`);
-  const outcome = await analyzePost(resolved, postForAnalysis(post));
+  if (contentKind === "transcript" && post.text.length > 40_000) {
+    ctx.logger.warn(
+      "Long transcript: provider token usage may be substantial; --summarize condenses it before concept extraction.",
+    );
+  }
+
+  let narrativeSummary: { summary: string; keyPoints: string[] } | undefined;
+  if (optBool(opts, "summarize")) {
+    ctx.logger.info(`Summarizing content with ${resolved.provider}/${resolved.model}…`);
+    narrativeSummary = (await summarizeContent(resolved, post.text)).result;
+    post = store.posts.mergeRaw(post.id, { summary: narrativeSummary });
+  }
+
+  ctx.logger.info(`Analyzing content with ${resolved.provider}/${resolved.model}…`);
+  const analysisInput = narrativeSummary
+    ? { ...postForAnalysis(post), text: narrativeSummary.summary }
+    : postForAnalysis(post);
+  const outcome = await analyzePost(resolved, analysisInput, contentKind);
 
   const analysis = store.analyses.create({
     postId: post.id,
@@ -173,7 +259,12 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
   }
 
   return {
-    data: { post, analysis, ...(track ? { track } : {}) },
+    data: {
+      post,
+      analysis,
+      ...(narrativeSummary ? { summary: narrativeSummary } : {}),
+      ...(track ? { track } : {}),
+    },
     meta: {
       analysisId: analysis.id,
       postId: post.id,
@@ -183,6 +274,7 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
       deduped,
       source,
       persisted: true,
+      ...(narrativeSummary ? { summarized: true } : {}),
       ...(threadParts !== undefined ? { threadParts } : {}),
       ...(track ? { trackId: track.id } : {}),
     },

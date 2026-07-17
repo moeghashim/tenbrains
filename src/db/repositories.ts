@@ -32,6 +32,17 @@ function parseJsonArray<T>(raw: unknown): T[] {
   }
 }
 
+function parseJson(raw: unknown): unknown {
+  if (typeof raw !== "string") {
+    return null;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 // --- row shapes --------------------------------------------------------------
 
 interface PostRow {
@@ -42,6 +53,7 @@ interface PostRow {
   author_name: string | null;
   text: string;
   posted_at: string | null;
+  raw_json: string | null;
   created_at: string;
 }
 
@@ -125,6 +137,7 @@ function mapPost(row: PostRow): Post {
     authorName: row.author_name,
     text: row.text,
     postedAt: row.posted_at,
+    raw: parseJson(row.raw_json),
     createdAt: row.created_at,
   };
 }
@@ -275,6 +288,21 @@ export class PostsRepo {
   all(): Post[] {
     const rows = this.db.prepare("SELECT * FROM posts").all() as unknown as PostRow[];
     return rows.map(mapPost);
+  }
+
+  mergeRaw(id: string, patch: Record<string, unknown>): Post {
+    const post = this.findById(id);
+    if (!post) {
+      throw new Error(`Post ${id} not found.`);
+    }
+    const current =
+      typeof post.raw === "object" && post.raw !== null && !Array.isArray(post.raw)
+        ? (post.raw as Record<string, unknown>)
+        : {};
+    this.db
+      .prepare("UPDATE posts SET raw_json = ? WHERE id = ?")
+      .run(JSON.stringify({ ...current, ...patch }), id);
+    return this.findById(id) as Post;
   }
 }
 

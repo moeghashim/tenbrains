@@ -10,6 +10,7 @@ export interface Post {
   authorName: string | null;
   text: string;
   postedAt: string | null;
+  raw: unknown;
   createdAt: string;
 }
 

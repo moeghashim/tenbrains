@@ -17,6 +17,11 @@ export const AnalysisResultSchema = z.object({
   novelConcepts: z.array(ConceptSchema).min(1).max(10),
 });
 
+export const SummaryResultSchema = z.object({
+  summary: z.string().min(1),
+  keyPoints: z.array(z.string().min(1)).min(1),
+});
+
 /** AI account-takeaway output. */
 export const TakeawayResultSchema = z.object({
   summary: z.string().min(1),
@@ -42,6 +47,7 @@ export const PostInputSchema = z.object({
   authorUsername: z.string().min(1).optional(),
   authorName: z.string().min(1).optional(),
   postedAt: z.string().min(1).optional(),
+  raw: z.unknown().optional(),
 });
 
 /** Input shape for one of the recent posts fed into `takeaway refresh`. */
@@ -64,6 +70,7 @@ export const ThreadInputSchema = z
 
 export type Concept = z.infer<typeof ConceptSchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
+export type SummaryResult = z.infer<typeof SummaryResultSchema>;
 export type TakeawayResult = z.infer<typeof TakeawayResultSchema>;
 export type ConceptRating = z.infer<typeof ConceptRatingSchema>;
 export type PostInput = z.infer<typeof PostInputSchema>;

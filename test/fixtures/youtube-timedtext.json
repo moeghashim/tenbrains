@@ -1,0 +1,7 @@
+{
+  "events": [
+    { "tStartMs": 0, "segs": [{ "utf8": "Agents &amp; " }, { "utf8": "tools" }] },
+    { "tStartMs": 2000, "segs": [{ "utf8": "emit JSON3." }] },
+    { "tStartMs": 4000, "segs": [{ "utf8": "Unicode: &#x1F9E0;" }] }
+  ]
+}

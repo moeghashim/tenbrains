@@ -25,6 +25,23 @@ test("posts.ingest dedupes by externalId", () => {
   store.database.close();
 });
 
+test("posts round-trip and merge raw metadata without a schema change", () => {
+  const store = freshStore();
+  const { post } = store.posts.ingest({
+    text: "transcript",
+    externalId: "yt:fixture",
+    raw: { videoId: "fixture", caption: { lang: "en" } },
+  });
+  const updated = store.posts.mergeRaw(post.id, { summary: { summary: "Digest" } });
+  assert.deepEqual(updated.raw, {
+    videoId: "fixture",
+    caption: { lang: "en" },
+    summary: { summary: "Digest" },
+  });
+  assert.equal(store.database.schemaVersion(), currentSchemaVersion());
+  store.database.close();
+});
+
 test("analyses persist and round-trip concepts as JSON", () => {
   const store = freshStore();
   const { post } = store.posts.ingest({ text: "concept post" });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -60,6 +60,47 @@ test("analyzeCommand --learn also persists a 7-day track", async () => {
   } finally {
     ctx.close();
     cleanup();
+  }
+});
+
+test("analyzeCommand composes supplied YouTube transcript, summary, and learning track", async () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  const dir = mkdtempSync(path.join(tmpdir(), "tb-transcript-"));
+  const transcriptPath = path.join(dir, "video.txt");
+  writeFileSync(
+    transcriptPath,
+    "Agent-first research tools ingest video transcripts. Narrative summaries condense long content. Structured concepts power focused learning tracks.",
+  );
+  try {
+    const result = await analyzeCommand(ctx, {
+      provider: "mock",
+      url: "https://youtu.be/dQw4w9WgXcQ",
+      transcript: `@${transcriptPath}`,
+      summarize: true,
+      learn: true,
+      minutes: 12,
+      author: "Fixture Channel",
+    });
+    const data = result.data as {
+      post: { externalId: string; raw: { summary?: unknown } };
+      summary?: { summary: string; keyPoints: string[] };
+      track?: { days: unknown[] };
+    };
+    assert.equal(result.meta?.source, "youtube");
+    assert.equal(result.meta?.summarized, true);
+    assert.equal(data.post.externalId, "yt:dQw4w9WgXcQ");
+    assert.ok(data.summary?.summary);
+    assert.ok(data.summary?.keyPoints.length);
+    assert.ok(data.track);
+    assert.equal(data.track?.days.length, 7);
+    assert.ok(data.post.raw.summary);
+    assert.equal(ctx.store().database.stats().posts, 1);
+    assert.equal(ctx.store().database.stats().analyses, 1);
+    assert.equal(ctx.store().database.stats().learning_tracks, 1);
+  } finally {
+    ctx.close();
+    cleanup();
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

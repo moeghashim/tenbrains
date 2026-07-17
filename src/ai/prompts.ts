@@ -9,9 +9,11 @@ function compactPost(post: Pick<NewPost, "text" | "authorUsername" | "authorName
   };
 }
 
-export function tweetAnalysisSystemPrompt(): string {
+export function tweetAnalysisSystemPrompt(kind: "tweet" | "transcript" = "tweet"): string {
   return [
-    "You are analyzing a post on X.",
+    kind === "transcript"
+      ? "You are analyzing a video transcript."
+      : "You are analyzing a post on X.",
     "Return only a valid JSON object with exactly these keys: topic, summary, intent, novelConcepts.",
     "novelConcepts must be an array with exactly 5 objects.",
     "Each concept object must have keys: name and whyItMattersInTweet.",
@@ -19,6 +21,21 @@ export function tweetAnalysisSystemPrompt(): string {
     "Do not include markdown fences, comments, or extra keys.",
     "Keep it factual and avoid speculation when evidence is missing.",
   ].join(" ");
+}
+
+export function contentSummarySystemPrompt(): string {
+  return [
+    "You are summarizing long-form content.",
+    "Return only a valid JSON object with exactly these keys: summary, keyPoints.",
+    "summary must be a substantive, readable multi-paragraph string.",
+    "keyPoints must be an array of non-empty strings.",
+    "Stay factual and grounded in the supplied content.",
+    "Do not include markdown fences, comments, or extra keys.",
+  ].join(" ");
+}
+
+export function contentSummaryUserPrompt(content: string): string {
+  return JSON.stringify({ content }, null, 2);
 }
 
 export function tweetAnalysisUserPrompt(post: {

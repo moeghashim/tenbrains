@@ -175,7 +175,7 @@ export function buildProgram(): Command {
   program
     .name("tenbrains")
     .description(
-      "Agent-first CLI for X research: analyze posts, track accounts, surface suggestions, and persist every outcome to a local SQLite database.",
+      "Agent-first CLI for X and YouTube research: analyze content and persist every outcome to a local SQLite database.",
     )
     .version(readVersion(), "-v, --version")
     .exitOverride()
@@ -185,13 +185,25 @@ export function buildProgram(): Command {
   // --- analyze --------------------------------------------------------------
   const analyze = makeCommand({
     name: "analyze",
-    description: "Analyze a post into topic, summary, intent, and 5 novel concepts.",
+    description: "Analyze a post or YouTube transcript into topic, summary, intent, and concepts.",
     options: [
       ...POST_INPUT_OPTIONS,
       {
         flags: "--thread [json]",
         description:
           "Analyze a whole thread as one document: pass parts as JSON (@file/- ok), or bare with --url/--id to fetch the author's self-thread via the X API",
+      },
+      {
+        flags: "--transcript <text>",
+        description: "Video transcript; @file reads a file, - reads stdin",
+      },
+      {
+        flags: "--lang <code>",
+        description: "Preferred YouTube caption language (then English, then first available)",
+      },
+      {
+        flags: "--summarize",
+        description: "Also generate and persist a fuller narrative summary with key points",
       },
       {
         flags: "--fetch <mode>",
