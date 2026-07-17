@@ -10,6 +10,7 @@ import { currentSchemaVersion } from "../db/migrations.js";
 interface OptionSpec {
   flags: string;
   description: string;
+  repeatable: boolean;
 }
 
 interface ArgSpec {
@@ -48,6 +49,7 @@ function describeCommand(command: Command): CommandSpec {
     options: command.options.map((option) => ({
       flags: option.flags,
       description: option.description ?? "",
+      repeatable: Array.isArray(option.defaultValue),
     })),
     commands: command.commands.map(describeCommand),
   };

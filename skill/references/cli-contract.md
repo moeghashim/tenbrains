@@ -30,8 +30,8 @@ Failure:
 ```
 
 `meta` commonly carries: `analysisId`, `postId`, `snapshotId`, `bookmarkId`, `suggestionId`,
-`trackId`, `objectiveId`, `provider`, `model`, `mock`, `deduped`, `persisted`. Branch on `ok`, then
-`error.code`.
+`trackId`, `objectiveId`, `objectives` (applied/inherited objective slugs), `provider`, `model`,
+`mock`, `deduped`, `persisted`. Branch on `ok`, then `error.code`.
 
 ## Error codes and exit codes
 
@@ -73,6 +73,8 @@ Any text/JSON flag (`--text`, `--transcript`, `--posts`, `--ratings`, and config
   `--post-id <id>` to re-analyze a stored post. If only `--url`/`--id` is given (no `--text`), the
   tweet is fetched: `--fetch auto|oembed|api` (default `auto`, free-first — oEmbed needs no key;
   `api` uses `--x-bearer`/config token). Learning: `--learn`, `--minutes <n>`, `--ratings`.
+  `--objective <slug>` is repeatable and explicitly tags the resulting post; with `--learn`, the
+  generated track receives the same objectives.
   `--summarize` also returns `data.summary = { summary, keyPoints[] }` and persists it in post
   metadata. Returns `{ post, analysis, summary?, track? }`; `meta.source` is `text` | `stored` |
   `thread` | `x:oembed` | `x:api` | `x:thread` | `youtube`.
@@ -90,7 +92,8 @@ Any text/JSON flag (`--text`, `--transcript`, `--posts`, `--ratings`, and config
 
 ### takeaway
 
-- `takeaway follow <username> [--name]` — follow an account.
+- `takeaway follow <username> [--name] [--objective <slug> ...]` — follow an account and explicitly
+  tag it with existing objectives.
 - `takeaway unfollow <username>` — stop following (deletes snapshots).
 - `takeaway list` — followed accounts + latest takeaway.
 - `takeaway refresh <username> [--posts <json> | --count <n>] [--x-bearer <token>] [provider flags]`
@@ -110,8 +113,9 @@ Any text/JSON flag (`--text`, `--transcript`, `--posts`, `--ratings`, and config
 
 ### bookmark (alias: bm)
 
-- `bookmark add (--post-id <id> | --text ...) [--tags a,b --note --source --no-auto-tags]` —
-  auto-tags from the post's analysis unless `--tags` is given.
+- `bookmark add (--post-id <id> | --text ...) [--tags a,b --note --source --no-auto-tags]
+  [--objective <slug> ...]` — auto-tags bookmark tags from the post's analysis unless `--tags` is
+  given; objective flags explicitly tag the post, not the bookmark.
 - `bookmark list [--tag --limit --offset]`.
 - `bookmark show <id>` — bookmark + post + analysis.
 - `bookmark tag <id> [--add a,b --remove c,d]`.
@@ -119,7 +123,9 @@ Any text/JSON flag (`--text`, `--transcript`, `--posts`, `--ratings`, and config
 
 ### learn
 
-- `learn generate --analysis <id> [--ratings <json> --minutes <n>]` — build a 7-day Feynman track.
+- `learn generate --analysis <id> [--ratings <json> --minutes <n>] [--objective <slug> ...]` —
+  build a 7-day Feynman track. Without explicit objectives, it inherits all objective tags from the
+  analysis' source post; explicit values override inheritance.
 - `learn today [id]` — the next pending day's task (defaults to the latest track with pending days;
   errors NOT_FOUND when none). `data.day` is the next unfinished day — content is never skipped —
   and `data.scheduledDay`/`data.behindBy` report where the calendar says the learner should be.
@@ -138,14 +144,19 @@ auto-tags content.
   active objective. Duplicate slugs return `CONFLICT`.
 - `objective list [--status active|archived|all]` — objectives with tagged-record counts and focus
   marker (default: active).
-- `objective show [slug]` — objective detail and counts; without a slug, defaults to the current
-  focus and returns `NOT_FOUND` when none is set.
+- `objective show [slug]` — objective detail, counts, and tagged records grouped into `posts`,
+  `accounts`, `bookmarks`, and `tracks`; without a slug, defaults to the current focus and returns
+  `NOT_FOUND` when none is set.
 - `objective focus <slug>` / `objective focus --clear` — atomically set or clear the current focus.
 - `objective archive <slug>` — archive while preserving record links; archiving the focus clears it.
+- `objective link <recordId> --objective <slug>` — tag an existing `post_`, `acc_`, `bm_`, or
+  `trk_` record.
+- `objective unlink <recordId> --objective <slug>` — remove that explicit tag.
 
 Objective records use `obj_` ids. `record get` returns an `objectives` array for linkable record
-types. Public link/tagging commands are not part of this core PR; tagging remains explicit when that
-surface lands.
+types. Creation-time `--objective` flags are repeatable. Every slug must already exist; unknown
+slugs return `NOT_FOUND` with guidance to run `objective add`. No command derives tags from content
+or from the current focus.
 
 ### search
 

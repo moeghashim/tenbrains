@@ -136,12 +136,17 @@ tenbrains objective list
 tenbrains objective show                 # current focus
 tenbrains objective focus ai-agents      # switch explicitly
 tenbrains objective focus --clear
+tenbrains objective link post_... --objective stablecoins
+tenbrains objective unlink post_... --objective stablecoins
 tenbrains objective archive stablecoins
 ```
 
-Use the returned `obj_...` id or slug for later calls. At this core stage, the CLI manages objective
-lifecycle and reports tagged counts; explicit record link/tagging commands are intentionally
-separate follow-up surface. Never infer or auto-create objectives from content.
+Use the returned `obj_...` id or slug for later calls. Tag new outcomes explicitly with repeatable
+`--objective <slug>` on `analyze`, `takeaway follow`, `bookmark add`, or `learn generate`.
+`bookmark add` tags its post, not the bookmark record. `learn generate` inherits objective tags from
+its analysis' source post only when no explicit objective is supplied; explicit values override the
+inheritance. The referenced objectives must already exist (`NOT_FOUND` otherwise). Never infer,
+auto-create, or copy the current focus into tags.
 
 ### Bookmarks and recall
 

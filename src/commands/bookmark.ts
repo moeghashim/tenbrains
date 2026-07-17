@@ -7,6 +7,7 @@ import { parseOrThrow } from "../core/validate.js";
 import { PostInputSchema } from "../domain/schemas.js";
 import { suggestTags } from "../domain/tags.js";
 import type { Post } from "../domain/types.js";
+import { linkObjectives, resolveObjectiveOptions } from "./objective-tags.js";
 
 function resolvePost(ctx: RunContext, opts: Opts): { post: Post; deduped: boolean } {
   const store = ctx.store();
@@ -36,6 +37,7 @@ function resolvePost(ctx: RunContext, opts: Opts): { post: Post; deduped: boolea
 
 export function bookmarkAddCommand(ctx: RunContext, opts: Opts): CommandResult {
   const store = ctx.store();
+  const objectives = resolveObjectiveOptions(store, opts);
   const { post } = resolvePost(ctx, opts);
 
   if (store.bookmarks.findByPostId(post.id)) {
@@ -56,10 +58,17 @@ export function bookmarkAddCommand(ctx: RunContext, opts: Opts): CommandResult {
     note: optString(opts, "note"),
     source: optString(opts, "source") ?? "cli",
   });
+  const objectiveSlugs = linkObjectives(store, objectives, "post", post.id);
 
   return {
     data: { bookmark, post },
-    meta: { bookmarkId: bookmark.id, postId: post.id, autoTagged: autoTags, persisted: true },
+    meta: {
+      bookmarkId: bookmark.id,
+      postId: post.id,
+      autoTagged: autoTags,
+      objectives: objectiveSlugs,
+      persisted: true,
+    },
     human: () =>
       `Bookmarked ${post.id} [${bookmark.tags.join(", ") || "no tags"}] (${bookmark.id}).`,
   };

@@ -59,8 +59,10 @@ test("manifest command tree matches the published contract", () => {
     "objective add",
     "objective archive",
     "objective focus",
+    "objective link",
     "objective list",
     "objective show",
+    "objective unlink",
     "record",
     "record get",
     "search",
@@ -98,6 +100,39 @@ test("manifest publishes objective flags and the obj_ id prefix", () => {
   assert.ok(optionsFor("add").includes("--focus"));
   assert.ok(optionsFor("list").includes("--status <status>"));
   assert.ok(optionsFor("focus").includes("--clear"));
+  assert.ok(optionsFor("link").includes("--objective <slug>"));
+  assert.ok(optionsFor("unlink").includes("--objective <slug>"));
+});
+
+test("manifest marks every creation-time --objective flag repeatable", () => {
+  const manifest = buildManifest(buildProgram());
+  const commands = manifest.commands as Array<{
+    name: string;
+    options: Array<{ flags: string; repeatable: boolean }>;
+    commands: Array<{
+      name: string;
+      options: Array<{ flags: string; repeatable: boolean }>;
+    }>;
+  }>;
+  const option = (
+    command: { options: Array<{ flags: string; repeatable: boolean }> } | undefined,
+  ) => command?.options.find((item) => item.flags === "--objective <slug>");
+  const child = (parent: string, name: string) =>
+    commands
+      .find((command) => command.name === parent)
+      ?.commands.find((item) => item.name === name);
+
+  assert.equal(option(commands.find((command) => command.name === "analyze"))?.repeatable, true);
+  assert.equal(option(child("takeaway", "follow"))?.repeatable, true);
+  assert.equal(option(child("bookmark", "add"))?.repeatable, true);
+  assert.equal(option(child("learn", "generate"))?.repeatable, true);
+});
+
+test("repeatable objective options retain every slug in CLI order", () => {
+  const analyze = buildProgram().commands.find((command) => command.name() === "analyze");
+  assert.ok(analyze);
+  analyze.parseOptions(["--objective", "stablecoins", "--objective", "payments"]);
+  assert.deepEqual(analyze.opts().objective, ["stablecoins", "payments"]);
 });
 
 test("manifest error and exit codes are stable", () => {

@@ -50,6 +50,8 @@ Error envelope:
   resolves via `tenbrains record get <id>`.
 - **Dedup is automatic.** Re-ingesting a post with the same `--id` (external X id) reuses the stored
   post (`meta.deduped: true`).
+- **Objective tagging is explicit.** Repeat `--objective <slug>` on supported creation commands, or
+  use `objective link`; objectives must already exist. The current focus never adds tags.
 - **Isolate state with `--db <path>`** if you want a per-task workspace.
 - **No environment variables.** Configure once with `tenbrains setup --provider <p> --api-key <k>`
   (add `--x-bearer <token>` for X timeline fetches; `-` pipes a secret without echo). Or test offline
@@ -71,6 +73,15 @@ Analyze + generate a learning track in one call (ratings optional):
 ```bash
 echo '[{"concept":"Agentic","familiarity":2,"interest":5}]' \
 | tenbrains analyze --provider mock --text "..." --learn --minutes 10 --ratings -
+```
+
+Create and apply learning objectives (repeat `--objective` for multiple goals):
+
+```bash
+tenbrains objective add "Agentic systems" --focus
+tenbrains analyze --provider mock --text "..." --objective agentic-systems
+tenbrains objective link bm_... --objective agentic-systems
+tenbrains objective show agentic-systems
 ```
 
 Account takeaways (supply recent posts, or fetch from X with a token):
