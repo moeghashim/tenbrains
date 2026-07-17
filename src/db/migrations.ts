@@ -220,6 +220,31 @@ export const MIGRATIONS: Migration[] = [
       ) WITHOUT ROWID;
     `,
   },
+  {
+    version: 4,
+    name: "learning-objectives",
+    up: /* sql */ `
+      CREATE TABLE objectives (
+        id          TEXT PRIMARY KEY,
+        slug        TEXT NOT NULL UNIQUE,
+        name        TEXT NOT NULL,
+        description TEXT,
+        status      TEXT NOT NULL DEFAULT 'active',
+        is_focus    INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+
+      CREATE TABLE objective_links (
+        objective_id TEXT NOT NULL REFERENCES objectives(id) ON DELETE CASCADE,
+        record_type  TEXT NOT NULL,
+        record_id    TEXT NOT NULL,
+        created_at   TEXT NOT NULL,
+        PRIMARY KEY (objective_id, record_type, record_id)
+      );
+      CREATE INDEX idx_objlinks_record ON objective_links(record_type, record_id);
+    `,
+  },
 ];
 
 export function currentSchemaVersion(): number {

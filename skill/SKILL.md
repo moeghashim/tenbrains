@@ -4,8 +4,9 @@ description: >-
   Do X/Twitter and YouTube research with the local `tenbrains` CLI and persist every result
   to a SQLite database. Analyze a post or video transcript into topic/summary/intent/key concepts,
   summarize a followed account's recent posts into takeaways, manage research
-  bookmarks and ranked suggestions, recall past analyses with search, and build
-  a 7-day learning track from a post. Use this skill whenever the user wants to
+  bookmarks and ranked suggestions, manage first-class learning objectives,
+  recall past analyses with search, and build a 7-day learning track from a post.
+  Use this skill whenever the user wants to
   analyze a tweet or X post, research or summarize an X/Twitter account, save or
   recall X research, triage saved posts, or turn a post into a study plan — even
   if they don't say "tenbrains" explicitly. Do not use it for posting/replying
@@ -14,8 +15,9 @@ description: >-
 
 # tenbrains — agent-first X and YouTube research CLI
 
-`tenbrains` analyzes X/Twitter content and YouTube transcripts with an AI provider and stores every outcome (posts,
-analyses, account takeaways, bookmarks, suggestions, learning tracks) in a local SQLite database.
+`tenbrains` analyzes X/Twitter content and YouTube transcripts with an AI provider and stores every
+outcome (posts, analyses, account takeaways, bookmarks, suggestions, learning tracks, objectives)
+in a local SQLite database.
 It is built to be driven by an agent: each run prints one JSON object you can parse directly.
 
 ## Prerequisites
@@ -45,6 +47,7 @@ found, `4` credentials, `5` provider, `6` validation, `7` conflict, `1` internal
 
 JSON is the default. Only add `--pretty` when a human will read the output. `meta` carries the ids you
 chain on: `analysisId`, `postId`, `snapshotId`, `bookmarkId`, `suggestionId`, `trackId`.
+Objective creation also returns `objectiveId` and its stable `slug`.
 
 The complete envelope, code tables, command catalog, and input forms are in
 [references/cli-contract.md](references/cli-contract.md). For the always-current machine spec, run
@@ -122,6 +125,24 @@ tenbrains learn done trk_... --notes "..."  # check it off; meta.completed=true 
 `learn today` never skips content — it returns the first unfinished day, plus `behindBy` when the
 calendar has moved ahead of the learner.
 
+### Learning objectives
+
+Objectives are first-class learning goals, separate from bookmark tags. Multiple objectives may be
+active, with at most one current focus. Focus is only a default view and never tags content:
+
+```bash
+tenbrains objective add "Stablecoins" --description "Understand reserves and settlement." --focus
+tenbrains objective list
+tenbrains objective show                 # current focus
+tenbrains objective focus ai-agents      # switch explicitly
+tenbrains objective focus --clear
+tenbrains objective archive stablecoins
+```
+
+Use the returned `obj_...` id or slug for later calls. At this core stage, the CLI manages objective
+lifecycle and reports tagged counts; explicit record link/tagging commands are intentionally
+separate follow-up surface. Never infer or auto-create objectives from content.
+
 ### Bookmarks and recall
 
 ```bash
@@ -143,13 +164,13 @@ tenbrains import x-archive ~/Downloads/twitter-archive
 
 ```bash
 tenbrains analyze list --limit 5
-tenbrains record get <id>      # resolves any post_/ana_/acc_/snap_/bm_/sug_/trk_ id
+tenbrains record get <id>      # resolves any post_/ana_/acc_/snap_/bm_/sug_/trk_/obj_ id
 tenbrains db stats             # row counts + schema version
 ```
 
 ## Conventions worth remembering
 
-- **Ids are prefixed and stable** (`post_`, `ana_`, `acc_`, `snap_`, `bm_`, `sug_`, `trk_`); chain on
+- **Ids are prefixed and stable** (`post_`, `ana_`, `acc_`, `snap_`, `bm_`, `sug_`, `trk_`, `obj_`); chain on
   the ids in `meta`, and resolve any of them with `tenbrains record get <id>`.
 - **Isolate a workspace** with `--db ./scratch.db` so a task doesn't touch the default database.
 - **No environment variables** are read for config or secrets — everything goes through

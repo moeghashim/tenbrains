@@ -5,7 +5,9 @@ import { DatabaseSync } from "node:sqlite";
 import { CliError } from "../core/errors.js";
 import { runMigrations } from "./migrations.js";
 
-export type IdPrefix = "post" | "ana" | "acc" | "snap" | "bm" | "sug" | "trk";
+export const ID_PREFIXES = ["post", "ana", "acc", "snap", "bm", "sug", "trk", "obj"] as const;
+
+export type IdPrefix = (typeof ID_PREFIXES)[number];
 
 /** Sortable, prefixed id: <prefix>_<base36 time><random hex>. */
 export function newId(prefix: IdPrefix): string {
@@ -78,6 +80,8 @@ export class Database {
       "suggestions",
       "learning_tracks",
       "track_progress",
+      "objectives",
+      "objective_links",
     ];
     const out: Record<string, number> = {};
     for (const table of tables) {

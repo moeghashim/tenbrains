@@ -21,8 +21,8 @@ machine-readable code and a deterministic exit status, and the entire surface is
   error codes, and exit codes as JSON — an agent can discover the whole tool in one call.
 - **Non-interactive.** No blocking prompts. Content comes in via flags, `@file`, or `-` (stdin);
   credentials are collected through commands, never by hand-editing a dotfile.
-- **Everything persisted.** Posts, analyses, takeaways, bookmarks, suggestions, and learning tracks
-  all land in one local SQLite file you can point anywhere with `--db`.
+- **Everything persisted.** Posts, analyses, takeaways, bookmarks, suggestions, learning tracks,
+  and learning objectives all land in one local SQLite file you can point anywhere with `--db`.
 - **Offline-capable.** The built-in `mock` provider produces deterministic analysis with no network,
   so agents and CI can exercise the full pipeline without API keys.
 
@@ -113,6 +113,7 @@ Exit codes: `0` success · `2` usage · `3` not found · `4` missing credentials
 | --- | --- |
 | `analyze` | Analyze a post or YouTube transcript (`--text`, `--transcript`, or `--url` to fetch) into topic, summary, intent, and concepts. `--summarize` adds a narrative digest; `--learn` builds a track. |
 | `analyze list` / `analyze get <id>` | Read stored analyses. |
+| `objective add\|list\|show\|focus\|archive` | Manage first-class learning goals and one optional current focus. |
 | `takeaway follow\|unfollow\|list\|refresh\|show` | Track accounts; summarize recent posts (supplied via `--posts` or fetched from X) into snapshots. |
 | `suggest generate\|list\|save\|dismiss\|add` | Rank un-saved posts against your saved signal; save/dismiss feedback. |
 | `bookmark add\|list\|show\|tag\|remove` | Save posts with tags (auto-suggested from analysis) and notes. |
@@ -134,6 +135,28 @@ Input flags accept inline text, `@path` to read a file, or `-` to read stdin:
 echo "long post text..." | tenbrains analyze --provider mock --text -
 tenbrains takeaway refresh levelsio --provider mock --posts @recent.json
 ```
+
+## Learning objectives
+
+Objectives are persistent learning goals, separate from loose bookmark tags. Each objective has a
+name, derived slug, optional description, active/archived lifecycle, and tagged-record counts.
+You can keep several active objectives while marking at most one as the current focus:
+
+```bash
+tenbrains objective add "Stablecoins" \
+  --description "Understand reserve models, settlement, and failure modes." --focus
+tenbrains objective add "AI agents"
+tenbrains objective list
+tenbrains objective show                 # defaults to the current focus
+tenbrains objective focus ai-agents
+tenbrains objective focus --clear
+tenbrains objective archive stablecoins
+```
+
+Focus never tags records automatically. Objective tagging remains explicit; the core repository
+already stores polymorphic post/account/bookmark/track links, while the public link/tagging commands
+land in the next review-sized objectives change. Objective records use `obj_...` ids, and
+`record get` includes an `objectives` array for records that support objective links.
 
 ## YouTube transcripts
 
@@ -202,8 +225,9 @@ If your tier can't read a tweet/timeline, the CLI returns a structured `PROVIDER
 
 A single SQLite file (default `~/.local/share/tenbrains/tenbrains.db`, override with `--db`). Schema
 is versioned and migrated automatically on open. Tables: `posts`, `analyses`, `accounts`,
-`takeaway_snapshots`, `bookmarks`, `suggestions`, `learning_tracks`, plus a trigger-maintained
-FTS5 index (`search_fts`) behind `search` — rebuild it anytime with `tenbrains db reindex`.
+`takeaway_snapshots`, `bookmarks`, `suggestions`, `learning_tracks`, `track_progress`, `objectives`,
+and `objective_links`, plus a trigger-maintained FTS5 index (`search_fts`) behind `search` — rebuild
+it anytime with `tenbrains db reindex`.
 
 ```bash
 tenbrains --db ./research.db analyze --provider mock --text "..."   # isolate a workspace

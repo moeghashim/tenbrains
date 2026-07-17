@@ -46,7 +46,7 @@ Error envelope:
   inline strings, `@path` (read file), or `-` (read stdin). JSON inputs (`--posts`, `--ratings`) take
   the same forms. `takeaway refresh` fetches a timeline when `--posts` is omitted (needs an X token,
   usually a paid tier).
-- **Ids are prefixed and stable**: `post_`, `ana_`, `acc_`, `snap_`, `bm_`, `sug_`, `trk_`. Any id
+- **Ids are prefixed and stable**: `post_`, `ana_`, `acc_`, `snap_`, `bm_`, `sug_`, `trk_`, `obj_`. Any id
   resolves via `tenbrains record get <id>`.
 - **Dedup is automatic.** Re-ingesting a post with the same `--id` (external X id) reuses the stored
   post (`meta.deduped: true`).
