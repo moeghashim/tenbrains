@@ -10,7 +10,7 @@ import { RatingsInputSchema } from "../domain/schemas.js";
 import type { LearningTrack } from "../domain/types.js";
 import {
   linkObjectives,
-  objectiveLensDescription,
+  objectiveLensDescriptions,
   objectiveRefs,
   resolveObjectiveRefs,
 } from "./objective-tags.js";
@@ -41,7 +41,7 @@ export function learnGenerateCommand(ctx: RunContext, opts: Opts): CommandResult
     analysis.concepts,
     minutes,
     ratings,
-    objectiveLensDescription(objectives),
+    objectiveLensDescriptions(objectives),
   );
   const track = store.tracks.create({ analysisId, minutesPerDay: minutes, ratings, days });
   const objectiveSlugs = linkObjectives(store, objectives, "track", track.id);

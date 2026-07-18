@@ -481,6 +481,52 @@ test("objective description lenses analyze --learn concept ordering", async () =
   }
 });
 
+test("a multi-objective track uses maximum overlap against one description", () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    const store = ctx.store();
+    store.objectives.create({
+      name: "Reserve Models",
+      description: "Alpha reserve models",
+    });
+    store.objectives.create({
+      name: "Settlement Rails",
+      description: "Beta settlement rails",
+    });
+    const post = store.posts.create({ text: "A multi-objective source." });
+    const analysis = store.analyses.create({
+      postId: post.id,
+      provider: "mock",
+      model: "mock",
+      topic: "Financial infrastructure",
+      summary: "Reserve and settlement concepts",
+      intent: "Explain",
+      concepts: [
+        {
+          name: "Reserve Settlement",
+          whyItMattersInTweet: "Connects two goals.",
+        },
+        {
+          name: "Alpha Reserve",
+          whyItMattersInTweet: "Matches one goal deeply.",
+        },
+      ],
+      mock: true,
+    });
+
+    const result = learnGenerateCommand(ctx, {
+      analysis: analysis.id,
+      objective: ["reserve-models", "settlement-rails"],
+    });
+    const track = (result.data as { track: { days: Array<{ concept: string }> } }).track;
+    assert.deepEqual(result.meta?.objectives, ["reserve-models", "settlement-rails"]);
+    assert.equal(track.days[0]?.concept, "Alpha Reserve");
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
 test("objective show reports descriptive learning and research progress counts", () => {
   const { ctx, cleanup } = ctxWithTempConfig();
   try {
@@ -509,10 +555,20 @@ test("objective show reports descriptive learning and research progress counts",
       ratings: [],
       days: buildFeynmanTrack(concepts, 10, []),
     });
+    const secondTrack = store.tracks.create({
+      analysisId: analysis.id,
+      minutesPerDay: 15,
+      ratings: [],
+      days: buildFeynmanTrack(concepts, 15, []),
+    });
     store.tracks.markDone(track.id, 1);
+    for (let day = 1; day <= 3; day += 1) {
+      store.tracks.markDone(secondTrack.id, day);
+    }
     store.objectives.link(objective.id, "account", account.id);
     store.objectives.link(objective.id, "post", post.id);
     store.objectives.link(objective.id, "track", track.id);
+    store.objectives.link(objective.id, "track", secondTrack.id);
 
     const shown = objectiveShowCommand(ctx, { slug: objective.slug });
     assert.deepEqual((shown.data as { progress: Record<string, number> }).progress, {
@@ -520,10 +576,10 @@ test("objective show reports descriptive learning and research progress counts",
       postsAnalyzed: 0,
       transcriptsAnalyzed: 1,
       bookmarksSaved: 1,
-      learningTracks: 1,
+      learningTracks: 2,
       learningTracksCompleted: 0,
-      learningDaysCompleted: 1,
-      learningDaysTotal: 7,
+      learningDaysCompleted: 4,
+      learningDaysTotal: 14,
     });
 
     for (let day = 2; day <= 7; day += 1) {
@@ -532,7 +588,7 @@ test("objective show reports descriptive learning and research progress counts",
     const completed = objectiveShowCommand(ctx, { slug: objective.slug });
     const progress = (completed.data as { progress: Record<string, number> }).progress;
     assert.equal(progress.learningTracksCompleted, 1);
-    assert.equal(progress.learningDaysCompleted, 7);
+    assert.equal(progress.learningDaysCompleted, 10);
   } finally {
     ctx.close();
     cleanup();

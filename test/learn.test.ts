@@ -50,21 +50,50 @@ test("objective token overlap takes precedence while ratings break relevance tie
       { concept: "Consensus Validators", familiarity: 1, interest: 5 },
       { concept: "Reserve Audits", familiarity: 5, interest: 1 },
     ],
-    "Understand reserve backing and audit transparency.",
+    ["Understand reserve backing and audit transparency."],
   );
   assert.equal(ordered[0]?.name, "Reserve Audits");
 });
 
-test("an unrelated objective description preserves the existing rating order", () => {
-  const ordered = prioritizeConcepts(
-    CONCEPTS,
-    [
-      { concept: "Gamma", familiarity: 1, interest: 5 },
-      { concept: "Alpha", familiarity: 1, interest: 2 },
-    ],
-    "Reserve backing transparency",
+test("no objective and empty descriptions preserve the pre-lens output byte for byte", () => {
+  const ratings = [
+    { concept: "Gamma", familiarity: 1, interest: 5 },
+    { concept: "Alpha", familiarity: 1, interest: 2 },
+  ];
+  const baseline = buildFeynmanTrack(CONCEPTS, 10, ratings);
+  const emptyDescriptions = buildFeynmanTrack(CONCEPTS, 10, ratings, ["", "the and"]);
+
+  assert.deepEqual(
+    prioritizeConcepts(CONCEPTS, ratings).map((concept) => concept.name),
+    ["Gamma", "Beta", "Alpha"],
   );
-  assert.equal(ordered[0]?.name, "Gamma");
+  assert.equal(JSON.stringify(emptyDescriptions), JSON.stringify(baseline));
+});
+
+test("multiple objectives use maximum overlap with any one description", () => {
+  const concepts: Concept[] = [
+    {
+      name: "Reserve Settlement",
+      whyItMattersInTweet: "Connects two goals.",
+    },
+    {
+      name: "Alpha Reserve",
+      whyItMattersInTweet: "Matches one goal deeply.",
+    },
+  ];
+  const ordered = prioritizeConcepts(
+    concepts,
+    [],
+    ["Alpha reserve models", "Beta settlement rails"],
+  );
+  const repeated = prioritizeConcepts(
+    concepts,
+    [],
+    ["Alpha reserve models", "Beta settlement rails"],
+  );
+
+  assert.equal(ordered[0]?.name, "Alpha Reserve");
+  assert.deepEqual(repeated, ordered);
 });
 
 test("buildFeynmanTrack always yields 7 days with all step fields", () => {

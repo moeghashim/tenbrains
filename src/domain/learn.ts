@@ -16,41 +16,70 @@ function ratingFor(
   };
 }
 
+function compareExistingPriority(
+  a: { familiarity: number; interest: number; index: number },
+  b: { familiarity: number; interest: number; index: number },
+): number {
+  if (b.interest !== a.interest) {
+    return b.interest - a.interest;
+  }
+  const noveltyA = 6 - a.familiarity;
+  const noveltyB = 6 - b.familiarity;
+  if (noveltyB !== noveltyA) {
+    return noveltyB - noveltyA;
+  }
+  return a.index - b.index;
+}
+
+function tokenOverlap(left: Set<string>, right: Set<string>): number {
+  let score = 0;
+  for (const token of left) {
+    if (right.has(token)) {
+      score += 1;
+    }
+  }
+  return score;
+}
+
 /**
- * Order concepts for study. When an objective description is supplied, token
- * overlap with the concept name/explanation is the primary lens; ratings retain
- * their existing interest/novelty order as deterministic tiebreakers.
+ * Order concepts for study. With objective descriptions, the highest unique-token
+ * overlap against any one description is the primary lens. Ratings retain their
+ * existing interest/novelty order as deterministic tiebreakers.
  */
 export function prioritizeConcepts(
   concepts: Concept[],
   ratings: ConceptRating[],
-  objectiveDescription?: string,
+  objectiveDescriptions: readonly string[] = [],
 ): Concept[] {
-  const objectiveTokens = tokenSet(objectiveDescription ?? "");
-  return concepts
-    .map((concept, index) => {
-      const conceptTokens = tokenSet(`${concept.name} ${concept.whyItMattersInTweet}`);
-      let relevance = 0;
-      for (const token of conceptTokens) {
-        if (objectiveTokens.has(token)) {
-          relevance += 1;
-        }
-      }
-      return { concept, index, relevance, ...ratingFor(concept, ratings) };
+  const ranked = concepts.map((concept, index) => ({
+    concept,
+    index,
+    ...ratingFor(concept, ratings),
+  }));
+  const objectiveTokenSets = objectiveDescriptions
+    .map((description) => tokenSet(description))
+    .filter((tokens) => tokens.size > 0);
+
+  // Preserve the pre-lens code path exactly when no usable description exists.
+  if (objectiveTokenSets.length === 0) {
+    return ranked.sort(compareExistingPriority).map((entry) => entry.concept);
+  }
+
+  return ranked
+    .map((entry) => {
+      const conceptTokens = tokenSet(`${entry.concept.name} ${entry.concept.whyItMattersInTweet}`);
+      const relevance = Math.max(
+        ...objectiveTokenSets.map((objectiveTokens) =>
+          tokenOverlap(conceptTokens, objectiveTokens),
+        ),
+      );
+      return { ...entry, relevance };
     })
     .sort((a, b) => {
       if (b.relevance !== a.relevance) {
         return b.relevance - a.relevance;
       }
-      if (b.interest !== a.interest) {
-        return b.interest - a.interest;
-      }
-      const noveltyA = 6 - a.familiarity;
-      const noveltyB = 6 - b.familiarity;
-      if (noveltyB !== noveltyA) {
-        return noveltyB - noveltyA;
-      }
-      return a.index - b.index;
+      return compareExistingPriority(a, b);
     })
     .map((entry) => entry.concept);
 }
@@ -96,9 +125,9 @@ export function buildFeynmanTrack(
   concepts: Concept[],
   minutesPerDay: number,
   ratings: ConceptRating[],
-  objectiveDescription?: string,
+  objectiveDescriptions: readonly string[] = [],
 ): LearningDay[] {
-  const ordered = prioritizeConcepts(concepts, ratings, objectiveDescription);
+  const ordered = prioritizeConcepts(concepts, ratings, objectiveDescriptions);
   if (ordered.length === 0) {
     return [];
   }

@@ -13,7 +13,7 @@ import { type FetchMode, fetchThread, fetchTweet, isFetchMode } from "../x/clien
 import { fetchTranscript, isYouTubeUrl, parseVideoRef } from "../youtube/client.js";
 import {
   linkObjectives,
-  objectiveLensDescription,
+  objectiveLensDescriptions,
   resolveObjectiveOptions,
 } from "./objective-tags.js";
 import { resolveXBearer } from "./shared.js";
@@ -266,7 +266,7 @@ export async function analyzeCommand(ctx: RunContext, opts: Opts): Promise<Comma
     if (trackObjectives.length === 0) {
       trackObjectives = store.objectives.forRecord("post", post.id);
     }
-    track = buildAndPersistTrack(ctx, analysis, opts, objectiveLensDescription(trackObjectives));
+    track = buildAndPersistTrack(ctx, analysis, opts, objectiveLensDescriptions(trackObjectives));
     linkObjectives(store, trackObjectives, "track", track.id);
   }
   const objectiveSlugs = (track ? trackObjectives : explicitObjectives).map(
@@ -302,14 +302,14 @@ function buildAndPersistTrack(
   ctx: RunContext,
   analysis: Analysis,
   opts: Opts,
-  objectiveDescription?: string,
+  objectiveDescriptions: string[] = [],
 ): LearningTrack {
   const ratingsOpt = optString(opts, "ratings");
   const ratings = ratingsOpt
     ? parseOrThrow(RatingsInputSchema, resolveJsonInput(ratingsOpt), "Invalid ratings input.")
     : [];
   const minutes = optNumber(opts, "minutes", 10);
-  const days = buildFeynmanTrack(analysis.concepts, minutes, ratings, objectiveDescription);
+  const days = buildFeynmanTrack(analysis.concepts, minutes, ratings, objectiveDescriptions);
   return ctx.store().tracks.create({
     analysisId: analysis.id,
     minutesPerDay: minutes,

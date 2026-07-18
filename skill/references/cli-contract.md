@@ -127,6 +127,8 @@ Any text/JSON flag (`--text`, `--transcript`, `--posts`, `--ratings`, and config
   build a 7-day Feynman track. Without explicit objectives, it inherits all objective tags from the
   analysis' source post; explicit values override inheritance. Objective-description token overlap
   orders concepts first, followed by interest, novelty, and original order as stable tiebreakers.
+  With multiple described objectives, relevance is the maximum overlap against any one description,
+  not a sum across descriptions.
 - `learn today [id]` — the next pending day's task (defaults to the latest track with pending days;
   errors NOT_FOUND when none). `data.day` is the next unfinished day — content is never skipped —
   and `data.scheduledDay`/`data.behindBy` report where the calendar says the learner should be.
