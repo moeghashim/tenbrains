@@ -59,6 +59,12 @@ export function linkObjectives(
   return objectives.map((objective) => objective.slug);
 }
 
+export function objectiveLensDescriptions(objectives: Objective[]): string[] {
+  return objectives
+    .map((objective) => objective.description?.trim())
+    .filter((description): description is string => Boolean(description));
+}
+
 export interface ObjectiveRecordTarget {
   type: ObjectiveRecordType;
   id: string;

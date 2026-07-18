@@ -84,6 +84,10 @@ tenbrains objective link bm_... --objective agentic-systems
 tenbrains objective show agentic-systems
 ```
 
+Objective descriptions lens learning-track concept order through deterministic token overlap. For
+multiple described objectives, use the maximum overlap against any one description. Read
+`objective show`'s raw progress counts; do not derive or present a made-up completion percentage.
+
 Account takeaways (supply recent posts, or fetch from X with a token):
 
 ```bash

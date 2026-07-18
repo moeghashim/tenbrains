@@ -22,6 +22,7 @@ import { RunContext } from "../src/core/context.js";
 import { Database } from "../src/db/database.js";
 import { MIGRATIONS, runMigrations } from "../src/db/migrations.js";
 import { Store } from "../src/db/repositories.js";
+import { buildFeynmanTrack } from "../src/domain/learn.js";
 
 function freshStore(): Store {
   return new Store(Database.open({ path: ":memory:" }));
@@ -373,8 +374,14 @@ test("learn inherits source-post objectives unless explicit objectives override 
   const { ctx, cleanup } = ctxWithTempConfig();
   try {
     const store = ctx.store();
-    store.objectives.create({ name: "Inherited Goal" });
-    store.objectives.create({ name: "Explicit Goal" });
+    store.objectives.create({
+      name: "Inherited Goal",
+      description: "Prioritize inherited concepts.",
+    });
+    store.objectives.create({
+      name: "Explicit Goal",
+      description: "Prioritize learning concepts.",
+    });
     const analyzed = await analyzeCommand(ctx, {
       provider: "mock",
       text: "A source post for an inherited learning objective.",
@@ -385,6 +392,10 @@ test("learn inherits source-post objectives unless explicit objectives override 
     const inherited = learnGenerateCommand(ctx, { analysis: analysis.id });
     const inheritedTrack = (inherited.data as { track: { id: string } }).track;
     assert.deepEqual(inherited.meta?.objectives, ["inherited-goal"]);
+    assert.equal(
+      (inherited.data as { track: { days: Array<{ concept: string }> } }).track.days[0]?.concept,
+      "Inherited",
+    );
     assert.deepEqual(
       store.objectives.forRecord("track", inheritedTrack.id).map((objective) => objective.slug),
       ["inherited-goal"],
@@ -396,6 +407,10 @@ test("learn inherits source-post objectives unless explicit objectives override 
     });
     const overriddenTrack = (overridden.data as { track: { id: string } }).track;
     assert.deepEqual(overridden.meta?.objectives, ["explicit-goal"]);
+    assert.equal(
+      (overridden.data as { track: { days: Array<{ concept: string }> } }).track.days[0]?.concept,
+      "Learning",
+    );
     assert.deepEqual(
       store.objectives.forRecord("track", overriddenTrack.id).map((objective) => objective.slug),
       ["explicit-goal"],
@@ -439,6 +454,141 @@ test("current focus never tags content without an explicit objective", async () 
     const post = (result.data as { post: { id: string } }).post;
     assert.deepEqual(result.meta?.objectives, []);
     assert.deepEqual(store.objectives.forRecord("post", post.id), []);
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
+test("objective description lenses analyze --learn concept ordering", async () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    ctx.store().objectives.create({
+      name: "Reserve Safety",
+      description: "Study reserves and backing.",
+    });
+    const result = await analyzeCommand(ctx, {
+      provider: "mock",
+      text: "Consensus validators networks settlement reserves.",
+      learn: true,
+      objective: ["reserve-safety"],
+    });
+    const track = (result.data as { track: { days: Array<{ concept: string }> } }).track;
+    assert.equal(track.days[0]?.concept, "Reserves");
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
+test("a multi-objective track uses maximum overlap against one description", () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    const store = ctx.store();
+    store.objectives.create({
+      name: "Reserve Models",
+      description: "Alpha reserve models",
+    });
+    store.objectives.create({
+      name: "Settlement Rails",
+      description: "Beta settlement rails",
+    });
+    const post = store.posts.create({ text: "A multi-objective source." });
+    const analysis = store.analyses.create({
+      postId: post.id,
+      provider: "mock",
+      model: "mock",
+      topic: "Financial infrastructure",
+      summary: "Reserve and settlement concepts",
+      intent: "Explain",
+      concepts: [
+        {
+          name: "Reserve Settlement",
+          whyItMattersInTweet: "Connects two goals.",
+        },
+        {
+          name: "Alpha Reserve",
+          whyItMattersInTweet: "Matches one goal deeply.",
+        },
+      ],
+      mock: true,
+    });
+
+    const result = learnGenerateCommand(ctx, {
+      analysis: analysis.id,
+      objective: ["reserve-models", "settlement-rails"],
+    });
+    const track = (result.data as { track: { days: Array<{ concept: string }> } }).track;
+    assert.deepEqual(result.meta?.objectives, ["reserve-models", "settlement-rails"]);
+    assert.equal(track.days[0]?.concept, "Alpha Reserve");
+  } finally {
+    ctx.close();
+    cleanup();
+  }
+});
+
+test("objective show reports descriptive learning and research progress counts", () => {
+  const { ctx, cleanup } = ctxWithTempConfig();
+  try {
+    const store = ctx.store();
+    const objective = store.objectives.create({ name: "Reserve Safety" });
+    const account = store.accounts.create("payments");
+    const post = store.posts.create({
+      text: "Reserve audit transcript",
+      raw: { source: "youtube" },
+    });
+    store.bookmarks.create({ postId: post.id, tags: [], source: "test" });
+    const concepts = [{ name: "Reserve Audits", whyItMattersInTweet: "Checks backing." }];
+    const analysis = store.analyses.create({
+      postId: post.id,
+      provider: "mock",
+      model: "mock",
+      topic: "Reserve Audits",
+      summary: "Audit reserves",
+      intent: "Explain",
+      concepts,
+      mock: true,
+    });
+    const track = store.tracks.create({
+      analysisId: analysis.id,
+      minutesPerDay: 10,
+      ratings: [],
+      days: buildFeynmanTrack(concepts, 10, []),
+    });
+    const secondTrack = store.tracks.create({
+      analysisId: analysis.id,
+      minutesPerDay: 15,
+      ratings: [],
+      days: buildFeynmanTrack(concepts, 15, []),
+    });
+    store.tracks.markDone(track.id, 1);
+    for (let day = 1; day <= 3; day += 1) {
+      store.tracks.markDone(secondTrack.id, day);
+    }
+    store.objectives.link(objective.id, "account", account.id);
+    store.objectives.link(objective.id, "post", post.id);
+    store.objectives.link(objective.id, "track", track.id);
+    store.objectives.link(objective.id, "track", secondTrack.id);
+
+    const shown = objectiveShowCommand(ctx, { slug: objective.slug });
+    assert.deepEqual((shown.data as { progress: Record<string, number> }).progress, {
+      accountsFollowed: 1,
+      postsAnalyzed: 0,
+      transcriptsAnalyzed: 1,
+      bookmarksSaved: 1,
+      learningTracks: 2,
+      learningTracksCompleted: 0,
+      learningDaysCompleted: 4,
+      learningDaysTotal: 14,
+    });
+
+    for (let day = 2; day <= 7; day += 1) {
+      store.tracks.markDone(track.id, day);
+    }
+    const completed = objectiveShowCommand(ctx, { slug: objective.slug });
+    const progress = (completed.data as { progress: Record<string, number> }).progress;
+    assert.equal(progress.learningTracksCompleted, 1);
+    assert.equal(progress.learningDaysCompleted, 10);
   } finally {
     ctx.close();
     cleanup();

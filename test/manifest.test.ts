@@ -135,6 +135,21 @@ test("repeatable objective options retain every slug in CLI order", () => {
   assert.deepEqual(analyze.opts().objective, ["stablecoins", "payments"]);
 });
 
+test("manifest describes the objective learn lens and progress surface", () => {
+  const manifest = buildManifest(buildProgram());
+  const commands = manifest.commands as Array<{
+    name: string;
+    commands: Array<{ name: string; description: string }>;
+  }>;
+  const child = (parent: string, name: string) =>
+    commands
+      .find((command) => command.name === parent)
+      ?.commands.find((command) => command.name === name);
+
+  assert.match(child("learn", "generate")?.description ?? "", /objective descriptions/);
+  assert.match(child("objective", "show")?.description ?? "", /progress/);
+});
+
 test("manifest error and exit codes are stable", () => {
   const manifest = buildManifest(buildProgram());
   assert.deepEqual(manifest.exitCodes, {

@@ -125,7 +125,10 @@ Any text/JSON flag (`--text`, `--transcript`, `--posts`, `--ratings`, and config
 
 - `learn generate --analysis <id> [--ratings <json> --minutes <n>] [--objective <slug> ...]` —
   build a 7-day Feynman track. Without explicit objectives, it inherits all objective tags from the
-  analysis' source post; explicit values override inheritance.
+  analysis' source post; explicit values override inheritance. Objective-description token overlap
+  orders concepts first, followed by interest, novelty, and original order as stable tiebreakers.
+  With multiple described objectives, relevance is the maximum overlap against any one description,
+  not a sum across descriptions.
 - `learn today [id]` — the next pending day's task (defaults to the latest track with pending days;
   errors NOT_FOUND when none). `data.day` is the next unfinished day — content is never skipped —
   and `data.scheduledDay`/`data.behindBy` report where the calendar says the learner should be.
@@ -146,7 +149,10 @@ auto-tags content.
   marker (default: active).
 - `objective show [slug]` — objective detail, counts, and tagged records grouped into `posts`,
   `accounts`, `bookmarks`, and `tracks`; without a slug, defaults to the current focus and returns
-  `NOT_FOUND` when none is set.
+  `NOT_FOUND` when none is set. `data.progress` reports raw counts: `accountsFollowed`,
+  `postsAnalyzed`, `transcriptsAnalyzed`, `bookmarksSaved`, `learningTracks`,
+  `learningTracksCompleted`, `learningDaysCompleted`, and `learningDaysTotal` (never a fabricated
+  percentage).
 - `objective focus <slug>` / `objective focus --clear` — atomically set or clear the current focus.
 - `objective archive <slug>` — archive while preserving record links; archiving the focus clears it.
 - `objective link <recordId> --objective <slug>` — tag an existing `post_`, `acc_`, `bm_`, or
