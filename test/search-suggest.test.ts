@@ -30,6 +30,29 @@ function seed(): Store {
   return store;
 }
 
+function seedEqualInterestCandidates(): Store {
+  const store = new Store(Database.open({ path: ":memory:" }));
+  const analyze = (externalId: string, text: string) => {
+    const { post } = store.posts.ingest({ text, externalId });
+    store.analyses.create({
+      postId: post.id,
+      provider: "mock",
+      model: "mock",
+      topic: text,
+      summary: text,
+      intent: "inform",
+      concepts: [],
+      mock: true,
+    });
+    return post;
+  };
+  const signal = analyze("signal", "general research methods");
+  store.bookmarks.create({ postId: signal.id, tags: ["research"], source: "test" });
+  analyze("vector", "research vector database systems");
+  analyze("garden", "research gardening tomatoes");
+  return store;
+}
+
 test("searchCorpus groups by type and ranks by overlap", () => {
   const store = seed();
   const result = searchCorpus(store, "embeddings retrieval", { limit: 5 });
@@ -115,6 +138,76 @@ test("generateSuggestions ranks against the bookmarked interest profile", () => 
   const topPostId = result.suggestions[0]?.postId;
   const topPost = topPostId ? store.posts.findById(topPostId) : null;
   assert.ok(topPost?.text.includes("embeddings"));
+  store.database.close();
+});
+
+test("current-focus relevance biases suggestions deterministically without tagging", () => {
+  const store = seed();
+  store.objectives.create({
+    name: "Grow Food",
+    description: "Learn gardening tomatoes and herbs",
+    focus: true,
+  });
+  const now = new Date("2026-07-19T12:00:00.000Z");
+
+  const first = generateSuggestions(store, { limit: 10, now });
+  const second = generateSuggestions(store, { limit: 10, now });
+  const rankedExternalIds = (result: typeof first) =>
+    result.suggestions.map((suggestion) => ({
+      externalId: store.posts.findById(suggestion.postId)?.externalId,
+      score: suggestion.score,
+      reason: suggestion.reason,
+    }));
+
+  assert.equal(rankedExternalIds(first)[0]?.externalId, "p3");
+  assert.match(rankedExternalIds(first)[0]?.reason ?? "", /current focus "grow-food"/);
+  assert.deepEqual(rankedExternalIds(second), rankedExternalIds(first));
+  for (const post of store.posts.all()) {
+    assert.deepEqual(store.objectives.forRecord("post", post.id), []);
+  }
+  store.database.close();
+});
+
+test("focus overlap breaks a tie between existing interest-profile matches", () => {
+  const store = seedEqualInterestCandidates();
+  store.objectives.create({
+    name: "Garden",
+    description: "gardening tomatoes",
+    focus: true,
+  });
+
+  const result = generateSuggestions(store, {
+    limit: 10,
+    now: new Date("2026-07-19T12:00:00.000Z"),
+  });
+  const top = store.posts.findById(result.suggestions[0]?.postId ?? "");
+  assert.equal(top?.externalId, "garden");
+  store.database.close();
+});
+
+test("no focus or an empty focus description leaves suggestion ranking unchanged", () => {
+  const store = seedEqualInterestCandidates();
+  const now = new Date("2026-07-19T12:00:00.000Z");
+  const baseline = generateSuggestions(store, { limit: 10, now });
+  const snapshot = (result: typeof baseline) =>
+    result.suggestions.map((suggestion) => ({
+      externalId: store.posts.findById(suggestion.postId)?.externalId,
+      score: suggestion.score,
+      reason: suggestion.reason,
+    }));
+  assert.equal(baseline.profileEmpty, false);
+  assert.equal(snapshot(baseline).length, 2);
+
+  store.objectives.create({
+    name: "Described But Not Focused",
+    description: "gardening tomatoes",
+  });
+  const withoutFocus = generateSuggestions(store, { limit: 10, now });
+  assert.deepEqual(snapshot(withoutFocus), snapshot(baseline));
+
+  store.objectives.create({ name: "Empty Focus", description: "the and", focus: true });
+  const emptyDescription = generateSuggestions(store, { limit: 10, now });
+  assert.deepEqual(snapshot(emptyDescription), snapshot(baseline));
   store.database.close();
 });
 

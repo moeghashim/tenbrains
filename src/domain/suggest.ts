@@ -1,16 +1,22 @@
-import { tokenSet } from "../core/text.js";
+import { tokenOverlapScore, tokenSet } from "../core/text.js";
 import type { Store } from "../db/repositories.js";
 import type { Suggestion } from "./types.js";
 
 const TAG_WEIGHT = 3;
 const TAKEAWAY_WEIGHT = 2;
 const BOOKMARK_TEXT_WEIGHT = 1;
+const FOCUS_TOKEN_WEIGHT = 2;
 /** Interests drift: signal loses half its weight every ~2 months. */
 const HALF_LIFE_DAYS = 60;
 
 interface Profile {
   weights: Map<string, number>;
   empty: boolean;
+}
+
+interface FocusProfile {
+  slug: string;
+  tokens: Set<string>;
 }
 
 /** Exponential decay in (0, 1] by age relative to `now`. */
@@ -76,6 +82,39 @@ function scoreCandidate(
   return { score, matched: matched.slice(0, 3).map((m) => m.token) };
 }
 
+function scoreProfileCandidate(
+  profile: Profile,
+  tokens: Set<string>,
+  topic: string,
+): { score: number; reason: string } | null {
+  if (profile.empty) {
+    return { score: 0.1, reason: `Analyzed (${topic}) but not yet bookmarked.` };
+  }
+  const scored = scoreCandidate(profile, tokens);
+  if (scored.score <= 0) {
+    return null;
+  }
+  return {
+    score: Number(scored.score.toFixed(4)),
+    reason: `Matches your saved interest in ${scored.matched.join(", ")}.`,
+  };
+}
+
+function buildFocusProfile(store: Store): FocusProfile | null {
+  const focus = store.objectives.focus();
+  const tokens = tokenSet(focus?.description ?? "");
+  return focus && tokens.size > 0 ? { slug: focus.slug, tokens } : null;
+}
+
+function scoreFocus(
+  focus: FocusProfile,
+  tokens: Set<string>,
+): { score: number; matched: string[] } {
+  const score = tokenOverlapScore(tokens, focus.tokens) * FOCUS_TOKEN_WEIGHT;
+  const matched = [...tokens].filter((token) => focus.tokens.has(token)).slice(0, 3);
+  return { score, matched };
+}
+
 export interface GenerateResult {
   created: number;
   updated: number;
@@ -93,6 +132,7 @@ export function generateSuggestions(
 ): GenerateResult {
   const limit = options.limit ?? 10;
   const profile = buildProfile(store, options.now ?? new Date());
+  const focus = buildFocusProfile(store);
   const bookmarkedPostIds = new Set(store.bookmarks.all().map((b) => b.postId));
 
   let created = 0;
@@ -115,19 +155,16 @@ export function generateSuggestions(
     const conceptText = analysis.concepts.map((c) => c.name).join(" ");
     const tokens = tokenSet(`${post.text} ${analysis.topic} ${conceptText}`);
 
-    let score: number;
-    let reason: string;
-    if (profile.empty) {
-      score = 0.1;
-      reason = `Analyzed (${analysis.topic}) but not yet bookmarked.`;
-    } else {
-      const scored = scoreCandidate(profile, tokens);
-      if (scored.score <= 0) {
-        continue;
-      }
-      score = Number(scored.score.toFixed(4));
-      reason = `Matches your saved interest in ${scored.matched.join(", ")}.`;
+    const base = scoreProfileCandidate(profile, tokens, analysis.topic);
+    if (!base) {
+      continue;
     }
+    const focused = focus ? scoreFocus(focus, tokens) : null;
+    const score = Number((base.score + (focused?.score ?? 0)).toFixed(4));
+    const reason =
+      focus && focused && focused.score > 0
+        ? `Aligns with current focus "${focus.slug}" via ${focused.matched.join(", ")}. ${base.reason}`
+        : base.reason;
 
     const before = existing !== null;
     store.suggestions.upsert({ postId: post.id, reason, score });

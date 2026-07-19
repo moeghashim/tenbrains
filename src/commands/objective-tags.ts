@@ -1,5 +1,5 @@
 import { CliError } from "../core/errors.js";
-import type { Opts } from "../core/opts.js";
+import { type Opts, optString } from "../core/opts.js";
 import type { Store } from "../db/repositories.js";
 import type { Objective, ObjectiveRecordType } from "../domain/types.js";
 
@@ -63,6 +63,59 @@ export function objectiveLensDescriptions(objectives: Objective[]): string[] {
   return objectives
     .map((objective) => objective.description?.trim())
     .filter((description): description is string => Boolean(description));
+}
+
+export interface ObjectiveContentScope {
+  objective: Objective;
+  analysisIds: ReadonlySet<string>;
+  takeawayIds: ReadonlySet<string>;
+  bookmarkIds: ReadonlySet<string>;
+}
+
+/**
+ * Resolve a singular --objective filter and map its linkable records to the
+ * derived content returned by search and digest.
+ */
+export function resolveObjectiveContentScope(
+  store: Store,
+  opts: Opts,
+): ObjectiveContentScope | undefined {
+  const ref = optString(opts, "objective");
+  if (!ref) {
+    return undefined;
+  }
+  const objective = resolveObjectiveRef(store, ref);
+  const links = store.objectives.links(objective.id);
+  const postIds = new Set(
+    links.filter((link) => link.recordType === "post").map((link) => link.recordId),
+  );
+  const accountIds = new Set(
+    links.filter((link) => link.recordType === "account").map((link) => link.recordId),
+  );
+  const bookmarkIds = new Set(
+    links.filter((link) => link.recordType === "bookmark").map((link) => link.recordId),
+  );
+  for (const bookmark of store.bookmarks.all()) {
+    if (postIds.has(bookmark.postId)) {
+      bookmarkIds.add(bookmark.id);
+    }
+  }
+  return {
+    objective,
+    analysisIds: new Set(
+      store.analyses
+        .all()
+        .filter((analysis) => postIds.has(analysis.postId))
+        .map((analysis) => analysis.id),
+    ),
+    takeawayIds: new Set(
+      store.snapshots
+        .all()
+        .filter((snapshot) => accountIds.has(snapshot.accountId))
+        .map((snapshot) => snapshot.id),
+    ),
+    bookmarkIds,
+  };
 }
 
 export interface ObjectiveRecordTarget {

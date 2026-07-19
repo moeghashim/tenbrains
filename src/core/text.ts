@@ -102,6 +102,17 @@ export function tokenSet(text: string): Set<string> {
   return new Set(tokenize(text).map((w) => w.replace(/^#/, "")));
 }
 
+/** Count unique tokens shared by two token sets. */
+export function tokenOverlapScore(left: ReadonlySet<string>, right: ReadonlySet<string>): number {
+  let score = 0;
+  for (const token of left) {
+    if (right.has(token)) {
+      score += 1;
+    }
+  }
+  return score;
+}
+
 /** Top `n` terms by frequency; ties resolved by first appearance (stable). */
 export function significantTerms(text: string, n: number): string[] {
   const counts = new Map<string, { count: number; first: number }>();

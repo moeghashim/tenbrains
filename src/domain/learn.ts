@@ -1,4 +1,4 @@
-import { tokenSet } from "../core/text.js";
+import { tokenOverlapScore, tokenSet } from "../core/text.js";
 import type { Concept, ConceptRating, LearningDay, TrackDayProgress } from "./types.js";
 
 const TRACK_DAYS = 7;
@@ -31,16 +31,6 @@ function compareExistingPriority(
   return a.index - b.index;
 }
 
-function tokenOverlap(left: Set<string>, right: Set<string>): number {
-  let score = 0;
-  for (const token of left) {
-    if (right.has(token)) {
-      score += 1;
-    }
-  }
-  return score;
-}
-
 /**
  * Order concepts for study. With objective descriptions, the highest unique-token
  * overlap against any one description is the primary lens. Ratings retain their
@@ -70,7 +60,7 @@ export function prioritizeConcepts(
       const conceptTokens = tokenSet(`${entry.concept.name} ${entry.concept.whyItMattersInTweet}`);
       const relevance = Math.max(
         ...objectiveTokenSets.map((objectiveTokens) =>
-          tokenOverlap(conceptTokens, objectiveTokens),
+          tokenOverlapScore(conceptTokens, objectiveTokens),
         ),
       );
       return { ...entry, relevance };

@@ -17,6 +17,8 @@ export interface SearchResult {
   groups: Record<SearchType, SearchHit[]>;
 }
 
+export type SearchIdFilter = Partial<Record<SearchType, ReadonlySet<string>>>;
+
 interface FtsRow {
   ref_id: string;
   title: string;
@@ -46,7 +48,7 @@ export function toMatchQuery(query: string): string | null {
 export function searchCorpus(
   store: Store,
   query: string,
-  options: { types?: SearchType[]; limit?: number } = {},
+  options: { types?: SearchType[]; limit?: number; allowedIds?: SearchIdFilter } = {},
 ): SearchResult {
   const types = new Set<SearchType>(options.types ?? ["analysis", "takeaway", "bookmark"]);
   const limit = options.limit ?? 10;
@@ -62,9 +64,27 @@ export function searchCorpus(
        ORDER BY rank
        LIMIT ?`,
     );
+    const unboundedStmt = options.allowedIds
+      ? store.database.handle.prepare(
+          `SELECT ref_id, title, snippet(search_fts, -1, '', '', '…', 24) AS snip,
+                  bm25(search_fts, 0, 0, 2.0, 1.0) AS rank
+           FROM search_fts
+           WHERE search_fts MATCH ? AND type = ?
+           ORDER BY rank`,
+        )
+      : null;
     for (const type of types) {
-      const rows = stmt.all(match, type, limit) as unknown as FtsRow[];
+      const allowed = options.allowedIds?.[type];
+      if (allowed?.size === 0) {
+        continue;
+      }
+      const rows = (allowed
+        ? unboundedStmt?.all(match, type)
+        : stmt.all(match, type, limit)) as unknown as FtsRow[];
       for (const row of rows) {
+        if (allowed && !allowed.has(row.ref_id)) {
+          continue;
+        }
         const refs = resolveRefs(store, type, row.ref_id);
         if (refs === null) {
           continue; // index row outlived its record; `db reindex` cleans these
@@ -79,6 +99,9 @@ export function searchCorpus(
           snippet: row.snip,
           refs,
         });
+        if (groups[type].length >= limit) {
+          break;
+        }
       }
     }
   }
