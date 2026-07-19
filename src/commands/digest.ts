@@ -2,6 +2,7 @@ import type { RunContext } from "../core/context.js";
 import { type Opts, optNumber } from "../core/opts.js";
 import type { CommandResult } from "../core/output.js";
 import type { Store } from "../db/repositories.js";
+import { resolveObjectiveContentScope } from "./objective-tags.js";
 
 interface DigestData {
   since: string;
@@ -10,20 +11,43 @@ interface DigestData {
   markdown: string;
 }
 
+interface DigestScope {
+  analysisIds: ReadonlySet<string>;
+  takeawayIds: ReadonlySet<string>;
+  bookmarkIds: ReadonlySet<string>;
+}
+
 function snippet(text: string, max = 120): string {
   const clean = text.replace(/\s+/g, " ").trim();
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 }
 
 /** A markdown recap of everything saved in the window — the tool's "output side". */
-export function buildDigest(store: Store, days: number, now: Date): DigestData {
+export function buildDigest(
+  store: Store,
+  days: number,
+  now: Date,
+  scope?: DigestScope,
+): DigestData {
   const since = new Date(now.getTime() - days * 86_400_000).toISOString();
   const postsById = new Map(store.posts.all().map((p) => [p.id, p]));
   const accountsById = new Map(store.accounts.list().map((a) => [a.id, a]));
 
-  const analyses = store.analyses.all().filter((a) => a.createdAt >= since);
-  const snapshots = store.snapshots.all().filter((s) => s.createdAt >= since);
-  const bookmarks = store.bookmarks.all().filter((b) => b.createdAt >= since);
+  const analyses = store.analyses
+    .all()
+    .filter(
+      (analysis) => analysis.createdAt >= since && (!scope || scope.analysisIds.has(analysis.id)),
+    );
+  const snapshots = store.snapshots
+    .all()
+    .filter(
+      (snapshot) => snapshot.createdAt >= since && (!scope || scope.takeawayIds.has(snapshot.id)),
+    );
+  const bookmarks = store.bookmarks
+    .all()
+    .filter(
+      (bookmark) => bookmark.createdAt >= since && (!scope || scope.bookmarkIds.has(bookmark.id)),
+    );
 
   const lines: string[] = [
     `# tenbrains digest — last ${days} day${days === 1 ? "" : "s"}`,
@@ -80,13 +104,16 @@ export function buildDigest(store: Store, days: number, now: Date): DigestData {
 }
 
 export function digestCommand(ctx: RunContext, opts: Opts): CommandResult {
+  const store = ctx.store();
   const days = optNumber(opts, "days", 7);
-  const digest = buildDigest(ctx.store(), days, new Date());
+  const scope = resolveObjectiveContentScope(store, opts);
+  const digest = buildDigest(store, days, new Date(), scope);
   return {
     data: digest,
     meta: {
       days,
       total: digest.counts.analyses + digest.counts.takeaways + digest.counts.bookmarks,
+      ...(scope ? { objective: scope.objective.slug } : {}),
     },
     human: () => digest.markdown,
   };

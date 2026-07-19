@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { hashtags, significantTerms, slugify, tokenSet } from "../src/core/text.js";
+import {
+  hashtags,
+  significantTerms,
+  slugify,
+  tokenOverlapScore,
+  tokenSet,
+} from "../src/core/text.js";
 
 test("significantTerms ranks by frequency, drops stopwords and short words", () => {
   const terms = significantTerms("agents agents agents tools tools the and a", 3);
@@ -25,6 +31,13 @@ test("tokenSet dedupes and strips hashes", () => {
   assert.ok(set.has("agents"));
   assert.ok(set.has("tools"));
   assert.equal([...set].filter((t) => t === "agents").length, 1);
+});
+
+test("tokenOverlapScore counts shared unique content tokens", () => {
+  assert.equal(
+    tokenOverlapScore(tokenSet("reserve reserve settlement"), tokenSet("reserve backing")),
+    1,
+  );
 });
 
 test("hashtags extracts lowercased tags", () => {

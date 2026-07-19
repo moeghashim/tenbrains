@@ -115,12 +115,12 @@ Exit codes: `0` success · `2` usage · `3` not found · `4` missing credentials
 | `analyze list` / `analyze get <id>` | Read stored analyses. |
 | `objective add\|list\|show\|focus\|archive\|link\|unlink` | Manage first-class learning goals, one optional current focus, and explicit record tags. |
 | `takeaway follow\|unfollow\|list\|refresh\|show` | Track accounts; summarize recent posts (supplied via `--posts` or fetched from X) into snapshots. |
-| `suggest generate\|list\|save\|dismiss\|add` | Rank un-saved posts against your saved signal; save/dismiss feedback. |
+| `suggest generate\|list\|save\|dismiss\|add` | Rank un-saved posts against your saved signal, biased toward a described current objective focus; save/dismiss feedback. |
 | `bookmark add\|list\|show\|tag\|remove` | Save posts with tags (auto-suggested from analysis) and notes. |
 | `learn generate\|today\|done\|show\|list` | Build 7-day Feynman learning tracks, get today's task, and check off progress. |
-| `search <query>` | Full-text search (SQLite FTS5, BM25-ranked, stemmed) across analyses, takeaways, and bookmarks. |
+| `search <query>` | Full-text search (SQLite FTS5, BM25-ranked, stemmed) across analyses, takeaways, and bookmarks; optionally filter by objective. |
 | `import x-archive <path>` | Bulk-import your extracted official X archive: likes become bookmarked posts, your tweets become posts. Free, idempotent. |
-| `digest [--days N]` | Markdown recap of analyses, takeaways, and bookmarks saved in the window (default 7 days). |
+| `digest [--days N]` | Markdown recap of analyses, takeaways, and bookmarks saved in the window (default 7 days), optionally filtered by objective. |
 | `setup` / `config set\|get\|list\|unset\|path` | Collect and manage provider credentials and defaults. |
 | `record get <id>` | Resolve any record by its prefixed id (`post_`, `ana_`, `acc_`, ...). |
 | `db stats\|migrate\|vacuum\|reindex\|reset` | Inspect and maintain the database. |
@@ -163,6 +163,8 @@ tenbrains analyze --provider mock --text "..." \
 tenbrains takeaway follow levelsio --objective ai-agents
 tenbrains bookmark add --post-id post_... --objective stablecoins
 tenbrains learn generate --analysis ana_... --objective stablecoins
+tenbrains search "reserve risk" --objective stablecoins
+tenbrains digest --objective stablecoins
 ```
 
 `bookmark add` tags the bookmark's post. Without an explicit `--objective`, `learn generate` inherits
@@ -178,6 +180,13 @@ description; matches are not summed across objectives. `objective show` also ret
 progress counts under `data.progress`:
 accounts followed, posts and transcripts analyzed, bookmarks saved, tracks completed, and learning
 days completed/total. It never fabricates a completion percentage.
+
+`suggest generate` adds deterministic token-overlap relevance from the current focus description to
+its existing saved-interest scores. With no focus or no usable focus description, its scores,
+reasons, and ordering are unchanged. This bias never creates objective links. `search` and `digest`
+accept one `--objective <slug>` filter and return only analyses whose posts, takeaways whose
+accounts, and bookmarks (directly or through their posts) are tagged to that objective. Unknown
+objectives return `NOT_FOUND`.
 
 ## YouTube transcripts
 

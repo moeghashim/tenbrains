@@ -3,6 +3,7 @@ import { CliError } from "../core/errors.js";
 import { type Opts, optList, optNumber, requireString } from "../core/opts.js";
 import type { CommandResult } from "../core/output.js";
 import { type SearchType, searchCorpus } from "../domain/search.js";
+import { resolveObjectiveContentScope } from "./objective-tags.js";
 
 const ALL_TYPES: SearchType[] = ["analysis", "takeaway", "bookmark"];
 
@@ -19,11 +20,24 @@ export function searchCommand(ctx: RunContext, opts: Opts): CommandResult {
     types = requested as SearchType[];
   }
   const limit = optNumber(opts, "limit", 10);
-  const result = searchCorpus(ctx.store(), query, { types, limit });
+  const scope = resolveObjectiveContentScope(ctx.store(), opts);
+  const result = searchCorpus(ctx.store(), query, {
+    types,
+    limit,
+    ...(scope
+      ? {
+          allowedIds: {
+            analysis: scope.analysisIds,
+            takeaway: scope.takeawayIds,
+            bookmark: scope.bookmarkIds,
+          },
+        }
+      : {}),
+  });
 
   return {
     data: result,
-    meta: { total: result.total },
+    meta: { total: result.total, ...(scope ? { objective: scope.objective.slug } : {}) },
     human: () => {
       const lines: string[] = [`Results for "${query}" (${result.total}):`];
       for (const type of ALL_TYPES) {

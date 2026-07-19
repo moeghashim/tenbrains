@@ -87,6 +87,8 @@ tenbrains objective show agentic-systems
 Objective descriptions lens learning-track concept order through deterministic token overlap. For
 multiple described objectives, use the maximum overlap against any one description. Read
 `objective show`'s raw progress counts; do not derive or present a made-up completion percentage.
+The current focus also biases `suggest generate` when it has a description, but never tags.
+Use `search --objective <slug>` or `digest --objective <slug>` for explicit scoped output.
 
 Account takeaways (supply recent posts, or fetch from X with a token):
 
@@ -100,7 +102,7 @@ tenbrains takeaway show levelsio --history
 Suggestion feedback loop:
 
 ```bash
-tenbrains suggest generate                 # ranks analyzed, un-bookmarked posts vs your saved signal
+tenbrains suggest generate                 # saved-signal ranking + described current-focus bias
 tenbrains suggest save sug_...             # -> creates a bookmark (meta.bookmarkId)
 tenbrains suggest dismiss sug_...          # -> suppressed in future ranking
 ```

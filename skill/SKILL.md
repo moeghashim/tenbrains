@@ -107,7 +107,7 @@ tenbrains takeaway show levelsio --history
 ### Suggestions feedback loop
 
 ```bash
-tenbrains suggest generate                 # ranks analyzed, un-bookmarked posts vs your saved signal
+tenbrains suggest generate                 # saved-signal ranking + current-focus description bias
 tenbrains suggest save sug_...             # materializes the suggestion as a bookmark
 tenbrains suggest dismiss sug_...          # suppresses it in future ranking
 ```
@@ -155,11 +155,25 @@ matches across objectives. Inspect `objective show <slug>` for grouped records a
 `data.progress` counts covering accounts, analyzed posts/transcripts, saved bookmarks, tracks
 completed, and learning days completed/total. Do not turn those counts into a made-up percentage.
 
+`suggest generate` deterministically biases its existing interest score toward token overlap with
+the current focus description. No focus or no usable description preserves the ordinary ranking,
+and focus never adds tags. Scope recall and recaps explicitly when needed:
+
+```bash
+tenbrains search "reserve risk" --objective stablecoins
+tenbrains digest --objective stablecoins
+```
+
+Both filters require an existing objective (`NOT_FOUND` otherwise). They include analyses through
+tagged posts, takeaways through tagged accounts, and bookmarks tagged directly or through their
+posts.
+
 ### Bookmarks and recall
 
 ```bash
 tenbrains bookmark add --post-id post_... [--tags rag,agents]   # auto-tags from the analysis if omitted
 tenbrains search "vector databases" --type analysis,bookmark
+tenbrains search "reserve risk" --objective stablecoins
 ```
 
 ### Bulk-import the user's X history (free)

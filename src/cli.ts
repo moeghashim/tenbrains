@@ -352,7 +352,7 @@ export function buildProgram(): Command {
   suggest.addCommand(
     makeCommand({
       name: "generate",
-      description: "Regenerate pending suggestions from the local corpus.",
+      description: "Regenerate suggestions, biased by the described current objective focus.",
       options: [{ flags: "--limit <n>", description: "Max suggestions returned (default 10)" }],
       handler: suggestGenerateCommand,
     }),
@@ -628,6 +628,7 @@ export function buildProgram(): Command {
       options: [
         { flags: "--type <list>", description: "Limit types: analysis,takeaway,bookmark (or all)" },
         { flags: "--limit <n>", description: "Max hits per type (default 10)" },
+        { flags: "--objective <slug>", description: "Only records tagged with this objective" },
       ],
       handler: searchCommand,
     }),
@@ -638,7 +639,10 @@ export function buildProgram(): Command {
     makeCommand({
       name: "digest",
       description: "Markdown recap of analyses, takeaways, and bookmarks saved recently.",
-      options: [{ flags: "--days <n>", description: "Window in days (default 7)" }],
+      options: [
+        { flags: "--days <n>", description: "Window in days (default 7)" },
+        { flags: "--objective <slug>", description: "Only records tagged with this objective" },
+      ],
       handler: digestCommand,
     }),
   );

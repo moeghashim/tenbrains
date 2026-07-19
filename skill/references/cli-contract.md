@@ -30,8 +30,9 @@ Failure:
 ```
 
 `meta` commonly carries: `analysisId`, `postId`, `snapshotId`, `bookmarkId`, `suggestionId`,
-`trackId`, `objectiveId`, `objectives` (applied/inherited objective slugs), `provider`, `model`,
-`mock`, `deduped`, `persisted`. Branch on `ok`, then `error.code`.
+`trackId`, `objectiveId`, `objectives` (applied/inherited objective slugs), `objective` (an applied
+search/digest filter), `provider`, `model`, `mock`, `deduped`, `persisted`. Branch on `ok`, then
+`error.code`.
 
 ## Error codes and exit codes
 
@@ -105,7 +106,10 @@ Any text/JSON flag (`--text`, `--transcript`, `--posts`, `--ratings`, and config
 ### suggest
 
 - `suggest generate [--limit]` — rank analyzed, un-bookmarked posts against your saved signal
-  (recency-weighted: saves lose half their influence every ~60 days).
+  (recency-weighted: saves lose half their influence every ~60 days). When the current focus has a
+  usable description, each matching unique description token adds 2 points to an otherwise eligible
+  candidate. No focus or no usable description preserves the existing score, reason, and order.
+  Focus biases only; it never tags.
 - `suggest list [--status pending|saved|dismissed|all --limit]`.
 - `suggest save <id>` — mark saved and create a bookmark.
 - `suggest dismiss <id>` — suppress in future ranking.
@@ -166,14 +170,20 @@ or from the current focus.
 
 ### search
 
-- `search <query> [--type analysis,takeaway,bookmark|all --limit]` — full-text search (SQLite FTS5)
-  across stored analyses, takeaways, and bookmarks; results grouped by type and ranked by BM25
-  (higher `score` = better). Queries are stemmed, so "embedding" matches "embeddings".
+- `search <query> [--type analysis,takeaway,bookmark|all --limit --objective <slug>]` — full-text
+  search (SQLite FTS5) across stored analyses, takeaways, and bookmarks; results grouped by type and
+  ranked by BM25 (higher `score` = better). Queries are stemmed, so "embedding" matches
+  "embeddings". The objective filter includes analyses through tagged posts, takeaways through
+  tagged accounts, and bookmarks tagged directly or through their posts.
 
 ### digest
 
-- `digest [--days <n>]` — recap of the window (default 7 days). `data.markdown` is a ready-to-send
-  markdown report; `data.counts` has per-section totals. Useful for weekly summaries.
+- `digest [--days <n> --objective <slug>]` — recap of the window (default 7 days).
+  `data.markdown` is a ready-to-send markdown report; `data.counts` has per-section totals. The
+  objective filter follows the same post/account/bookmark derivation as search.
+
+`search --objective` and `digest --objective` require an existing slug or `obj_` id and return
+`NOT_FOUND` otherwise. They filter only and never create tags.
 
 ### import
 

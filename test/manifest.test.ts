@@ -150,6 +150,25 @@ test("manifest describes the objective learn lens and progress surface", () => {
   assert.match(child("objective", "show")?.description ?? "", /progress/);
 });
 
+test("manifest publishes the 2.3.0 objective bias and filter surface", () => {
+  const manifest = buildManifest(buildProgram());
+  const commands = manifest.commands as Array<{
+    name: string;
+    options: Array<{ flags: string }>;
+    commands: Array<{ name: string; description: string }>;
+  }>;
+  const flagsFor = (name: string) =>
+    commands.find((command) => command.name === name)?.options.map((option) => option.flags) ?? [];
+  const suggestGenerate = commands
+    .find((command) => command.name === "suggest")
+    ?.commands.find((command) => command.name === "generate");
+
+  assert.equal(manifest.version, "2.3.0");
+  assert.ok(flagsFor("search").includes("--objective <slug>"));
+  assert.ok(flagsFor("digest").includes("--objective <slug>"));
+  assert.match(suggestGenerate?.description ?? "", /current objective focus/);
+});
+
 test("manifest error and exit codes are stable", () => {
   const manifest = buildManifest(buildProgram());
   assert.deepEqual(manifest.exitCodes, {
