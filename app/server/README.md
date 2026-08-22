@@ -28,6 +28,15 @@ WAYFINDER_MODEL=claude-sonnet-5
 
 Anthropic and mock mode use the same SSE contract. Intake messages append transcript entries and staged candidates only.
 
+Discovery persistence uses these endpoints:
+
+- `GET /api/discoveries` lists discoveries with server-derived map counts and clarity.
+- `GET /api/discoveries/:id` reads one full discovery document.
+- `POST /api/discoveries` creates a discovery.
+- `PATCH /api/discoveries/:id` renames or archives a discovery.
+
+Deletion is intentionally unavailable to avoid destructive surprises while the data model is still settling.
+
 Grilling sessions use these endpoints:
 
 - `POST /api/discoveries/:id/sessions` creates a standalone session or starts one from an approved Grilling ticket.

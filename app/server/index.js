@@ -2,7 +2,7 @@ import express from 'express';
 import { loadServerEnvironment } from './env.js';
 import { applyCandidates, selectCandidates } from './candidates.js';
 import { createProvider } from './providers/index.js';
-import { createDiscovery, getDiscovery, initializeStore, saveDiscovery } from './store.js';
+import { createDiscovery, getDiscovery, initializeStore, listDiscoveries, saveDiscovery } from './store.js';
 
 await loadServerEnvironment();
 
@@ -20,9 +20,43 @@ function publicError(response, status, message) {
   response.status(status).json({ error: message });
 }
 
-app.post('/api/discoveries', async (_request, response, next) => {
+app.post('/api/discoveries', async (request, response, next) => {
   try {
-    response.status(201).json(await createDiscovery());
+    const name = typeof request.body?.name === 'string' && request.body.name.trim()
+      ? request.body.name.trim().slice(0, 80)
+      : 'Untitled discovery';
+    response.status(201).json(await createDiscovery({ name }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/discoveries', async (_request, response, next) => {
+  try {
+    response.json(await listDiscoveries());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/discoveries/:id', async (request, response, next) => {
+  try {
+    const discovery = await getDiscovery(request.params.id);
+    if (!discovery) return publicError(response, 404, 'Discovery not found');
+    let changed = false;
+    if (request.body?.name !== undefined) {
+      if (typeof request.body.name !== 'string' || !request.body.name.trim()) return publicError(response, 400, 'Discovery name is required');
+      discovery.name = request.body.name.trim().slice(0, 80);
+      changed = true;
+    }
+    if (request.body?.status !== undefined) {
+      if (!['Active', 'Archived'].includes(request.body.status)) return publicError(response, 400, 'Discovery status is invalid');
+      discovery.status = request.body.status;
+      changed = true;
+    }
+    if (!changed) return publicError(response, 400, 'Name or status is required');
+    await saveDiscovery(discovery);
+    response.json(discovery);
   } catch (error) {
     next(error);
   }

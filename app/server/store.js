@@ -13,12 +13,12 @@ export async function initializeStore() {
   await mkdir(dataDirectory, { recursive: true });
 }
 
-export async function createDiscovery() {
+export async function createDiscovery({ name = 'Untitled discovery' } = {}) {
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const discovery = {
     id,
-    name: 'Untitled discovery',
+    name,
     status: 'Active',
     createdAt: now,
     updatedAt: now,
@@ -63,9 +63,29 @@ export async function saveDiscovery(discovery) {
   return discovery;
 }
 
-export async function listDiscoveryIds() {
+export function discoverySummary(discovery) {
+  const counts = {
+    open: discovery.map.openFrontier.length,
+    fog: discovery.map.fogOfWar.length,
+    closed: discovery.map.closedDecisions.length,
+  };
+  const clarity = Math.min(100, (discovery.map.destination ? 30 : 10) + (counts.open + counts.fog + counts.closed) * 10);
+  return {
+    id: discovery.id,
+    name: discovery.name,
+    status: discovery.status,
+    clarity,
+    counts,
+    updatedAt: discovery.updatedAt,
+  };
+}
+
+export async function listDiscoveries() {
   await initializeStore();
-  return (await readdir(dataDirectory))
-    .filter((name) => name.endsWith('.json'))
-    .map((name) => name.slice(0, -5));
+  const names = (await readdir(dataDirectory)).filter((name) => name.endsWith('.json'));
+  const discoveries = await Promise.all(names.map((name) => getDiscovery(name.slice(0, -5))));
+  return discoveries
+    .filter(Boolean)
+    .map(discoverySummary)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
