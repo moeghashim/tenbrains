@@ -1509,6 +1509,302 @@ a,
   padding: 0;
 }
 
+/* Live session states are scoped so the demo session remains unchanged. */
+.live-session-shell .session-main {
+  padding-bottom: 16px;
+}
+
+.live-session-load {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+}
+
+.live-session-load-card {
+  display: grid;
+  width: min(100%, 520px);
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 18px;
+  border-color: var(--border-subtle);
+  background: var(--surface);
+}
+
+.live-session-load-card > svg {
+  width: 18px;
+  color: var(--workbench-accent);
+}
+
+.live-session-load-card h1,
+.live-session-load-card p {
+  margin: 0;
+}
+
+.live-session-load-card h1 {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 620;
+}
+
+.live-session-load-card p {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.live-session-load-actions {
+  display: flex;
+  grid-column: 2;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.live-session-grid .panel:nth-child(2) .panel-content {
+  overflow: hidden;
+}
+
+@media (min-width: 1280px) {
+  .live-session-grid {
+    height: calc(100dvh - 170px);
+    min-height: 560px;
+  }
+
+  .live-session-grid > .panel {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .live-session-grid > .panel:first-child .panel-content,
+  .live-session-grid > .panel:last-child .panel-content {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+.live-transcript-viewport {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.live-transcript-list {
+  min-height: 100%;
+  align-content: end;
+  padding-top: 10px;
+}
+
+.live-transcript-list .transcript-row.is-streaming p::after {
+  display: inline-block;
+  width: 5px;
+  height: 1em;
+  margin-left: 3px;
+  background: var(--workbench-accent);
+  content: "";
+  vertical-align: -2px;
+  animation: live-cursor 900ms steps(1, end) infinite;
+}
+
+@keyframes live-cursor {
+  50% { opacity: 0; }
+}
+
+.live-session-working {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 4px 2px 144px;
+  color: var(--workbench-accent);
+  font-size: 11px;
+}
+
+.live-session-working svg {
+  width: 14px;
+  height: 14px;
+}
+
+.live-session-composer {
+  position: relative;
+  min-height: 60px;
+}
+
+.live-session-error {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.live-session-error > svg {
+  width: 16px;
+  color: var(--danger);
+}
+
+.live-session-error p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.live-session-composer .live-session-error {
+  position: static;
+  grid-column: 1 / -1;
+}
+
+.live-inquiry-card {
+  min-height: 0;
+  margin: 0 0 10px;
+}
+
+.live-inquiry-content {
+  padding: 12px;
+}
+
+.live-inquiry-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.live-inquiry-card.recommended-card .live-inquiry-label {
+  color: var(--workbench-accent);
+}
+
+.live-inquiry-label svg {
+  width: 15px;
+  height: 15px;
+}
+
+.live-inquiry-label button {
+  margin-left: auto;
+}
+
+.live-inquiry-card textarea {
+  width: 100%;
+  min-height: 78px;
+  resize: vertical;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  outline: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.live-inquiry-card textarea:hover {
+  border-color: var(--border);
+}
+
+.live-inquiry-card textarea:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px var(--workbench-accent-soft);
+}
+
+.live-session-empty {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+  padding: 18px 8px;
+  color: var(--text-dim);
+}
+
+.live-session-empty svg {
+  width: 18px;
+}
+
+.live-session-empty strong,
+.live-session-empty p,
+.live-signal-empty {
+  margin: 0;
+}
+
+.live-session-empty strong {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.live-session-empty p,
+.live-signal-empty {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.live-signal-empty {
+  padding: 4px 2px 10px;
+}
+
+.live-evidence-content {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  padding-block: 9px;
+}
+
+.live-evidence-content > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.live-evidence-content strong {
+  color: var(--success);
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.live-arrival {
+  animation: live-arrival 180ms ease-out both;
+}
+
+@keyframes live-arrival {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.live-session-drawer .drawer-body > .panel {
+  min-height: auto;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.live-session-composer-sheet {
+  gap: 12px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  background: var(--surface);
+}
+
+.live-mobile-composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.live-mobile-composer .live-session-error {
+  position: static;
+  grid-column: 1 / -1;
+}
+
 /* Ledger and document views share one restrained workbench rhythm. */
 .workspace-main {
   padding: 16px 22px 56px;
@@ -1594,6 +1890,63 @@ a,
 
 .session-map-scroll:focus-visible {
   outline-offset: 3px;
+}
+
+.session-map-state {
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.session-map-state > svg {
+  width: 17px;
+  height: 17px;
+  color: var(--workbench-accent);
+}
+
+.session-map-state.is-error {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--text-secondary);
+}
+
+.session-map-state.is-error > svg {
+  color: var(--danger);
+}
+
+.live-session-map-shell .workspace-main {
+  display: flex;
+  height: 100dvh;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.live-session-map-shell .session-map-collection {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.live-session-map-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+@media (max-width: 900px) {
+  .live-session-map-shell .workspace-main {
+    height: calc(100dvh - 48px);
+    max-height: calc(100dvh - 48px);
+    flex: 0 0 calc(100dvh - 48px);
+  }
 }
 
 .session-map-svg {
@@ -2307,6 +2660,20 @@ a,
 }
 
 @media (max-width: 768px) {
+  .session-shell.live-session-shell .session-main {
+    padding-bottom: 48px;
+  }
+
+  .live-session-grid > .panel:nth-child(2) {
+    height: max(360px, calc(100dvh - 410px));
+    min-height: 0;
+    padding-bottom: 0;
+  }
+
+  .live-session-grid .live-transcript-list {
+    padding-bottom: 58px;
+  }
+
   .map-main,
   .session-main {
     padding: 10px 10px 84px;

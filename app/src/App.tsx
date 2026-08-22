@@ -147,6 +147,9 @@ type ApiDiscovery = {
 
 type LiveDiscoveryStatus = 'loading' | 'ready' | 'error';
 type IntakeError = { kind: 'load' | 'turn'; message: string };
+type LiveSessionError = { kind: 'load' | 'stream' | 'moment' | 'approve'; message: string };
+type LiveSessionDrawer = 'inquiry' | 'signals' | null;
+type InquiryDraft = { id: string; question: string; sourceQuestion: string };
 
 type StagedFrontierTicket = {
   title: string;
@@ -1865,7 +1868,10 @@ function sessionMapData(session: ApiSession): SessionMapData {
       id: candidate.id,
       type: candidate.type === 'ticket' ? 'open-frontier-ticket' : candidate.type,
       title: candidate.type === 'fog-question' ? candidate.question : candidate.title,
-      sourceTurnIndex: Math.max(0, session.transcript.length - 1),
+      sourceTurnIndex: Math.min(
+        Math.max(0, session.transcript.length - 1),
+        Math.max(0, Number(candidate.stagedAfter.match(/\d+/)?.[0] ?? session.transcript.length) - 1),
+      ),
       evidenceIds: candidate.type === 'closed-decision' ? [...new Set([...(candidate.evidence ?? []), ...evidenceIds])] : evidenceIds,
     })),
     outcome: {
@@ -1882,19 +1888,47 @@ function SessionMapView({ navigate }: { navigate: (path: string) => void }) {
 
 function LiveSessionMapView({ navigate, sessionId }: { navigate: (path: string) => void; sessionId: string }) {
   const [session, setSession] = useState<ApiSession | null>(null);
+  const [status, setStatus] = useState<LiveDiscoveryStatus>('loading');
+  const [attempt, setAttempt] = useState(0);
+  const sessionMapScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const discoveryId = window.sessionStorage.getItem('ten-brains-live-discovery');
-    if (!discoveryId) return;
+    setStatus('loading');
+    if (!discoveryId) { setStatus('error'); return; }
     fetch(`/api/discoveries/${discoveryId}`)
-      .then((response) => response.ok ? response.json() : null)
+      .then((response) => {
+        if (!response.ok) throw new Error('Session map could not load');
+        return response.json();
+      })
       .then((discovery: ApiDiscovery | null) => {
         const found = discovery?.sessions.find((item): item is ApiSession => item.id === sessionId && item.type === 'grilling');
-        if (found) setSession(found);
+        if (!found) throw new Error('Session map could not load');
+        setSession(found);
+        setStatus('ready');
       })
-      .catch(() => undefined);
-  }, [sessionId]);
+      .catch(() => setStatus('error'));
+  }, [sessionId, attempt]);
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const container = sessionMapScrollRef.current;
+    if (!container) return;
+    const centerSessionPath = () => {
+      const svg = container.querySelector<SVGSVGElement>('.session-map-svg');
+      const viewBoxWidth = svg?.viewBox.baseVal.width;
+      const pathCenter = Number(svg?.dataset.centerX);
+      const renderedPathCenter = svg && viewBoxWidth && Number.isFinite(pathCenter)
+        ? (pathCenter / viewBoxWidth) * svg.getBoundingClientRect().width
+        : container.scrollWidth / 2;
+      container.scrollLeft = Math.max(0, renderedPathCenter - container.clientWidth / 2);
+    };
+    centerSessionPath();
+    const resizeObserver = new ResizeObserver(centerSessionPath);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [status, session]);
   return (
-    <div className="app-shell">
+    <div className="app-shell live-session-map-shell">
       <SideNav active="session" navigate={navigate} />
       <main className="main-surface workspace-main">
         <header className="topbar">
@@ -1908,7 +1942,9 @@ function LiveSessionMapView({ navigate, sessionId }: { navigate: (path: string) 
         </header>
         <section className="workspace-collection session-map-collection">
           <div className="workspace-intro"><p className="eyebrow">{session?.title ?? 'Grilling session'}</p><h1>Session map</h1><p>{session?.objective ?? 'Loading session map.'}</p></div>
-          {session && <div className="session-map-scroll" role="region" aria-label={`${session.title} session map`} tabIndex={0}><SessionMap data={sessionMapData(session)} /></div>}
+          {status === 'loading' && <div className="session-map-state" role="status"><LoaderCircle aria-hidden="true" className="animate-spin" /><span>Loading the live session map.</span></div>}
+          {status === 'error' && <div className="session-map-state is-error" role="alert"><AlertCircle aria-hidden="true" /><span>The live session map could not load.</span><Button size="sm" onClick={() => setAttempt((current) => current + 1)}><RotateCcw aria-hidden="true" /> Retry</Button></div>}
+          {session && status === 'ready' && <div ref={sessionMapScrollRef} className="session-map-scroll live-session-map-scroll" role="region" aria-label={`${session.title} session map`} tabIndex={0}><SessionMap data={sessionMapData(session)} /></div>}
         </section>
       </main>
     </div>
@@ -2172,36 +2208,86 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
   const [streamedReply, setStreamedReply] = useState('');
   const [working, setWorking] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [inquiries, setInquiries] = useState<Array<{ id: string; question: string }>>([]);
+  const [drawer, setDrawer] = useState<LiveSessionDrawer>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [inquiries, setInquiries] = useState<InquiryDraft[]>([]);
+  const [loadStatus, setLoadStatus] = useState<LiveDiscoveryStatus>('loading');
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [error, setError] = useState<LiveSessionError | null>(null);
+  const [approving, setApproving] = useState(false);
+  const [approvalError, setApprovalError] = useState('');
+  const [momentStatus, setMomentStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const dismissedInquiryQuestions = useRef(new Set<string>());
   const discoveryId = window.sessionStorage.getItem('ten-brains-live-discovery');
   const session = discovery?.sessions.find((item): item is ApiSession => item.id === sessionId && item.type === 'grilling') ?? null;
 
-  async function refresh() {
-    if (!discoveryId) return;
-    const response = await fetch(`/api/discoveries/${discoveryId}`);
-    if (!response.ok) return;
-    const updated: ApiDiscovery = await response.json();
-    setDiscovery(updated);
-    const found = updated.sessions.find((item): item is ApiSession => item.id === sessionId && item.type === 'grilling');
-    if (found) setInquiries(found.lineOfInquiry.map((item) => ({ id: item.id, question: item.question })));
+  function mergeInquiries(found: ApiSession) {
+    setInquiries((current) => found.lineOfInquiry
+      .filter((item) => !dismissedInquiryQuestions.current.has(item.question))
+      .map((item) => {
+        const existing = current.find((draft) => draft.sourceQuestion === item.question);
+        return existing ? { ...existing, id: item.id } : { id: item.id, question: item.question, sourceQuestion: item.question };
+      }));
   }
 
-  useEffect(() => { refresh(); }, [sessionId]);
+  async function refresh(): Promise<ApiSession> {
+    if (!discoveryId) throw new Error('Live discovery is unavailable');
+    const response = await fetch(`/api/discoveries/${discoveryId}`);
+    if (!response.ok) throw new Error('Session could not load');
+    const updated: ApiDiscovery = await response.json();
+    const found = updated.sessions.find((item): item is ApiSession => item.id === sessionId && item.type === 'grilling');
+    if (!found) throw new Error('Session could not load');
+    setDiscovery(updated);
+    mergeInquiries(found);
+    return found;
+  }
 
-  async function sendSessionMessage() {
-    const text = message.trim();
+  useEffect(() => {
+    let cancelled = false;
+    setLoadStatus('loading');
+    setError(null);
+    refresh()
+      .then(() => { if (!cancelled) setLoadStatus('ready'); })
+      .catch(() => {
+        if (!cancelled) {
+          setLoadStatus('error');
+          setError({ kind: 'load', message: 'The session API is not available. Retry the connection or return to the map.' });
+        }
+      });
+    return () => { cancelled = true; };
+  }, [sessionId, loadAttempt]);
+
+  function updateLiveSession(update: (current: ApiSession) => ApiSession) {
+    setDiscovery((current) => current ? {
+      ...current,
+      sessions: current.sessions.map((item) => item.id === sessionId && item.type === 'grilling' ? update(item) : item),
+    } : current);
+  }
+
+  async function sendSessionMessage(textOverride?: string) {
+    const text = (textOverride ?? message).trim();
     if (!text || !discoveryId || !session || working) return;
-    setMessage('');
+    setError(null);
     setWorking(true);
     setStreamedReply('');
-    const response = await fetch(`/api/discoveries/${discoveryId}/sessions/${session.id}/messages`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }),
-    });
-    if (response.ok && response.body) {
+    updateLiveSession((current) => ({
+      ...current,
+      transcript: [
+        ...current.transcript.filter((turn) => turn.id !== 'local-pending-session-turn'),
+        { id: 'local-pending-session-turn', actor: 'You', text, createdAt: new Date().toISOString() },
+      ],
+    }));
+
+    try {
+      const response = await fetch(`/api/discoveries/${discoveryId}/sessions/${session.id}/messages`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }),
+      });
+      if (!response.ok || !response.body) throw new Error('Session turn failed');
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       let reply = '';
+
       while (true) {
         const { value, done } = await reader.read();
         buffer += decoder.decode(value, { stream: !done });
@@ -2212,39 +2298,107 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
           const dataLine = block.match(/^data: (.+)$/m)?.[1];
           if (!event || !dataLine) continue;
           const data = JSON.parse(dataLine);
-          if (event === 'token') { reply += data.text; setStreamedReply(reply); }
-          if (event === 'inquiry') setInquiries((current) => [...current, { id: `local-${Date.now()}`, question: data.question }]);
+          if (event === 'token') {
+            reply += data.text;
+            setStreamedReply(reply);
+          } else if (event === 'candidate') {
+            updateLiveSession((current) => ({ ...current, staged: [...current.staged.filter((candidate) => candidate.id !== data.id), data as ApiCandidate] }));
+          } else if (event === 'inquiry' && typeof data.question === 'string' && !dismissedInquiryQuestions.current.has(data.question)) {
+            setInquiries((current) => current.some((item) => item.sourceQuestion === data.question)
+              ? current
+              : [...current, { id: `local-inquiry-${Date.now()}`, question: data.question, sourceQuestion: data.question }]);
+          } else if (event === 'error') {
+            throw new Error(data.message || 'Wayfinder could not complete this turn.');
+          }
         }
         if (done) break;
       }
+
       await refresh();
+      setMessage((current) => current.trim() === text ? '' : current);
+      setStreamedReply('');
+      setComposerOpen(false);
+    } catch {
+      setMessage(text);
+      setStreamedReply('');
+      setError({ kind: 'stream', message: 'Wayfinder lost the connection. Your message and transcript are ready to retry.' });
+    } finally {
+      setWorking(false);
     }
-    setStreamedReply('');
-    setWorking(false);
   }
 
   async function markMoment() {
-    if (!discoveryId || !session) return;
-    const source = [...session.transcript].reverse().find((turn) => turn.actor === 'You');
+    if (!discoveryId || !session || momentStatus === 'saving') return;
+    const source = [...session.transcript].reverse().find((turn) => turn.actor === 'You' && turn.id !== 'local-pending-session-turn');
     if (!source) return;
-    await fetch(`/api/discoveries/${discoveryId}/sessions/${session.id}/evidence`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: source.text, sourceTurn: source.id }),
-    });
-    await refresh();
+    setMomentStatus('saving');
+    setError(null);
+    try {
+      const response = await fetch(`/api/discoveries/${discoveryId}/sessions/${session.id}/evidence`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: source.text, sourceTurn: source.id }),
+      });
+      if (!response.ok) throw new Error('Evidence could not be captured');
+      await refresh();
+      setMomentStatus('saved');
+      window.setTimeout(() => setMomentStatus('idle'), 1800);
+    } catch {
+      setMomentStatus('idle');
+      setError({ kind: 'moment', message: 'Wayfinder could not mark that moment. Your transcript is unchanged.' });
+    }
   }
 
   async function approveUpdates(candidateIds: string[]) {
     if (!discoveryId || !session) return;
-    const response = await fetch(`/api/discoveries/${discoveryId}/sessions/${session.id}/updates/approve`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ candidateIds }),
-    });
-    if (response.ok) { setReviewOpen(false); await refresh(); }
+    setApproving(true);
+    setApprovalError('');
+    try {
+      const response = await fetch(`/api/discoveries/${discoveryId}/sessions/${session.id}/updates/approve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ candidateIds }),
+      });
+      if (!response.ok) throw new Error('Approval failed');
+      setReviewOpen(false);
+      await refresh();
+    } catch {
+      setApprovalError('Wayfinder could not apply the selected updates. Review the selection, then retry.');
+    } finally {
+      setApproving(false);
+    }
   }
 
-  if (!session) return <div className="app-shell"><SideNav active="session" navigate={navigate} /><main className="main-surface session-main"><p className="p-6">Loading session.</p></main></div>;
-  const transcriptLines = [...session.transcript, ...(streamedReply ? [{ id: 'stream', actor: 'Wayfinder' as const, text: streamedReply, createdAt: new Date().toISOString() }] : [])];
+  function dismissInquiry(item: InquiryDraft) {
+    dismissedInquiryQuestions.current.add(item.sourceQuestion);
+    setInquiries((current) => current.filter((entry) => entry.id !== item.id));
+  }
+
+  const retry = () => {
+    if (error?.kind === 'stream') sendSessionMessage(message);
+    else if (error?.kind === 'load') setLoadAttempt((attempt) => attempt + 1);
+    else if (error?.kind === 'moment') markMoment();
+  };
+
+  if (loadStatus !== 'ready' || !session) {
+    return (
+      <div className="app-shell">
+        <SideNav active="session" navigate={navigate} />
+        <main className="main-surface session-main live-session-load">
+          <Card className="live-session-load-card">
+            {loadStatus === 'loading' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <AlertCircle aria-hidden="true" />}
+            <div><h1>{loadStatus === 'loading' ? 'Loading session' : 'Session unavailable'}</h1><p>{loadStatus === 'loading' ? 'Loading the live transcript and staged updates.' : error?.message}</p></div>
+            {loadStatus === 'error' && <div className="live-session-load-actions"><Button size="sm" onClick={() => setLoadAttempt((attempt) => attempt + 1)}><RotateCcw aria-hidden="true" /> Retry connection</Button><Button variant="outline" size="sm" onClick={() => navigate('/map')}>Back to map</Button></div>}
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  const transcriptLines = [...session.transcript, ...(streamedReply ? [{ id: 'streamed-session-reply', actor: 'Wayfinder' as const, text: streamedReply, createdAt: new Date().toISOString() }] : [])];
+  const lastUserTurn = [...session.transcript].reverse().find((turn) => turn.actor === 'You' && turn.id !== 'local-pending-session-turn');
+  const lastTurnMarked = Boolean(lastUserTurn && session.evidence.some((item) => String(item.sourceTurn) === lastUserTurn.id));
+  const signals = <LiveSessionSignals session={session} onReview={() => { setApprovalError(''); setReviewOpen(true); }} />;
+  const inquiryPanel = <LiveLineOfInquiry inquiries={inquiries} onChange={(id, question) => setInquiries((current) => current.map((item) => item.id === id ? { ...item, question } : item))} onDismiss={dismissInquiry} />;
+
   return (
-    <div className="app-shell session-shell">
+    <div className="app-shell session-shell live-session-shell">
       <SideNav active="session" navigate={navigate} compactBrand />
       <main className="main-surface session-main">
         <header className="topbar session-topbar">
@@ -2254,25 +2408,97 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
         <Card className="objective-card">
           <div className="objective-section wide"><Target aria-hidden="true" className="target-icon" /><div><p className="eyebrow">Objective</p><strong>{session.objective}</strong></div></div>
           <Separator orientation="vertical" /><div className="objective-section"><Target aria-hidden="true" className="target-icon" /><div><p className="eyebrow">Evidence target</p><strong>{session.evidenceTarget}</strong></div></div>
-          <Separator orientation="vertical" /><div className="objective-section progress-summary"><div><p className="eyebrow">Progress</p><strong>{session.evidence.length} captured</strong></div></div>
+          <Separator orientation="vertical" /><div className="objective-section progress-summary"><div><p className="eyebrow">Progress</p><strong><span>{session.evidence.length}</span> captured</strong></div></div>
         </Card>
-        <section className="session-grid">
-          <PanelShell title="Line of Inquiry">
-            {inquiries.length === 0 && <p className="text-sm text-muted-foreground">Wayfinder will suggest the next question.</p>}
-            {inquiries.map((item) => <Card className="probe-card" key={item.id}><CardContent className="probe-content"><Input aria-label="Edit question" value={item.question} onChange={(event) => setInquiries((current) => current.map((entry) => entry.id === item.id ? { ...entry, question: event.target.value } : entry))} /><Button variant="ghost" size="icon-xs" aria-label="Dismiss question" onClick={() => setInquiries((current) => current.filter((entry) => entry.id !== item.id))}><X /></Button></CardContent></Card>)}
-          </PanelShell>
+
+        <Sheet open={drawer !== null} onOpenChange={(open) => !open && setDrawer(null)}>
+          <div className="mobile-session-actions" aria-label="Session drawers"><Button variant="outline" size="sm" onClick={() => setDrawer('inquiry')}>Line of Inquiry</Button><Button variant="outline" size="sm" onClick={() => setDrawer('signals')}>Session Signals</Button></div>
+          <SheetContent className="mobile-drawer live-session-drawer" side="right"><SheetHeader><SheetTitle>{drawer === 'inquiry' ? 'Line of Inquiry' : 'Session Signals'}</SheetTitle><SheetDescription className="sr-only">Live session details</SheetDescription></SheetHeader><div className="drawer-body">{drawer === 'inquiry' ? <LiveLineOfInquiry inquiries={inquiries} onChange={(id, question) => setInquiries((current) => current.map((item) => item.id === id ? { ...item, question } : item))} onDismiss={dismissInquiry} drawer /> : <LiveSessionSignals session={session} onReview={() => { setDrawer(null); setApprovalError(''); setReviewOpen(true); }} drawer />}</div></SheetContent>
+        </Sheet>
+
+        <section className="session-grid live-session-grid">
+          {inquiryPanel}
           <PanelShell title="Live transcript">
-            <div className="transcript-list">{transcriptLines.map((line) => <div className="transcript-row" key={line.id}><time>{new Date(line.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time><strong>{line.actor}</strong><div><p>{line.text}</p></div></div>)}</div>
-            <div className="composer"><Input aria-label="Send to Wayfinder" placeholder="Give Wayfinder one concrete example." value={message} disabled={working} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') sendSessionMessage(); }} /><Button variant="outline" size="sm" onClick={markMoment}><Bookmark aria-hidden="true" /> Mark moment</Button><Button size="sm" disabled={working || !message.trim()} onClick={sendSessionMessage}><SendHorizontal aria-hidden="true" /> Send</Button></div>
+            <LiveSessionTranscript lines={transcriptLines} working={working} />
+            <LiveSessionComposer message={message} working={working} momentStatus={momentStatus} markDisabled={!lastUserTurn || lastTurnMarked} error={error} onMessageChange={(value) => { setMessage(value); if (error?.kind === 'stream') setError(null); }} onSend={() => sendSessionMessage()} onMark={markMoment} onRetry={retry} />
           </PanelShell>
-          <PanelShell title="Session Signals">
-            <div className="signal-section"><h3>Evidence captured</h3>{session.evidence.map((item) => <Card className="evidence-item" key={item.id}><CardContent className="evidence-content"><Bookmark aria-hidden="true" /><span>{item.text}</span></CardContent></Card>)}</div>
-            <div className="signal-section map-updates"><h3>Candidate map updates</h3>{session.staged.map((candidate) => <CandidateUpdate key={candidate.id} tone={candidate.type === 'fog-question' ? 'fog' : candidate.type === 'closed-decision' ? 'decision' : 'frontier'} label={candidate.type === 'fog-question' ? 'Candidate Fog of War question' : candidate.type === 'closed-decision' ? 'Candidate Closed Decision' : 'Candidate Open Frontier ticket'} text={candidate.type === 'fog-question' ? candidate.question : candidate.title} />)}<Button className="review-button" disabled={session.staged.length === 0} onClick={() => setReviewOpen(true)}>Review {session.staged.length} map updates</Button></div>
-          </PanelShell>
+          {signals}
         </section>
       </main>
-      <WayfinderPill status={working ? 'grilling' : 'listening'} expanded />
-      <ReviewMapDialog candidates={session.staged} open={reviewOpen} onOpenChange={setReviewOpen} onApprove={approveUpdates} context="session" />
+      <WayfinderPill status={error?.kind === 'stream' ? 'reconnect needed' : working ? 'working' : 'listening'} expanded />
+      <div className="mobile-live-controls">
+        <Button variant="outline" size="sm" disabled={working || !lastUserTurn || lastTurnMarked || momentStatus === 'saving'} onClick={markMoment}>{momentStatus === 'saving' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : momentStatus === 'saved' || lastTurnMarked ? <CheckCircle2 aria-hidden="true" /> : <Bookmark aria-hidden="true" />}{momentStatus === 'saving' ? 'Saving' : momentStatus === 'saved' || lastTurnMarked ? 'Moment saved' : 'Mark moment'}</Button>
+        <Button size="sm" onClick={() => setComposerOpen(true)}><Mic aria-hidden="true" /> Ask Wayfinder</Button>
+      </div>
+      <Sheet open={composerOpen} onOpenChange={setComposerOpen}><SheetContent side="bottom" className="live-session-composer-sheet"><SheetHeader><SheetTitle>Ask Wayfinder</SheetTitle><SheetDescription>Give one concrete example, constraint, or contradiction.</SheetDescription></SheetHeader><LiveSessionComposer message={message} working={working} momentStatus={momentStatus} markDisabled error={error} mobile onMessageChange={(value) => { setMessage(value); if (error?.kind === 'stream') setError(null); }} onSend={() => sendSessionMessage()} onMark={markMoment} onRetry={retry} /></SheetContent></Sheet>
+      <ReviewMapDialog candidates={session.staged} open={reviewOpen} onOpenChange={(open) => { setReviewOpen(open); if (open) setApprovalError(''); }} onApprove={approveUpdates} approving={approving} error={approvalError} context="session" />
+    </div>
+  );
+}
+
+function LiveLineOfInquiry({ inquiries, onChange, onDismiss, drawer = false }: { inquiries: InquiryDraft[]; onChange: (id: string, question: string) => void; onDismiss: (item: InquiryDraft) => void; drawer?: boolean }) {
+  return (
+    <PanelShell title="Line of Inquiry" drawer={drawer}>
+      {inquiries.length === 0 && <div className="live-session-empty"><CircleHelp aria-hidden="true" /><strong>No suggested question</strong><p>Wayfinder will add a question after a useful turn.</p></div>}
+      {inquiries.map((item, index) => (
+        <Card className={`${index === 0 ? 'recommended-card' : 'probe-card'} live-inquiry-card live-arrival`} key={item.id}>
+          <CardContent className="live-inquiry-content">
+            <div className="live-inquiry-label">{index === 0 && <Sparkles aria-hidden="true" />}<strong>{index === 0 ? 'Next question' : `Question ${index + 1}`}</strong><Button variant="ghost" size="icon-xs" aria-label="Dismiss question" onClick={() => onDismiss(item)}><X /></Button></div>
+            <textarea aria-label="Edit question" value={item.question} onChange={(event) => onChange(item.id, event.target.value)} />
+          </CardContent>
+        </Card>
+      ))}
+    </PanelShell>
+  );
+}
+
+function LiveSessionSignals({ session, onReview, drawer = false }: { session: ApiSession; onReview: () => void; drawer?: boolean }) {
+  return (
+    <PanelShell title="Session Signals" drawer={drawer}>
+      <div className="signal-section">
+        <h3>Evidence captured</h3>
+        {session.evidence.length === 0 && <p className="live-signal-empty">Mark a concrete moment to add evidence.</p>}
+        {session.evidence.map((item) => <Card className="evidence-item live-arrival" key={item.id}><CardContent className="evidence-content live-evidence-content"><Bookmark aria-hidden="true" /><span><strong>{item.id}</strong>{item.text}</span></CardContent></Card>)}
+      </div>
+      <div className="signal-section map-updates">
+        <h3>Candidate map updates</h3>
+        {session.staged.length === 0 && <p className="live-signal-empty">Wayfinder has not staged an update.</p>}
+        {session.staged.map((candidate) => <div className="live-arrival" key={candidate.id}><CandidateUpdate tone={candidate.type === 'fog-question' ? 'fog' : candidate.type === 'closed-decision' ? 'decision' : 'frontier'} label={candidate.type === 'fog-question' ? 'Candidate Fog of War question' : candidate.type === 'closed-decision' ? 'Candidate Closed Decision' : 'Candidate Open Frontier ticket'} text={candidate.type === 'fog-question' ? candidate.question : candidate.title} /></div>)}
+        <Button className="review-button" disabled={session.staged.length === 0} onClick={onReview}>Review {session.staged.length} map {session.staged.length === 1 ? 'update' : 'updates'}</Button>
+      </div>
+    </PanelShell>
+  );
+}
+
+function LiveSessionTranscript({ lines, working }: { lines: ApiSession['transcript']; working: boolean }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
+  const lastText = lines.at(-1)?.text ?? '';
+  useEffect(() => {
+    if (!stickToBottom.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (viewportRef.current) viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [lastText, lines.length, working]);
+
+  return (
+    <div ref={viewportRef} className="live-transcript-viewport" role="log" aria-label="Messages between You and Wayfinder" aria-busy={working} aria-live="polite" onScroll={(event) => { const viewport = event.currentTarget; stickToBottom.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 64; }}>
+      <div className="transcript-list live-transcript-list">
+        {lines.map((line) => <div className={`transcript-row ${line.id === 'streamed-session-reply' ? 'is-streaming' : ''}`} key={line.id}><time>{new Date(line.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time><strong>{line.actor}</strong><div><p>{line.text}</p></div></div>)}
+        {working && <div className="live-session-working" role="status"><LoaderCircle aria-hidden="true" className="animate-spin" /><span>Wayfinder is working</span></div>}
+      </div>
+    </div>
+  );
+}
+
+function LiveSessionComposer({ message, working, momentStatus, markDisabled, error, mobile = false, onMessageChange, onSend, onMark, onRetry }: { message: string; working: boolean; momentStatus: 'idle' | 'saving' | 'saved'; markDisabled: boolean; error: LiveSessionError | null; mobile?: boolean; onMessageChange: (message: string) => void; onSend: () => void; onMark: () => void; onRetry: () => void }) {
+  return (
+    <div className={mobile ? 'live-mobile-composer' : 'composer live-session-composer'}>
+      <Input aria-label="Send to Wayfinder" placeholder="Give Wayfinder one concrete example." value={message} disabled={working} onChange={(event) => onMessageChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onSend(); }} />
+      {!mobile && <Button variant="outline" size="sm" disabled={working || markDisabled || momentStatus === 'saving'} onClick={onMark}>{momentStatus === 'saving' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : momentStatus === 'saved' ? <CheckCircle2 aria-hidden="true" /> : <Bookmark aria-hidden="true" />}{momentStatus === 'saving' ? 'Saving moment' : momentStatus === 'saved' ? 'Moment saved' : 'Mark moment'}</Button>}
+      <Button size="sm" disabled={working || !message.trim()} onClick={onSend}>{working ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <SendHorizontal aria-hidden="true" />}{working ? 'Working' : 'Send'}</Button>
+      {error && error.kind !== 'approve' && <div className="live-session-error" role="alert"><AlertCircle aria-hidden="true" /><p>{error.message}</p><Button variant="outline" size="sm" onClick={onRetry}><RotateCcw aria-hidden="true" /> Retry</Button></div>}
     </div>
   );
 }

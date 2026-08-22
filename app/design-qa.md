@@ -82,3 +82,14 @@ passed
 - Responsive and theme QA: actual theme controls switched dark and light at 1440 × 900, 700 × 900, and 390 × 844. Evidence is in `../qa-live-intake/intake-{dark|light}-{700|390}.png` and `staged-drawer-light-390.png`; document overflow was zero and the mobile transcript, fixed composer, staged-map Sheet, and toolbar remained reachable without clipped controls.
 - Regression routes: `../qa-live-intake/regression-{demo-map|grilling|evidence|spec}-dark-1440.png` confirms the demo map, grilling session, evidence, and Discovery Spec remained visually unchanged with zero document overflow.
 - Final result: passed
+
+## Live grilling session
+
+- Live-path evidence: `../qa-live-intake/grilling-session-dark-1440.png`, `grilling-error-dark-1440.png`, `grilling-review-dark-1440.png`, and `grilling-approved-light-1440.png` capture a real mock-provider session with streamed turns, editable Line of Inquiry suggestions, marked evidence, nine staged map updates, an interrupted request, review, and approval.
+- Streaming and recovery: the transcript follows tokens only while You remain near its bottom, preserves scroll position after You scroll up, keeps the composer disabled while `Wayfinder is working`, and preserves the typed message plus transcript behind an inline danger-token retry state when the connection drops.
+- Signals and review: Mark moment reports saving and saved states before the new evidence row appears; SSE inquiry and candidate events enter with a restrained 180ms motion that the global reduced-motion rule suppresses; the review label and approval dialog use the live staged count.
+- Session map: `../qa-live-intake/grilling-map-{dark|light}-{1440|700|390}.png` verifies a real session with multiple turns, two evidence branches, nine candidate branches, and an awaiting-review outcome. Candidate branches attach to their recorded staged turn, narrow views open on the computed spine center, and both horizontal and vertical map overflow remain inside the focusable map region.
+- Responsive and theme QA: dark and light passed at 1440 × 900, 700 × 900, and 390 × 844 for the live session and live map. The live transcript and map are viewport-contained, mobile drawers and the fixed composer remain reachable, and horizontal document overflow was zero at every size.
+- Demo regression: `../qa-live-intake/grilling-demo-{dark|light}-{1440|700|390}.png` covers the unchanged `/sessions/grilling` route; no demo component markup or demo-scoped style was modified.
+- Build and console: the Node 22 production build completed without TypeScript errors, and the Playwright run passed the live flow, recovery, approval, both themes, and all three QA viewports.
+- Final result: passed
