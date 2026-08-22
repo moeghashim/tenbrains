@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="1470" viewBox="0 0 1140 1470" role="img" aria-labelledby="title desc">
+  <title id="title">How a Ten Brains discovery session moves</title>
+  <desc id="desc">A flowchart from setting the Destination through choosing an Open Frontier ticket, running one of four ticket types, writing a Closed Decision, and either continuing or producing the Discovery Spec.</desc>
+
+  <defs>
+    <style><![CDATA[
+      text {
+        font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+      .title { fill: #e5ddca; font-size: 24px; font-weight: 650; letter-spacing: -0.55px; }
+      .eyebrow { fill: #f08a52; font-size: 12px; font-weight: 650; }
+      .subtitle { fill: #bbb4a3; font-size: 13px; }
+      .node { fill: #383e43; stroke: rgba(221, 214, 195, 0.13); stroke-width: 1; }
+      .node-title { fill: #e5ddca; font-size: 16px; font-weight: 650; letter-spacing: -0.18px; }
+      .node-copy { fill: #bbb4a3; font-size: 13px; }
+      .node-copy-strong { fill: #d0c7b1; font-size: 13px; }
+      .type-title { fill: #e5ddca; font-size: 15px; font-weight: 650; }
+      .type-copy { fill: #bbb4a3; font-size: 12.5px; }
+      .decision-label { fill: #f08a52; font-size: 14px; font-weight: 650; }
+      .branch-label { fill: #d0c7b1; font-size: 12px; font-weight: 650; }
+      .path { fill: none; stroke: #f08a52; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .path-branch { fill: none; stroke: #f08a52; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.78; }
+      .path-fog { fill: none; stroke: #f0a95d; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    ]]></style>
+
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f08a52"/>
+    </marker>
+    <marker id="arrow-fog" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f0a95d"/>
+    </marker>
+  </defs>
+
+  <rect width="1140" height="1470" fill="#2f353b"/>
+
+  <!-- Header -->
+  <text x="56" y="42" class="eyebrow">Ten Brains · Discovery map</text>
+  <text x="56" y="76" class="title">How a discovery session moves</text>
+  <text x="56" y="104" class="subtitle">Lines show the path You take through one discovery.</text>
+  <line x1="56" y1="128" x2="1084" y2="128" stroke="rgba(221, 214, 195, 0.13)"/>
+
+  <!-- Primary action path -->
+  <path d="M570 222 V246" class="path" marker-end="url(#arrow-accent)"/>
+  <path d="M570 326 V350" class="path" marker-end="url(#arrow-accent)"/>
+  <path d="M570 434 V458" class="path" marker-end="url(#arrow-accent)"/>
+  <path d="M570 498 V548" class="path" marker-end="url(#arrow-accent)"/>
+  <path d="M570 624 V658" class="path" marker-end="url(#arrow-accent)"/>
+
+  <!-- Fog branch -->
+  <path d="M550 478 H300 V524" class="path-fog" marker-end="url(#arrow-fog)"/>
+  <text x="318" y="468" fill="#f0a95d" font-size="12" font-weight="650">no · only fog</text>
+  <path d="M206 680 V700" class="path-fog" marker-end="url(#arrow-fog)"/>
+
+  <!-- Ticket type split and join -->
+  <path d="M570 698 V752" class="path"/>
+  <path d="M161 752 H979" class="path-branch"/>
+  <path d="M161 752 V790 M433 752 V790 M707 752 V790 M979 752 V790" class="path-branch" marker-end="url(#arrow-accent)"/>
+  <path d="M161 890 V930 M433 890 V930 M707 890 V930 M979 890 V930" class="path-branch"/>
+  <path d="M161 930 H979" class="path-branch"/>
+  <path d="M570 930 V970" class="path" marker-end="url(#arrow-accent)"/>
+  <path d="M570 1054 V1094" class="path" marker-end="url(#arrow-accent)"/>
+  <path d="M570 1174 V1192" class="path" marker-end="url(#arrow-accent)"/>
+  <path d="M570 1232 V1290" class="path" marker-end="url(#arrow-accent)"/>
+
+  <!-- Continue loop: keep this outside the work path -->
+  <path d="M590 1212 H1100 V458 H778 V392 H750" class="path" marker-end="url(#arrow-accent)"/>
+  <text x="900" y="448" class="decision-label">yes · scan again</text>
+
+  <!-- Start -->
+  <rect x="390" y="146" width="360" height="76" rx="12" fill="rgba(240, 138, 82, 0.10)" stroke="rgba(240, 138, 82, 0.48)"/>
+  <text x="416" y="178" class="node-title" fill="#f08a52">Start</text>
+  <text x="416" y="203" class="node-copy-strong">Set the Destination</text>
+
+  <!-- Open the map -->
+  <rect x="390" y="246" width="360" height="80" rx="12" class="node"/>
+  <text x="416" y="279" class="node-title">Open the map</text>
+  <text x="416" y="304" class="node-copy">One discovery</text>
+
+  <!-- Scan the board -->
+  <rect x="390" y="350" width="360" height="84" rx="12" class="node"/>
+  <text x="416" y="384" class="node-title">Scan the board</text>
+  <text x="416" y="410" class="node-copy">Open Frontier vs Fog of War</text>
+
+  <!-- Fog annotation -->
+  <rect x="806" y="338" width="260" height="86" rx="12" fill="#383e43" stroke="rgba(240, 169, 93, 0.35)"/>
+  <line x1="822" y1="356" x2="822" y2="406" stroke="#f0a95d" stroke-width="2" stroke-linecap="round"/>
+  <text x="840" y="371" fill="#f0a95d" font-size="13" font-weight="650">Fog sits beside the path</text>
+  <text x="840" y="396" class="node-copy">See it coming. Ticket it later.</text>
+
+  <!-- Open Frontier decision -->
+  <path d="M570 458 L590 478 L570 498 L550 478 Z" fill="#383e43" stroke="#f08a52" stroke-width="2"/>
+  <circle cx="570" cy="478" r="3" fill="#f08a52"/>
+  <text x="604" y="483" class="decision-label">Any Open Frontier tickets?</text>
+  <text x="582" y="526" class="branch-label">yes</text>
+
+  <!-- Only fog left -->
+  <rect x="56" y="524" width="300" height="156" rx="12" fill="rgba(240, 169, 93, 0.09)" stroke="rgba(240, 169, 93, 0.42)"/>
+  <text x="80" y="558" fill="#f0a95d" font-size="16" font-weight="650">Only fog left</text>
+  <text x="80" y="588" class="node-copy-strong">Mark what You can see</text>
+  <text x="80" y="614" class="node-copy-strong">Do not invent tickets</text>
+  <text x="80" y="640" class="node-copy-strong">Wait on blockers</text>
+  <line x1="80" y1="658" x2="332" y2="658" stroke="rgba(221, 214, 195, 0.13)"/>
+  <text x="80" y="673" fill="#bbb4a3" font-size="11">Resume when the map changes</text>
+  <rect x="132" y="708" width="148" height="34" rx="12" fill="#383e43" stroke="rgba(240, 169, 93, 0.35)"/>
+  <text x="158" y="730" fill="#f0a95d" font-size="12" font-weight="650">Next session</text>
+
+  <!-- Pick a ticket -->
+  <rect x="390" y="548" width="360" height="76" rx="12" class="node"/>
+  <text x="416" y="580" class="node-title">Pick one ticket</text>
+  <text x="416" y="605" class="node-copy">Open Frontier only</text>
+
+  <!-- Ticket type decision -->
+  <path d="M570 658 L590 678 L570 698 L550 678 Z" fill="#383e43" stroke="#f08a52" stroke-width="2"/>
+  <circle cx="570" cy="678" r="3" fill="#f08a52"/>
+  <text x="604" y="683" class="decision-label">Which ticket type?</text>
+
+  <!-- Ticket types -->
+  <rect x="46" y="790" width="230" height="100" rx="12" class="node"/>
+  <text x="68" y="824" class="type-title">Grilling</text>
+  <text x="68" y="853" class="type-copy">Wayfinder grills You</text>
+  <text x="68" y="875" class="type-copy">Force one choice</text>
+
+  <rect x="318" y="790" width="230" height="100" rx="12" class="node"/>
+  <text x="340" y="824" class="type-title">Prototype</text>
+  <text x="340" y="853" class="type-copy">Build a cheap draft</text>
+  <text x="340" y="875" class="type-copy">React to it</text>
+
+  <rect x="592" y="790" width="230" height="100" rx="12" class="node"/>
+  <text x="614" y="824" class="type-title">Research</text>
+  <text x="614" y="853" class="type-copy">Collect external evidence</text>
+  <text x="614" y="875" class="type-copy">Answer one question</text>
+
+  <rect x="864" y="790" width="230" height="100" rx="12" class="node"/>
+  <text x="886" y="824" class="type-title">Synthesis</text>
+  <text x="886" y="853" class="type-copy">Merge the evidence</text>
+  <text x="886" y="875" class="type-copy">Decide</text>
+
+  <!-- Closed Decision -->
+  <rect x="370" y="970" width="400" height="84" rx="12" fill="rgba(155, 210, 124, 0.10)" stroke="rgba(155, 210, 124, 0.44)"/>
+  <text x="396" y="1004" fill="#9bd27c" font-size="16" font-weight="650">Write a Closed Decision</text>
+  <text x="396" y="1030" class="node-copy-strong">Add evidence links</text>
+
+  <!-- Refresh -->
+  <rect x="390" y="1094" width="360" height="80" rx="12" class="node"/>
+  <text x="416" y="1127" class="node-title">Refresh the board</text>
+  <text x="416" y="1153" class="node-copy">Fog of War → new tickets?</text>
+
+  <!-- Continue decision -->
+  <path d="M570 1192 L590 1212 L570 1232 L550 1212 Z" fill="#383e43" stroke="#f08a52" stroke-width="2"/>
+  <circle cx="570" cy="1212" r="3" fill="#f08a52"/>
+  <text x="604" y="1194" class="decision-label">More to do on the map?</text>
+  <text x="582" y="1262" class="branch-label">no</text>
+
+  <!-- Done -->
+  <rect x="350" y="1290" width="440" height="118" rx="12" fill="rgba(155, 210, 124, 0.10)" stroke="rgba(155, 210, 124, 0.44)"/>
+  <text x="376" y="1324" fill="#9bd27c" font-size="16" font-weight="650">Done</text>
+  <text x="376" y="1352" class="node-copy-strong">Closed Decisions form the Discovery Spec</text>
+  <text x="376" y="1380" class="node-copy">Stop · ship from the spec</text>
+
+  <text x="56" y="1440" fill="#bbb4a3" font-size="11">One discovery · one map · one decision path</text>
+</svg>
