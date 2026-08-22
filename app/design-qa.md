@@ -72,3 +72,13 @@ passed
 - Fidelity surfaces: system-monospace type, 12px geometry, restrained dashed borders, theme-variable colors, warm semantic accents, and existing controlled copy remain consistent. The diagram is native SVG, so there are no raster asset or image-quality deviations; all visible fog cards remain one question and end with `?`.
 - Console: no page errors occurred. Opening the existing mobile navigation for the actual theme-toggle check reproduced the pre-existing Radix `SheetOverlay` ref warning documented above; it does not originate in either session map.
 - Final result: passed
+
+## Live intake states
+
+- Live-path evidence: `../qa-live-intake/working-dark-1440.png`, `staged-dark-1440.png`, `review-dark-1440.png`, `approved-loading-dark-1440.png`, and `approved-dark-1440.png` capture one real create, SSE turn, candidate review, approval, GET loading, and approved-map sequence against the Phase-1 API.
+- Streaming: the composer keeps the submitted message visible but disabled, the transcript shows one stable live Wayfinder turn, `Wayfinder is working` appears in the header and transcript, and the view follows new tokens without smooth-scroll or layout animation. New staged candidates use a 180ms fade and 4px rise; the global reduced-motion rule reduces this to 0.01ms.
+- Errors and recovery: `../qa-live-intake/error-light-1440.png` captures an aborted message request with the exact typed message preserved, a danger-token inline explanation, and `Retry turn`; `error-sse-light-1440.png` exercises the same recovery for an SSE `error` event. Both retry paths completed against the live API without duplicate optimistic turns.
+- Map runtime states: approval now transitions to a GET-driven loading surface before rendering only approved API data; an unavailable GET keeps saved items intact and exposes `Retry map`. The empty map remains the intentional empty state and no demo arrays render on the live path.
+- Responsive and theme QA: actual theme controls switched dark and light at 1440 × 900, 700 × 900, and 390 × 844. Evidence is in `../qa-live-intake/intake-{dark|light}-{700|390}.png` and `staged-drawer-light-390.png`; document overflow was zero and the mobile transcript, fixed composer, staged-map Sheet, and toolbar remained reachable without clipped controls.
+- Regression routes: `../qa-live-intake/regression-{demo-map|grilling|evidence|spec}-dark-1440.png` confirms the demo map, grilling session, evidence, and Discovery Spec remained visually unchanged with zero document overflow.
+- Final result: passed

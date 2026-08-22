@@ -499,6 +499,22 @@ a,
   box-shadow: var(--shadow-sm);
 }
 
+.staged-candidate-enter {
+  animation: staged-candidate-enter 180ms ease-out both;
+}
+
+@keyframes staged-candidate-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 [data-slot="dialog-content"] {
   box-shadow: var(--shadow-dialog);
 }
@@ -2514,6 +2530,15 @@ a,
 
   .intake-composer-shell {
     border-radius: 18px;
+  }
+
+  .intake-error-state {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .intake-error-state button {
+    width: 100%;
   }
 }
 

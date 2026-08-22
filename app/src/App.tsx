@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import {
+  AlertCircle,
   ArrowRight,
   AudioLines,
   Bookmark,
@@ -17,6 +18,7 @@ import {
   HelpCircle,
   Inbox,
   Keyboard,
+  LoaderCircle,
   Map as MapIcon,
   Menu,
   MessageSquareText,
@@ -28,6 +30,7 @@ import {
   Pencil,
   Plus,
   PlusCircle,
+  RotateCcw,
   SendHorizontal,
   Settings,
   Sparkles,
@@ -125,6 +128,9 @@ type ApiDiscovery = {
   };
   staged: ApiCandidate[];
 };
+
+type LiveDiscoveryStatus = 'loading' | 'ready' | 'error';
+type IntakeError = { kind: 'load' | 'turn'; message: string };
 
 type StagedFrontierTicket = {
   title: string;
@@ -553,6 +559,12 @@ function App() {
   const [route, setRoute] = useState<RouteName>(getRouteFromPath);
   const [locationKey, setLocationKey] = useState(() => window.location.pathname + window.location.search + window.location.hash);
   const [liveDiscovery, setLiveDiscovery] = useState<ApiDiscovery | null>(null);
+  const [liveDiscoveryStatus, setLiveDiscoveryStatus] = useState<LiveDiscoveryStatus>(() => {
+    const hasStoredDiscovery = Boolean(window.sessionStorage.getItem('ten-brains-live-discovery'));
+    const isLiveMap = getRouteFromPath() === 'map' && new URLSearchParams(window.location.search).get('demo') !== '1';
+    return hasStoredDiscovery && isLiveMap ? 'loading' : 'ready';
+  });
+  const [mapLoadAttempt, setMapLoadAttempt] = useState(0);
 
   useEffect(() => {
     const syncLocation = () => {
@@ -564,13 +576,31 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (route !== 'map' || new URLSearchParams(window.location.search).get('demo') === '1') return;
     const discoveryId = window.sessionStorage.getItem('ten-brains-live-discovery');
-    if (!discoveryId || new URLSearchParams(window.location.search).get('demo') === '1') return;
+    if (!discoveryId) {
+      setLiveDiscovery(null);
+      setLiveDiscoveryStatus('ready');
+      return;
+    }
+    let cancelled = false;
+    setLiveDiscovery(null);
+    setLiveDiscoveryStatus('loading');
     fetch(`/api/discoveries/${discoveryId}`)
-      .then((response) => response.ok ? response.json() : null)
-      .then((discovery: ApiDiscovery | null) => discovery && setLiveDiscovery(discovery))
-      .catch(() => undefined);
-  }, [route]);
+      .then((response) => {
+        if (!response.ok) throw new Error('Discovery map could not load');
+        return response.json();
+      })
+      .then((discovery: ApiDiscovery) => {
+        if (cancelled) return;
+        setLiveDiscovery(discovery);
+        setLiveDiscoveryStatus('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setLiveDiscoveryStatus('error');
+      });
+    return () => { cancelled = true; };
+  }, [route, locationKey, mapLoadAttempt]);
 
   function navigate(path: string) {
     window.history.pushState({}, '', path);
@@ -579,7 +609,9 @@ function App() {
   }
 
   function createMap(discovery: ApiDiscovery) {
-    setLiveDiscovery(discovery);
+    window.sessionStorage.setItem('ten-brains-live-discovery', discovery.id);
+    setLiveDiscovery(null);
+    setLiveDiscoveryStatus('loading');
     navigate('/map');
   }
 
@@ -602,7 +634,12 @@ function App() {
       ) : route === 'how-it-works' ? (
         <HowItWorksView navigate={navigate} />
       ) : (
-        <MapOverview navigate={navigate} liveDiscovery={liveDiscovery} />
+        <MapOverview
+          navigate={navigate}
+          liveDiscovery={liveDiscovery}
+          liveDiscoveryStatus={liveDiscoveryStatus}
+          onRetryLiveMap={() => setMapLoadAttempt((attempt) => attempt + 1)}
+        />
       )}
     </TooltipProvider>
   );
@@ -796,16 +833,29 @@ function DiscoveriesCrumb({ navigate }: { navigate: (path: string) => void }) {
   );
 }
 
-function MapOverview({ navigate, liveDiscovery }: { navigate: (path: string) => void; liveDiscovery: ApiDiscovery | null }) {
+function MapOverview({
+  navigate,
+  liveDiscovery,
+  liveDiscoveryStatus,
+  onRetryLiveMap,
+}: {
+  navigate: (path: string) => void;
+  liveDiscovery: ApiDiscovery | null;
+  liveDiscoveryStatus: LiveDiscoveryStatus;
+  onRetryLiveMap: () => void;
+}) {
   const [segment, setSegment] = useState<MapSegment>('frontier');
   const isDemoMap = new URLSearchParams(window.location.search).get('demo') === '1';
+  const isLoadingMap = !isDemoMap && liveDiscoveryStatus === 'loading';
+  const hasMapError = !isDemoMap && liveDiscoveryStatus === 'error';
   const liveMap = isDemoMap ? null : liveDiscovery?.map;
   const displayedTickets = liveMap?.openFrontier ?? frontierTickets;
   const displayedFog = liveMap?.fogOfWar.map((item) => item.question) ?? fogQuestions;
   const displayedDecisions = liveMap?.closedDecisions ?? closedDecisions;
   const hasLiveMap = Boolean(liveMap && (liveMap.destination || displayedTickets.length || displayedFog.length || displayedDecisions.length));
-  const isEmptyMap = !isDemoMap && !hasLiveMap;
+  const isEmptyMap = !isDemoMap && liveDiscoveryStatus === 'ready' && !hasLiveMap;
   const clarity = isDemoMap ? 62 : Math.min(100, (liveMap?.destination ? 30 : 10) + (displayedTickets.length + displayedFog.length + displayedDecisions.length) * 10);
+  const mapStatus = isLoadingMap ? 'Loading' : hasMapError ? 'Unavailable' : isEmptyMap ? 'Empty' : 'Active';
 
   return (
     <div className="app-shell">
@@ -817,13 +867,17 @@ function MapOverview({ navigate, liveDiscovery }: { navigate: (path: string) => 
             <span aria-hidden="true" className="breadcrumb-slash">/</span>
             <strong>{isEmptyMap ? 'Untitled discovery' : (isDemoMap ? 'AI onboarding assistant' : (liveDiscovery?.name ?? 'Untitled discovery'))}</strong>
             <Badge variant="outline" className="status-badge active">
-              <Circle aria-hidden="true" className="status-icon" /> {isEmptyMap ? 'Empty' : 'Active'}
+              {isLoadingMap ? <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" /> : <Circle aria-hidden="true" className="status-icon" />} {mapStatus}
             </Badge>
           </div>
           <MoreMenu label="Discovery options" />
         </header>
 
-        {isEmptyMap ? (
+        {isLoadingMap ? (
+          <MapLoadingState />
+        ) : hasMapError ? (
+          <MapLoadErrorState onRetry={onRetryLiveMap} />
+        ) : isEmptyMap ? (
           <EmptyMapState navigate={navigate} />
         ) : (
           <>
@@ -884,8 +938,35 @@ function MapOverview({ navigate, liveDiscovery }: { navigate: (path: string) => 
           </>
         )}
       </main>
-      {!isEmptyMap && <WayfinderPill status={isDemoMap ? 'synthesizing 2 evidence statements' : 'showing approved map items'} />}
+      {!isEmptyMap && !isLoadingMap && !hasMapError && <WayfinderPill status={isDemoMap ? 'synthesizing 2 evidence statements' : 'showing approved map items'} />}
     </div>
+  );
+}
+
+function MapLoadingState() {
+  return (
+    <Card className="mt-4 border-[var(--border-subtle)] bg-card shadow-none">
+      <CardContent className="flex min-h-[360px] flex-col items-center justify-center px-6 py-16 text-center" role="status" aria-live="polite">
+        <LoaderCircle aria-hidden="true" className="mb-4 size-5 animate-spin text-[var(--workbench-accent)]" />
+        <h1 className="text-base font-semibold text-[var(--text)]">Loading the approved map</h1>
+        <p className="mt-2 max-w-md text-sm text-[var(--text-muted)]">Ten Brains is reading the latest approved items.</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MapLoadErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Card className="mt-4 border-[var(--danger-border)] bg-[var(--danger-soft)] shadow-none">
+      <CardContent className="flex min-h-[360px] flex-col items-center justify-center px-6 py-16 text-center" role="alert">
+        <AlertCircle aria-hidden="true" className="mb-4 size-5 text-[var(--danger)]" />
+        <h1 className="text-base font-semibold text-[var(--text)]">The approved map did not load</h1>
+        <p className="mt-2 max-w-md text-sm text-[var(--text-muted)]">Your approved items remain saved. Retry the map request.</p>
+        <Button variant="outline" className="mt-5 border-[var(--danger-border)] bg-[var(--surface)]" onClick={onRetry}>
+          <RotateCcw aria-hidden="true" /> Retry map
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1024,11 +1105,17 @@ function DiscoveryIntake({
   const [message, setMessage] = useState('');
   const [streamedReply, setStreamedReply] = useState('');
   const [working, setWorking] = useState(false);
-  const [error, setError] = useState('');
+  const [initializing, setInitializing] = useState(true);
+  const [error, setError] = useState<IntakeError | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [approving, setApproving] = useState(false);
+  const [approvalError, setApprovalError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     async function loadDiscovery() {
+      setInitializing(true);
+      setError(null);
       try {
         const storedId = window.sessionStorage.getItem('ten-brains-live-discovery');
         let response = storedId ? await fetch(`/api/discoveries/${storedId}`) : null;
@@ -1038,32 +1125,41 @@ function DiscoveryIntake({
         if (!response.ok) throw new Error('Discovery could not start');
         const loaded: ApiDiscovery = await response.json();
         window.sessionStorage.setItem('ten-brains-live-discovery', loaded.id);
-        if (!cancelled) setDiscovery(loaded);
+        if (!cancelled) {
+          setDiscovery(loaded);
+          setError(null);
+        }
       } catch {
-        if (!cancelled) setError('Wayfinder could not start this discovery. Start the local API and try again.');
+        if (!cancelled) setError({ kind: 'load', message: 'The discovery API is not available. Start it, then retry.' });
+      } finally {
+        if (!cancelled) setInitializing(false);
       }
     }
     loadDiscovery();
     return () => { cancelled = true; };
-  }, []);
+  }, [loadAttempt]);
 
-  async function sendMessage() {
-    const text = message.trim();
+  async function sendMessage(textOverride?: string) {
+    const text = (textOverride ?? message).trim();
     if (!text || !discovery || working) return;
-    setMessage('');
-    setError('');
+    setError(null);
     setWorking(true);
     setStreamedReply('');
     const optimistic = {
-      id: `local-${Date.now()}`,
+      id: 'local-pending-turn',
       actor: 'You' as const,
       text,
       createdAt: new Date().toISOString(),
     };
-    setDiscovery({
-      ...discovery,
-      transcripts: { intake: [...discovery.transcripts.intake, optimistic] },
-    });
+    setDiscovery((current) => current ? {
+      ...current,
+      transcripts: {
+        intake: [
+          ...current.transcripts.intake.filter((entry) => entry.id !== optimistic.id),
+          optimistic,
+        ],
+      },
+    } : current);
 
     try {
       const response = await fetch(`/api/discoveries/${discovery.id}/intake/messages`, {
@@ -1106,11 +1202,14 @@ function DiscoveryIntake({
       if (!refreshed.ok) throw new Error('Discovery refresh failed');
       setDiscovery(await refreshed.json());
       setStreamedReply('');
+      setMessage((current) => current.trim() === text ? '' : current);
     } catch {
-      setError('Wayfinder could not complete this turn. Try again.');
       const refreshed = await fetch(`/api/discoveries/${discovery.id}`).catch(() => null);
       if (refreshed?.ok) setDiscovery(await refreshed.json());
       setStreamedReply('');
+      setMessage(text);
+      setWorking(false);
+      setError({ kind: 'turn', message: 'Wayfinder could not complete this turn. Your message is ready to retry.' });
     } finally {
       setWorking(false);
     }
@@ -1118,6 +1217,8 @@ function DiscoveryIntake({
 
   async function approveCandidates(candidateIds: string[]) {
     if (!discovery) return;
+    setApproving(true);
+    setApprovalError('');
     try {
       const response = await fetch(`/api/discoveries/${discovery.id}/intake/approve`, {
         method: 'POST',
@@ -1129,7 +1230,9 @@ function DiscoveryIntake({
       setDiscovery(updated);
       onCreateMap(updated);
     } catch {
-      setError('Wayfinder could not apply the selected items. Try again.');
+      setApprovalError('Wayfinder could not apply the selected items. Review the selection, then retry.');
+    } finally {
+      setApproving(false);
     }
   }
 
@@ -1171,8 +1274,14 @@ function DiscoveryIntake({
                 <CardTitle className="text-sm font-semibold tracking-[-0.01em]">Discovery session with Wayfinder</CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">Two actors · You approve staged changes</p>
               </div>
-              <Badge variant="secondary" className="gap-1.5 bg-[var(--workbench-accent-soft)] text-xs text-[var(--workbench-accent)]">
-                <Sparkles aria-hidden="true" className="size-3" /> {working ? 'Wayfinder working' : 'Wayfinder ready'}
+              <Badge
+                variant="secondary"
+                className={`gap-1.5 text-xs ${error ? 'bg-[var(--danger-soft)] text-[var(--danger)]' : 'bg-[var(--workbench-accent-soft)] text-[var(--workbench-accent)]'}`}
+                role="status"
+                aria-live="polite"
+              >
+                {error ? <AlertCircle aria-hidden="true" className="size-3" /> : working || initializing ? <LoaderCircle aria-hidden="true" className="size-3 animate-spin" /> : <Sparkles aria-hidden="true" className="size-3" />}
+                {error ? 'Retry needed' : working ? 'Wayfinder is working' : initializing ? 'Starting discovery' : 'Wayfinder is ready'}
               </Badge>
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col p-0">
@@ -1186,14 +1295,22 @@ function DiscoveryIntake({
                     className="border-0 bg-transparent shadow-none focus-visible:ring-0"
                     value={message}
                     disabled={!discovery || working}
-                    onChange={(event) => setMessage(event.target.value)}
+                    onChange={(event) => {
+                      setMessage(event.target.value);
+                      if (error?.kind === 'turn') setError(null);
+                    }}
                     onKeyDown={(event) => { if (event.key === 'Enter') sendMessage(); }}
                   />
-                  <Button className="h-10 bg-[var(--workbench-accent)] hover:bg-[var(--workbench-accent-hover)]" type="button" disabled={!discovery || working || !message.trim()} onClick={sendMessage}>
-                    <SendHorizontal aria-hidden="true" /> Send
+                  <Button className="h-10 bg-[var(--workbench-accent)] hover:bg-[var(--workbench-accent-hover)]" type="button" disabled={!discovery || working || !message.trim()} onClick={() => sendMessage()}>
+                    {working ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <SendHorizontal aria-hidden="true" />} {working ? 'Working' : 'Send'}
                   </Button>
                 </div>
-                {error && <p role="alert" className="mx-auto mt-2 max-w-[800px] text-xs text-destructive">{error}</p>}
+                {error && (
+                  <IntakeErrorState
+                    error={error}
+                    onRetry={() => error.kind === 'load' ? setLoadAttempt((attempt) => attempt + 1) : sendMessage(message)}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1216,15 +1333,48 @@ function DiscoveryIntake({
         </SheetContent>
       </Sheet>
 
-      <ReviewMapDialog candidates={staged} open={reviewOpen} onOpenChange={setReviewOpen} onApprove={approveCandidates} />
+      <ReviewMapDialog
+        candidates={staged}
+        open={reviewOpen}
+        onOpenChange={(open) => {
+          setReviewOpen(open);
+          if (open) setApprovalError('');
+        }}
+        onApprove={approveCandidates}
+        approving={approving}
+        error={approvalError}
+      />
+    </div>
+  );
+}
+
+function IntakeErrorState({ error, onRetry }: { error: IntakeError; onRetry: () => void }) {
+  return (
+    <div className="intake-error-state mx-auto mt-2 flex max-w-[800px] items-center gap-3 rounded-lg border border-[var(--danger-border)] bg-[var(--danger-soft)] px-3 py-2.5" role="alert">
+      <AlertCircle aria-hidden="true" className="size-4 shrink-0 text-[var(--danger)]" />
+      <p className="min-w-0 flex-1 text-xs leading-5 text-[var(--text-secondary)]">{error.message}</p>
+      <Button variant="outline" size="sm" className="shrink-0 border-[var(--danger-border)] bg-[var(--surface)]" onClick={onRetry}>
+        <RotateCcw aria-hidden="true" /> {error.kind === 'load' ? 'Retry connection' : 'Retry turn'}
+      </Button>
     </div>
   );
 }
 
 function IntakeTranscriptView({ messages, working }: { messages: IntakeMessage[]; working: boolean }) {
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const lastMessageText = messages.at(-1)?.text ?? '';
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const viewport = transcriptRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
+      if (viewport) viewport.scrollTop = viewport.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [lastMessageText, messages.length, working]);
+
   return (
-    <ScrollArea className="min-h-0 flex-1" aria-label="Discovery session transcript">
-      <div role="log" aria-label="Messages between You and Wayfinder" className="mx-auto max-w-[800px] space-y-5 px-5 py-5 pb-28 md:pb-6">
+    <ScrollArea ref={transcriptRef} className="min-h-0 flex-1" aria-label="Discovery session transcript">
+      <div role="log" aria-label="Messages between You and Wayfinder" aria-busy={working} aria-live="polite" className="mx-auto max-w-[800px] space-y-5 px-5 py-5 pb-28 md:pb-6">
         {messages.map((message, index) => (
           <IntakeMessageRow key={message.id ?? `${message.time}-${index}`} message={message} index={index} />
         ))}
@@ -1270,22 +1420,23 @@ function IntakeMessageRow({ message, index }: { message: IntakeMessage; index: n
 function WayfinderWorkingIndicator() {
   return (
     <article role="status" aria-live="polite" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground" aria-label="Wayfinder is working">
-      <Sparkles aria-hidden="true" className="size-3.5 text-[var(--workbench-accent)]" />
-      <span className="font-semibold text-[var(--workbench-accent)]">Wayfinder</span>
+      <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin text-[var(--workbench-accent)]" />
+      <span className="font-semibold text-[var(--workbench-accent)]">Wayfinder is working</span>
       <span className="flex items-center gap-1" aria-hidden="true">
         <span className="size-1.5 animate-pulse rounded-full bg-[var(--workbench-accent)]" />
         <span className="size-1.5 animate-pulse rounded-full bg-[var(--workbench-accent)] [animation-delay:140ms]" />
         <span className="size-1.5 animate-pulse rounded-full bg-[var(--workbench-accent)] [animation-delay:280ms]" />
       </span>
-      <span>Refining the staged map</span>
+      <span>Reviewing your message</span>
     </article>
   );
 }
 
 function EmergingMapPanel({ candidates, onReview, drawer }: { candidates: ApiCandidate[]; onReview: () => void; drawer?: boolean }) {
-  const destination = candidates.find((candidate): candidate is Extract<ApiCandidate, { type: 'destination-draft' }> => candidate.type === 'destination-draft');
+  const destinations = candidates.filter((candidate): candidate is Extract<ApiCandidate, { type: 'destination-draft' }> => candidate.type === 'destination-draft');
   const tickets = candidates.filter((candidate): candidate is Extract<ApiCandidate, { type: 'ticket' }> => candidate.type === 'ticket');
   const fog = candidates.filter((candidate): candidate is Extract<ApiCandidate, { type: 'fog-question' }> => candidate.type === 'fog-question');
+  const decisions = candidates.filter((candidate): candidate is Extract<ApiCandidate, { type: 'closed-decision' }> => candidate.type === 'closed-decision');
   return (
     <Card className={`${drawer ? '' : 'sticky top-4 max-h-[calc(100vh-112px)] overflow-y-auto'} border-dashed border-[var(--border-strong)] bg-[var(--surface-subtle)] shadow-xs`}>
       <CardHeader className="border-b border-border px-4 py-3">
@@ -1298,16 +1449,13 @@ function EmergingMapPanel({ candidates, onReview, drawer }: { candidates: ApiCan
         </div>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
-        {destination && (
-          <section className="rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-3">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.07em] text-muted-foreground">
-              <Target aria-hidden="true" className="size-4" /> Destination draft
-            </div>
-            <p className="text-sm font-medium leading-6 text-[var(--text)]">{destination.title}</p>
-            <Badge variant="outline" className="mt-3 h-5 rounded-md border-dashed text-[10px]">Candidate · {destination.stagedAfter}</Badge>
-          </section>
+        {destinations.map((destination) => <StagedDestinationCard key={destination.id} destination={destination} />)}
+        {candidates.length === 0 && (
+          <div className="rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-5 text-center">
+            <p className="text-sm font-medium text-[var(--text-secondary)]">No staged candidates</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Wayfinder stages candidates after You add concrete context.</p>
+          </div>
         )}
-        {candidates.length === 0 && <p className="text-sm text-muted-foreground">No staged candidates yet.</p>}
 
         <section className="space-y-2">
           <div className="flex items-center justify-between">
@@ -1315,7 +1463,7 @@ function EmergingMapPanel({ candidates, onReview, drawer }: { candidates: ApiCan
             <Badge variant="secondary" className="h-5 text-[10px]">{tickets.length} staged</Badge>
           </div>
           {tickets.map((ticket) => (
-            <StagedFrontierCard key={ticket.title} ticket={ticket} />
+            <StagedFrontierCard key={ticket.id} ticket={ticket} />
           ))}
         </section>
 
@@ -1325,9 +1473,19 @@ function EmergingMapPanel({ candidates, onReview, drawer }: { candidates: ApiCan
             <Badge variant="secondary" className="h-5 text-[10px]">{fog.length} staged</Badge>
           </div>
           {fog.map((item) => (
-            <StagedFogCard key={item.question} question={item.question} stagedAfter={item.stagedAfter} />
+            <StagedFogCard key={item.id} question={item.question} stagedAfter={item.stagedAfter} />
           ))}
         </section>
+
+        {decisions.length > 0 && (
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-semibold tracking-[0.03em] text-[var(--success)]">Candidate Closed Decisions</h2>
+              <Badge variant="secondary" className="h-5 text-[10px]">{decisions.length} staged</Badge>
+            </div>
+            {decisions.map((decision) => <StagedDecisionCard key={decision.id} decision={decision} />)}
+          </section>
+        )}
 
         <Button className="w-full bg-[var(--workbench-accent)] hover:bg-[var(--workbench-accent-hover)]" onClick={onReview} disabled={candidates.length === 0}>
           <ClipboardCheck aria-hidden="true" /> Review and create map
@@ -1337,10 +1495,22 @@ function EmergingMapPanel({ candidates, onReview, drawer }: { candidates: ApiCan
   );
 }
 
+function StagedDestinationCard({ destination }: { destination: Extract<ApiCandidate, { type: 'destination-draft' }> }) {
+  return (
+    <section className="staged-candidate-enter rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+        <Target aria-hidden="true" className="size-4" /> Destination draft
+      </div>
+      <p className="text-sm font-medium leading-6 text-[var(--text)]">{destination.title}</p>
+      <Badge variant="outline" className="mt-3 h-5 rounded-md border-dashed text-[10px]">Candidate · {destination.stagedAfter}</Badge>
+    </section>
+  );
+}
+
 function StagedFrontierCard({ ticket }: { ticket: StagedFrontierTicket | Extract<ApiCandidate, { type: 'ticket' }> }) {
   const ticketType = 'ticketType' in ticket ? ticket.ticketType : ticket.type;
   return (
-    <Card className="border-dashed border-[var(--workbench-accent-border)] bg-[var(--workbench-accent-soft)] shadow-none">
+    <Card className="staged-candidate-enter border-dashed border-[var(--workbench-accent-border)] bg-[var(--workbench-accent-soft)] shadow-none">
       <CardContent className="p-3">
         <div className="mb-2 flex items-center gap-2">
           <PlusCircle aria-hidden="true" className="size-4 text-[var(--workbench-accent)]" />
@@ -1360,7 +1530,7 @@ function StagedFrontierCard({ ticket }: { ticket: StagedFrontierTicket | Extract
 
 function StagedFogCard({ question, stagedAfter }: { question: string; stagedAfter: string }) {
   return (
-    <Card className="border-dashed border-[var(--warning-border)] bg-[var(--warning-soft)] shadow-none">
+    <Card className="staged-candidate-enter border-dashed border-[var(--warning-border)] bg-[var(--warning-soft)] shadow-none">
       <CardContent className="p-3">
         <div className="mb-2 flex items-center gap-2">
           <HelpCircle aria-hidden="true" className="size-4 text-[var(--warning)]" />
@@ -1373,16 +1543,35 @@ function StagedFogCard({ question, stagedAfter }: { question: string; stagedAfte
   );
 }
 
+function StagedDecisionCard({ decision }: { decision: Extract<ApiCandidate, { type: 'closed-decision' }> }) {
+  return (
+    <Card className="staged-candidate-enter border-dashed border-[var(--success-border)] bg-[var(--success-soft)] shadow-none">
+      <CardContent className="p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <CheckCircle2 aria-hidden="true" className="size-4 text-[var(--success)]" />
+          <Badge variant="outline" className="h-5 rounded-md border-dashed border-[var(--success-border)] bg-[var(--surface)] text-[10px] text-[var(--success)]">Candidate Closed Decision</Badge>
+          <span className="ml-auto text-[10px] text-muted-foreground">{decision.stagedAfter}</span>
+        </div>
+        <p className="text-sm font-medium leading-5 text-[var(--text)]">{decision.title}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ReviewMapDialog({
   candidates,
   open,
   onOpenChange,
   onApprove,
+  approving,
+  error,
 }: {
   candidates: ApiCandidate[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onApprove: (candidateIds: string[]) => void;
+  onApprove: (candidateIds: string[]) => Promise<void>;
+  approving: boolean;
+  error: string;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -1398,7 +1587,7 @@ function ReviewMapDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!approving) onOpenChange(nextOpen); }}>
       <DialogContent className="grid max-h-[92dvh] w-[calc(100%-24px)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="border-b border-border px-5 py-4 text-left">
           <div className="mb-1 flex items-center gap-2">
@@ -1413,26 +1602,39 @@ function ReviewMapDialog({
               const label = candidate.type === 'fog-question' ? candidate.question : candidate.title;
               const helper = candidate.type === 'ticket'
                 ? `${candidate.ticketType} · ${candidate.mode} · ${candidate.target}`
-                : candidate.type === 'fog-question' ? 'Fog of War · candidate fog question' : 'Destination draft';
+                : candidate.type === 'fog-question'
+                  ? 'Fog of War · candidate fog question'
+                  : candidate.type === 'closed-decision'
+                    ? `Closed Decision · ${candidate.confidence ?? 'Medium'} confidence`
+                    : 'Destination draft';
               return (
                 <ReviewCheckbox
                   key={candidate.id}
                   label={label}
                   helper={helper}
                   checked={selectedIds.has(candidate.id)}
+                  disabled={approving}
                   onCheckedChange={(checked) => setSelected(candidate.id, checked)}
                 />
               );
             })}
+            {error && (
+              <div className="flex items-start gap-2 rounded-lg border border-[var(--danger-border)] bg-[var(--danger-soft)] p-3 text-xs leading-5 text-[var(--text-secondary)]" role="alert">
+                <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[var(--danger)]" />
+                <span>{error}</span>
+              </div>
+            )}
             <div className="rounded-lg border border-[var(--success-border)] bg-[var(--success-soft)] p-3 text-sm leading-6 text-[var(--text)]">
               Wayfinder will create the map only with the selected staged items. Future changes still require explicit review.
             </div>
           </div>
         </ScrollArea>
         <DialogFooter className="mx-0 mb-0 border-t border-border bg-[var(--surface-subtle)] px-5 py-3 sm:justify-between">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Continue grilling</Button>
-          <Button className="bg-[var(--workbench-accent)] hover:bg-[var(--workbench-accent-hover)]" disabled={selectedIds.size === 0} onClick={() => onApprove([...selectedIds])}>
-            Approve and create map <ArrowRight aria-hidden="true" />
+          <Button variant="outline" disabled={approving} onClick={() => onOpenChange(false)}>Continue grilling</Button>
+          <Button className="bg-[var(--workbench-accent)] hover:bg-[var(--workbench-accent-hover)]" disabled={approving || selectedIds.size === 0} onClick={() => void onApprove([...selectedIds])}>
+            {approving ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null}
+            {approving ? 'Creating map' : 'Approve and create map'}
+            {!approving && <ArrowRight aria-hidden="true" />}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1440,10 +1642,10 @@ function ReviewMapDialog({
   );
 }
 
-function ReviewCheckbox({ label, helper, checked, onCheckedChange }: { label: string; helper?: string; checked: boolean; onCheckedChange: (checked: boolean) => void }) {
+function ReviewCheckbox({ label, helper, checked, disabled, onCheckedChange }: { label: string; helper?: string; checked: boolean; disabled?: boolean; onCheckedChange: (checked: boolean) => void }) {
   return (
-    <label className="flex gap-3 rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-3 text-sm leading-5 transition-colors hover:bg-[var(--surface-subtle)]">
-      <Checkbox checked={checked} onCheckedChange={(value) => onCheckedChange(value === true)} className="mt-0.5" aria-label={label} />
+    <label className={`flex gap-3 rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-3 text-sm leading-5 transition-colors hover:bg-[var(--surface-subtle)] ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}>
+      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(value) => onCheckedChange(value === true)} className="mt-0.5" aria-label={label} />
       <span>
         <span className="block font-medium text-[var(--text)]">{label}</span>
         {helper && <span className="mt-1 block text-xs text-muted-foreground">{helper}</span>}
