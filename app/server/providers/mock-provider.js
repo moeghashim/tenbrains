@@ -37,7 +37,7 @@ function candidateId(type, source, turn) {
 }
 
 export class MockProvider {
-  async createIntakeTurn({ message, transcript }) {
+  async createIntakeTurn({ message, transcript, onToken = () => {}, onCandidate = () => {} }) {
     const idea = compact(message);
     const userTurn = transcript.filter((item) => item.actor === 'You').length + 1;
     const questions = [
@@ -78,6 +78,8 @@ export class MockProvider {
       });
     }
 
+    for (const token of reply.match(/\S+\s*/g) ?? []) onToken(token);
+    for (const candidate of candidates) onCandidate(candidate);
     return { reply, candidates };
   }
 }

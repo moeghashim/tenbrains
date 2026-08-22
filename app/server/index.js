@@ -1,6 +1,9 @@
 import express from 'express';
+import { loadServerEnvironment } from './env.js';
 import { createProvider } from './providers/index.js';
 import { createDiscovery, getDiscovery, initializeStore, saveDiscovery } from './store.js';
+
+await loadServerEnvironment();
 
 const port = Number(process.env.PORT ?? 5174);
 const app = express();
@@ -56,16 +59,13 @@ app.post('/api/discoveries/:id/intake/messages', async (request, response, next)
       const result = await provider.createIntakeTurn({
         message,
         transcript: discovery.transcripts.intake,
+        map: discovery.map,
+        staged: discovery.staged,
+        onToken: (text) => sendEvent(response, 'token', { text }),
+        onCandidate: (candidate) => sendEvent(response, 'candidate', candidate),
       });
       const userEntry = { id: crypto.randomUUID(), actor: 'You', text: message, createdAt: now };
       const wayfinderEntry = { id: crypto.randomUUID(), actor: 'Wayfinder', text: result.reply, createdAt: now };
-
-      for (const token of result.reply.match(/\S+\s*/g) ?? []) {
-        sendEvent(response, 'token', { text: token });
-      }
-      for (const candidate of result.candidates) {
-        sendEvent(response, 'candidate', candidate);
-      }
 
       discovery.transcripts.intake.push(userEntry, wayfinderEntry);
       const existingIds = new Set(discovery.staged.map((candidate) => candidate.id));
@@ -78,9 +78,14 @@ app.post('/api/discoveries/:id/intake/messages', async (request, response, next)
       });
       response.end();
     } catch (error) {
-      sendEvent(response, 'error', { message: 'Wayfinder could not complete this turn.' });
+      sendEvent(response, 'error', {
+        message: error.publicMessage ?? 'Wayfinder could not complete this turn. Try again.',
+      });
       response.end();
-      console.error(error);
+      console.error('Wayfinder provider error', {
+        name: error.name ?? 'Error',
+        status: error.status,
+      });
     }
   } catch (error) {
     next(error);
