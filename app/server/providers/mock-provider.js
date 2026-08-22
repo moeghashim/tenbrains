@@ -82,4 +82,48 @@ export class MockProvider {
     for (const candidate of candidates) onCandidate(candidate);
     return { reply, candidates };
   }
+
+  async createSessionTurn({ message, objective, transcript, onToken = () => {}, onCandidate = () => {}, onInquiry = () => {} }) {
+    const answer = compact(message);
+    const objectiveText = artifactExcerpt(objective, 10);
+    const answerText = artifactExcerpt(answer, 11);
+    const userTurn = transcript.filter((item) => item.actor === 'You').length + 1;
+    const questions = [
+      `You said “${answer}.” What happened immediately before that?`,
+      `Against “${objectiveText},” what concrete behavior supports that answer?`,
+      `You described “${answer}.” What would have changed the outcome?`,
+    ];
+    const reply = questions[(userTurn - 1) % questions.length];
+    const stagedAfter = `turn ${transcript.length + 2}`;
+    const candidates = [
+      {
+        id: candidateId('fog-question', `session-${answer}`, userTurn),
+        type: 'fog-question',
+        question: `What evidence would disprove “${answerText}”?`,
+        stagedAfter,
+      },
+      {
+        id: candidateId('closed-decision', `session-${answer}`, userTurn),
+        type: 'closed-decision',
+        title: `Evidence supports ${answerText}.`,
+        confidence: 'Medium',
+        evidence: [],
+        stagedAfter,
+      },
+      {
+        id: candidateId('ticket', `session-${answer}`, userTurn),
+        type: 'ticket',
+        title: /^test\s/i.test(objectiveText) ? objectiveText : `Test ${objectiveText}`,
+        ticketType: 'Grilling',
+        mode: 'You + Wayfinder',
+        target: '3 concrete examples',
+        stagedAfter,
+      },
+    ];
+    const inquiries = [{ question: `What evidence would contradict “${answerText}”?` }];
+    for (const token of reply.match(/\S+\s*/g) ?? []) onToken(token);
+    for (const candidate of candidates) onCandidate(candidate);
+    for (const inquiry of inquiries) onInquiry(inquiry);
+    return { reply, candidates, inquiries };
+  }
 }

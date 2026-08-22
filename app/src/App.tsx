@@ -113,6 +113,21 @@ type ApiCandidate =
   | { id: string; type: 'fog-question'; question: string; stagedAfter: string }
   | { id: string; type: 'closed-decision'; title: string; confidence?: 'High' | 'Medium'; evidence?: string[]; stagedAfter: string };
 
+type ApiSession = {
+  id: string;
+  type: 'grilling';
+  ticketId?: string | null;
+  title: string;
+  objective: string;
+  evidenceTarget: string;
+  mode: WorkMode;
+  status: string;
+  transcript: Array<{ id: string; actor: 'You' | 'Wayfinder'; text: string; createdAt: string }>;
+  lineOfInquiry: Array<{ id: string; question: string; status: string }>;
+  evidence: Array<{ id: string; text: string; sourceTurn: string | number; createdAt: string }>;
+  staged: ApiCandidate[];
+};
+
 type ApiDiscovery = {
   id: string;
   name: string;
@@ -127,6 +142,7 @@ type ApiDiscovery = {
     intake: Array<{ id: string; actor: 'You' | 'Wayfinder'; text: string; createdAt: string }>;
   };
   staged: ApiCandidate[];
+  sessions: Array<ApiSession | { id: string; type: 'intake'; status: string; createdAt: string }>;
 };
 
 type LiveDiscoveryStatus = 'loading' | 'ready' | 'error';
@@ -524,7 +540,7 @@ const typeClass: Record<TicketType, string> = {
 function getRouteFromPath(): RouteName {
   const { pathname } = window.location;
 
-  if (pathname === '/sessions/grilling/map') {
+  if (pathname === '/sessions/grilling/map' || /^\/sessions\/[^/]+\/map$/.test(pathname)) {
     return 'session-map';
   }
 
@@ -857,6 +873,22 @@ function MapOverview({
   const clarity = isDemoMap ? 62 : Math.min(100, (liveMap?.destination ? 30 : 10) + (displayedTickets.length + displayedFog.length + displayedDecisions.length) * 10);
   const mapStatus = isLoadingMap ? 'Loading' : hasMapError ? 'Unavailable' : isEmptyMap ? 'Empty' : 'Active';
 
+  async function startSession(ticket: Ticket & { id?: string }) {
+    if (isDemoMap || !liveDiscovery || !ticket.id) {
+      navigate('/sessions/grilling');
+      return;
+    }
+    const response = await fetch(`/api/discoveries/${liveDiscovery.id}/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketId: ticket.id }),
+    });
+    if (!response.ok) return;
+    const session: ApiSession = await response.json();
+    window.sessionStorage.setItem('ten-brains-live-discovery', liveDiscovery.id);
+    navigate(`/sessions/${session.id}`);
+  }
+
   return (
     <div className="app-shell">
       <SideNav active="map" navigate={navigate} />
@@ -915,7 +947,11 @@ function MapOverview({
               <section className="map-grid" aria-label="Decision map">
                 <MapColumn title="Open Frontier" count={displayedTickets.length} tone="frontier" active={segment === 'frontier'}>
                   {displayedTickets.map((ticket) => (
-                    <TicketCard key={ticket.title} ticket={ticket} onWork={() => navigate('/sessions/grilling')} />
+                    <TicketCard
+                      key={ticket.title}
+                      ticket={{ ...ticket, selected: isDemoMap ? ticket.selected : ticket.type === 'Grilling' }}
+                      onWork={() => startSession(ticket)}
+                    />
                   ))}
                   <Button variant="ghost" className="add-row"><Plus aria-hidden="true" /> Add ticket</Button>
                 </MapColumn>
@@ -1563,15 +1599,17 @@ function ReviewMapDialog({
   open,
   onOpenChange,
   onApprove,
-  approving,
-  error,
+  approving = false,
+  error = '',
+  context = 'intake',
 }: {
   candidates: ApiCandidate[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onApprove: (candidateIds: string[]) => Promise<void>;
-  approving: boolean;
-  error: string;
+  approving?: boolean;
+  error?: string;
+  context?: 'intake' | 'session';
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -1594,7 +1632,7 @@ function ReviewMapDialog({
             <Badge variant="outline" className="border-dashed border-[var(--warning-border)] bg-[var(--warning-soft)] text-[var(--warning)]">Approval required</Badge>
           </div>
           <DialogTitle>Review staged map</DialogTitle>
-          <DialogDescription>Select staged items before Wayfinder creates the map.</DialogDescription>
+          <DialogDescription>{context === 'session' ? 'Select staged updates before Wayfinder applies them to the map.' : 'Select staged items before Wayfinder creates the map.'}</DialogDescription>
         </DialogHeader>
         <ScrollArea className="min-h-0">
           <div className="space-y-3 p-5">
@@ -1625,7 +1663,7 @@ function ReviewMapDialog({
               </div>
             )}
             <div className="rounded-lg border border-[var(--success-border)] bg-[var(--success-soft)] p-3 text-sm leading-6 text-[var(--text)]">
-              Wayfinder will create the map only with the selected staged items. Future changes still require explicit review.
+              {context === 'session' ? 'Wayfinder will apply only the selected updates. Future changes still require explicit review.' : 'Wayfinder will create the map only with the selected staged items. Future changes still require explicit review.'}
             </div>
           </div>
         </ScrollArea>
@@ -1633,7 +1671,7 @@ function ReviewMapDialog({
           <Button variant="outline" disabled={approving} onClick={() => onOpenChange(false)}>Continue grilling</Button>
           <Button className="bg-[var(--workbench-accent)] hover:bg-[var(--workbench-accent-hover)]" disabled={approving || selectedIds.size === 0} onClick={() => void onApprove([...selectedIds])}>
             {approving ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null}
-            {approving ? 'Creating map' : 'Approve and create map'}
+            {approving ? (context === 'session' ? 'Applying updates' : 'Creating map') : (context === 'session' ? 'Approve map updates' : 'Approve and create map')}
             {!approving && <ArrowRight aria-hidden="true" />}
           </Button>
         </DialogFooter>
@@ -1800,7 +1838,84 @@ function EvidenceView({ navigate }: { navigate: (path: string) => void }) {
   );
 }
 
+function liveSessionIdFromPath() {
+  const match = window.location.pathname.match(/^\/sessions\/([^/]+)(?:\/map)?$/);
+  return match && match[1] !== 'grilling' ? match[1] : null;
+}
+
+function sessionMapData(session: ApiSession): SessionMapData {
+  const evidenceIds = session.evidence.map((item) => item.id);
+  return {
+    meta: {
+      title: session.title,
+      objective: session.objective,
+      evidenceTarget: session.evidenceTarget,
+      progress: `${session.evidence.length} evidence captured`,
+      mode: session.mode,
+    },
+    transcript: session.transcript.map((turn) => ({
+      id: turn.id,
+      time: new Date(turn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      actor: turn.actor,
+      text: turn.text,
+      evidenceFlag: session.evidence.some((item) => item.sourceTurn === turn.id) ? 'Evidence' : undefined,
+    })),
+    evidenceCaptured: session.evidence.map((item) => ({ id: item.id, text: item.text, sourceTurnId: String(item.sourceTurn) })),
+    candidateUpdates: session.staged.map((candidate) => ({
+      id: candidate.id,
+      type: candidate.type === 'ticket' ? 'open-frontier-ticket' : candidate.type,
+      title: candidate.type === 'fog-question' ? candidate.question : candidate.title,
+      sourceTurnIndex: Math.max(0, session.transcript.length - 1),
+      evidenceIds: candidate.type === 'closed-decision' ? [...new Set([...(candidate.evidence ?? []), ...evidenceIds])] : evidenceIds,
+    })),
+    outcome: {
+      stagedCount: session.staged.length,
+      reviewState: session.staged.length ? 'Awaiting review' : 'No staged updates',
+    },
+  };
+}
+
 function SessionMapView({ navigate }: { navigate: (path: string) => void }) {
+  const sessionId = liveSessionIdFromPath();
+  return sessionId ? <LiveSessionMapView navigate={navigate} sessionId={sessionId} /> : <DemoSessionMapView navigate={navigate} />;
+}
+
+function LiveSessionMapView({ navigate, sessionId }: { navigate: (path: string) => void; sessionId: string }) {
+  const [session, setSession] = useState<ApiSession | null>(null);
+  useEffect(() => {
+    const discoveryId = window.sessionStorage.getItem('ten-brains-live-discovery');
+    if (!discoveryId) return;
+    fetch(`/api/discoveries/${discoveryId}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((discovery: ApiDiscovery | null) => {
+        const found = discovery?.sessions.find((item): item is ApiSession => item.id === sessionId && item.type === 'grilling');
+        if (found) setSession(found);
+      })
+      .catch(() => undefined);
+  }, [sessionId]);
+  return (
+    <div className="app-shell">
+      <SideNav active="session" navigate={navigate} />
+      <main className="main-surface workspace-main">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <DiscoveriesCrumb navigate={navigate} />
+            <span aria-hidden="true" className="breadcrumb-slash">/</span>
+            <a href={`/sessions/${sessionId}`} onClick={(event) => { event.preventDefault(); navigate(`/sessions/${sessionId}`); }}>Session</a>
+            <span aria-hidden="true" className="breadcrumb-slash">/</span><strong>Session map</strong>
+          </div>
+          <Button variant="outline" size="lg" className="session-map-action" onClick={() => navigate(`/sessions/${sessionId}`)}>Back to session</Button>
+        </header>
+        <section className="workspace-collection session-map-collection">
+          <div className="workspace-intro"><p className="eyebrow">{session?.title ?? 'Grilling session'}</p><h1>Session map</h1><p>{session?.objective ?? 'Loading session map.'}</p></div>
+          {session && <div className="session-map-scroll" role="region" aria-label={`${session.title} session map`} tabIndex={0}><SessionMap data={sessionMapData(session)} /></div>}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function DemoSessionMapView({ navigate }: { navigate: (path: string) => void }) {
   const sessionMapScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -2047,6 +2162,122 @@ function SpecSection({ title, children }: { title: string; children: ReactNode }
 }
 
 function GrillingSession({ navigate }: { navigate: (path: string) => void }) {
+  const sessionId = liveSessionIdFromPath();
+  return sessionId ? <LiveGrillingSession navigate={navigate} sessionId={sessionId} /> : <DemoGrillingSession navigate={navigate} />;
+}
+
+function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string) => void; sessionId: string }) {
+  const [discovery, setDiscovery] = useState<ApiDiscovery | null>(null);
+  const [message, setMessage] = useState('');
+  const [streamedReply, setStreamedReply] = useState('');
+  const [working, setWorking] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [inquiries, setInquiries] = useState<Array<{ id: string; question: string }>>([]);
+  const discoveryId = window.sessionStorage.getItem('ten-brains-live-discovery');
+  const session = discovery?.sessions.find((item): item is ApiSession => item.id === sessionId && item.type === 'grilling') ?? null;
+
+  async function refresh() {
+    if (!discoveryId) return;
+    const response = await fetch(`/api/discoveries/${discoveryId}`);
+    if (!response.ok) return;
+    const updated: ApiDiscovery = await response.json();
+    setDiscovery(updated);
+    const found = updated.sessions.find((item): item is ApiSession => item.id === sessionId && item.type === 'grilling');
+    if (found) setInquiries(found.lineOfInquiry.map((item) => ({ id: item.id, question: item.question })));
+  }
+
+  useEffect(() => { refresh(); }, [sessionId]);
+
+  async function sendSessionMessage() {
+    const text = message.trim();
+    if (!text || !discoveryId || !session || working) return;
+    setMessage('');
+    setWorking(true);
+    setStreamedReply('');
+    const response = await fetch(`/api/discoveries/${discoveryId}/sessions/${session.id}/messages`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }),
+    });
+    if (response.ok && response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let reply = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value, { stream: !done });
+        const blocks = buffer.split('\n\n');
+        buffer = blocks.pop() ?? '';
+        for (const block of blocks) {
+          const event = block.match(/^event: (.+)$/m)?.[1];
+          const dataLine = block.match(/^data: (.+)$/m)?.[1];
+          if (!event || !dataLine) continue;
+          const data = JSON.parse(dataLine);
+          if (event === 'token') { reply += data.text; setStreamedReply(reply); }
+          if (event === 'inquiry') setInquiries((current) => [...current, { id: `local-${Date.now()}`, question: data.question }]);
+        }
+        if (done) break;
+      }
+      await refresh();
+    }
+    setStreamedReply('');
+    setWorking(false);
+  }
+
+  async function markMoment() {
+    if (!discoveryId || !session) return;
+    const source = [...session.transcript].reverse().find((turn) => turn.actor === 'You');
+    if (!source) return;
+    await fetch(`/api/discoveries/${discoveryId}/sessions/${session.id}/evidence`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: source.text, sourceTurn: source.id }),
+    });
+    await refresh();
+  }
+
+  async function approveUpdates(candidateIds: string[]) {
+    if (!discoveryId || !session) return;
+    const response = await fetch(`/api/discoveries/${discoveryId}/sessions/${session.id}/updates/approve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ candidateIds }),
+    });
+    if (response.ok) { setReviewOpen(false); await refresh(); }
+  }
+
+  if (!session) return <div className="app-shell"><SideNav active="session" navigate={navigate} /><main className="main-surface session-main"><p className="p-6">Loading session.</p></main></div>;
+  const transcriptLines = [...session.transcript, ...(streamedReply ? [{ id: 'stream', actor: 'Wayfinder' as const, text: streamedReply, createdAt: new Date().toISOString() }] : [])];
+  return (
+    <div className="app-shell session-shell">
+      <SideNav active="session" navigate={navigate} compactBrand />
+      <main className="main-surface session-main">
+        <header className="topbar session-topbar">
+          <div className="breadcrumb session-breadcrumb"><DiscoveriesCrumb navigate={navigate} /><span aria-hidden="true" className="breadcrumb-slash">/</span><strong>{session.title}</strong><Badge className="live-badge"><Circle aria-hidden="true" className="live-dot" /> LIVE</Badge></div>
+          <div className="session-header-actions"><Button variant="secondary" size="lg" className="session-map-action" onClick={() => navigate(`/sessions/${session.id}/map`)}>Session map</Button></div>
+        </header>
+        <Card className="objective-card">
+          <div className="objective-section wide"><Target aria-hidden="true" className="target-icon" /><div><p className="eyebrow">Objective</p><strong>{session.objective}</strong></div></div>
+          <Separator orientation="vertical" /><div className="objective-section"><Target aria-hidden="true" className="target-icon" /><div><p className="eyebrow">Evidence target</p><strong>{session.evidenceTarget}</strong></div></div>
+          <Separator orientation="vertical" /><div className="objective-section progress-summary"><div><p className="eyebrow">Progress</p><strong>{session.evidence.length} captured</strong></div></div>
+        </Card>
+        <section className="session-grid">
+          <PanelShell title="Line of Inquiry">
+            {inquiries.length === 0 && <p className="text-sm text-muted-foreground">Wayfinder will suggest the next question.</p>}
+            {inquiries.map((item) => <Card className="probe-card" key={item.id}><CardContent className="probe-content"><Input aria-label="Edit question" value={item.question} onChange={(event) => setInquiries((current) => current.map((entry) => entry.id === item.id ? { ...entry, question: event.target.value } : entry))} /><Button variant="ghost" size="icon-xs" aria-label="Dismiss question" onClick={() => setInquiries((current) => current.filter((entry) => entry.id !== item.id))}><X /></Button></CardContent></Card>)}
+          </PanelShell>
+          <PanelShell title="Live transcript">
+            <div className="transcript-list">{transcriptLines.map((line) => <div className="transcript-row" key={line.id}><time>{new Date(line.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time><strong>{line.actor}</strong><div><p>{line.text}</p></div></div>)}</div>
+            <div className="composer"><Input aria-label="Send to Wayfinder" placeholder="Give Wayfinder one concrete example." value={message} disabled={working} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') sendSessionMessage(); }} /><Button variant="outline" size="sm" onClick={markMoment}><Bookmark aria-hidden="true" /> Mark moment</Button><Button size="sm" disabled={working || !message.trim()} onClick={sendSessionMessage}><SendHorizontal aria-hidden="true" /> Send</Button></div>
+          </PanelShell>
+          <PanelShell title="Session Signals">
+            <div className="signal-section"><h3>Evidence captured</h3>{session.evidence.map((item) => <Card className="evidence-item" key={item.id}><CardContent className="evidence-content"><Bookmark aria-hidden="true" /><span>{item.text}</span></CardContent></Card>)}</div>
+            <div className="signal-section map-updates"><h3>Candidate map updates</h3>{session.staged.map((candidate) => <CandidateUpdate key={candidate.id} tone={candidate.type === 'fog-question' ? 'fog' : candidate.type === 'closed-decision' ? 'decision' : 'frontier'} label={candidate.type === 'fog-question' ? 'Candidate Fog of War question' : candidate.type === 'closed-decision' ? 'Candidate Closed Decision' : 'Candidate Open Frontier ticket'} text={candidate.type === 'fog-question' ? candidate.question : candidate.title} />)}<Button className="review-button" disabled={session.staged.length === 0} onClick={() => setReviewOpen(true)}>Review {session.staged.length} map updates</Button></div>
+          </PanelShell>
+        </section>
+      </main>
+      <WayfinderPill status={working ? 'grilling' : 'listening'} expanded />
+      <ReviewMapDialog candidates={session.staged} open={reviewOpen} onOpenChange={setReviewOpen} onApprove={approveUpdates} context="session" />
+    </div>
+  );
+}
+
+function DemoGrillingSession({ navigate }: { navigate: (path: string) => void }) {
   const [drawer, setDrawer] = useState<DrawerName>(null);
 
   return (

@@ -125,6 +125,21 @@ const STAGE_CANDIDATES_TOOL = {
   },
 };
 
+const SUGGEST_INQUIRY_TOOL = {
+  name: 'suggest_inquiry',
+  description: 'Suggest one editable Line of Inquiry question for Your session. This does not change the map.',
+  input_schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      question: { type: 'string', minLength: 1 },
+    },
+    required: ['question'],
+  },
+};
+
+const SESSION_PROMPT = `${SYSTEM_PROMPT}\n\nGrilling session behavior\n- Grill against the supplied session objective and evidence target.\n- Ask one concrete follow-up question that tests behavior, evidence, a constraint, or a contradiction.\n- Use the Line of Inquiry as guidance, not a script.\n- Stage only fog-question, closed-decision, or ticket candidates during a Grilling session. Never stage a Destination draft.\n- Closed Decisions must cite supplied evidence IDs when evidence supports them.\n- You may call suggest_inquiry once with one editable next question. The question must be sentence case and end with ?.\n- Keep the session map, evidence, and staged candidates read-only.`;
+
 export class ProviderError extends Error {
   constructor(message, { publicMessage, status } = {}) {
     super(message);
@@ -148,6 +163,11 @@ function buildMessages(transcript, message) {
 function contextBlock({ map, staged, transcript }) {
   const currentTurn = `turn ${transcript.length + 2}`;
   return `${SYSTEM_PROMPT}\n\nRead-only discovery context\nCurrent turn label: ${currentTurn}\nCurrent map JSON: ${JSON.stringify(map)}\nCurrent staged candidates JSON: ${JSON.stringify(staged)}`;
+}
+
+function sessionContextBlock({ objective, evidenceTarget, mode, lineOfInquiry, transcript, evidence, map, staged }) {
+  const currentTurn = `turn ${transcript.length + 2}`;
+  return `${SESSION_PROMPT}\n\nRead-only session context\nCurrent turn label: ${currentTurn}\nObjective: ${objective}\nEvidence target: ${evidenceTarget}\nMode: ${mode}\nLine of Inquiry JSON: ${JSON.stringify(lineOfInquiry)}\nEvidence JSON: ${JSON.stringify(evidence)}\nCurrent map JSON: ${JSON.stringify(map)}\nCurrent session candidates JSON: ${JSON.stringify(staged)}`;
 }
 
 function candidatesFromToolInput(input) {
@@ -216,6 +236,55 @@ export class AnthropicProvider {
       throw publicProviderError(error);
     }
   }
+
+  async createSessionTurn({
+    message,
+    objective,
+    evidenceTarget,
+    mode,
+    lineOfInquiry,
+    transcript,
+    evidence,
+    map,
+    staged,
+    onToken = () => {},
+    onCandidate = () => {},
+    onInquiry = () => {},
+  }) {
+    if (!this.apiKey) {
+      throw new ProviderError('Anthropic API key is missing', {
+        publicMessage: 'Anthropic API key is missing. Set ANTHROPIC_API_KEY or use mock mode.',
+      });
+    }
+    try {
+      const client = new Anthropic({ apiKey: this.apiKey });
+      const stream = client.messages.stream({
+        model: this.model,
+        max_tokens: 1400,
+        system: sessionContextBlock({ objective, evidenceTarget, mode, lineOfInquiry, transcript, evidence, map, staged }),
+        messages: buildMessages(transcript, message),
+        tools: [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL],
+      });
+      stream.on('text', (text) => onToken(text));
+      const finalMessage = await stream.finalMessage();
+      const reply = finalMessage.content
+        .filter((block) => block.type === 'text')
+        .map((block) => block.text)
+        .join('');
+      const candidates = finalMessage.content
+        .filter((block) => block.type === 'tool_use' && block.name === 'stage_candidates')
+        .flatMap((block) => candidatesFromToolInput(block.input))
+        .filter((candidate) => candidate.type !== 'destination-draft');
+      const inquiries = finalMessage.content
+        .filter((block) => block.type === 'tool_use' && block.name === 'suggest_inquiry' && typeof block.input?.question === 'string')
+        .map((block) => ({ question: block.input.question }));
+      for (const candidate of candidates) onCandidate(candidate);
+      for (const inquiry of inquiries) onInquiry(inquiry);
+      return { reply, candidates, inquiries };
+    } catch (error) {
+      throw publicProviderError(error);
+    }
+  }
 }
 
-export { STAGE_CANDIDATES_TOOL, SYSTEM_PROMPT };
+export { SESSION_PROMPT, STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, SYSTEM_PROMPT };
