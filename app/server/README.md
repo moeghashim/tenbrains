@@ -8,7 +8,7 @@ npm run server
 
 The Express API listens on `http://localhost:5174`. Vite proxies `/api` to that port. Discovery documents persist as JSON under `server/data/`.
 
-## Wayfinder provider
+## Wayfinder providers
 
 Mock mode needs no key and stays deterministic:
 
@@ -16,17 +16,39 @@ Mock mode needs no key and stays deterministic:
 WAYFINDER_PROVIDER=mock npm run server
 ```
 
-To use Anthropic, create the gitignored `server/.env` file:
+Create the gitignored `server/.env` file for provider settings. Global selection accepts `mock`, `anthropic`, or `openai`:
 
 ```dotenv
-ANTHROPIC_API_KEY=your-key
 WAYFINDER_PROVIDER=anthropic
+ANTHROPIC_API_KEY=<paste key here>
 WAYFINDER_MODEL=claude-sonnet-5
 ```
 
-`WAYFINDER_PROVIDER` accepts `mock` or `anthropic` and always wins. When it is unset, the server selects Anthropic if `ANTHROPIC_API_KEY` exists; otherwise it selects mock. `WAYFINDER_MODEL` is optional and defaults to `claude-sonnet-5`. Shell environment values override matching values in `server/.env`.
+When `WAYFINDER_PROVIDER` is unset, selection priority is Anthropic key, OpenAI key, then mock. An explicit provider always wins. Shell environment values override matching values in `server/.env`.
 
-Anthropic and mock mode use the same SSE contract. Intake messages append transcript entries and staged candidates only.
+Use any OpenAI-compatible chat-completions endpoint with these settings:
+
+```dotenv
+WAYFINDER_PROVIDER=openai
+OPENAI_API_KEY=<paste key here>
+WAYFINDER_OPENAI_BASE_URL=https://api.openai.com/v1
+WAYFINDER_MODEL=gpt-5.6-luna
+```
+
+`WAYFINDER_OPENAI_BASE_URL` defaults to `https://api.openai.com/v1`. Change it for OpenRouter, Ollama, or another compatible endpoint.
+
+Intake and Grilling sessions can select providers and models independently with `WAYFINDER_INTAKE_PROVIDER`, `WAYFINDER_INTAKE_MODEL`, `WAYFINDER_SESSION_PROVIDER`, and `WAYFINDER_SESSION_MODEL`. Surface settings fall back to the global provider and model.
+
+Use this exact mixed-provider recipe to keep intake in deterministic mock mode and run Grilling sessions on GPT-5.6 Luna:
+
+```dotenv
+WAYFINDER_PROVIDER=mock
+OPENAI_API_KEY=<paste key here>
+WAYFINDER_SESSION_PROVIDER=openai
+WAYFINDER_SESSION_MODEL=gpt-5.6-luna
+```
+
+All providers use the same SSE and staging contracts. Intake messages append transcript entries and staged candidates only.
 
 Discovery persistence uses these endpoints:
 

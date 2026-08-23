@@ -1,14 +1,14 @@
 import express from 'express';
 import { loadServerEnvironment } from './env.js';
 import { applyCandidates, selectCandidates } from './candidates.js';
-import { createProvider } from './providers/index.js';
+import { createProviders } from './providers/index.js';
 import { createDiscovery, getDiscovery, initializeStore, listDiscoveries, saveDiscovery } from './store.js';
 
 await loadServerEnvironment();
 
 const port = Number(process.env.PORT ?? 5174);
 const app = express();
-const provider = createProvider();
+const providers = createProviders();
 
 app.use(express.json({ limit: '32kb' }));
 
@@ -91,7 +91,7 @@ app.post('/api/discoveries/:id/intake/messages', async (request, response, next)
 
     try {
       const now = new Date().toISOString();
-      const result = await provider.createIntakeTurn({
+      const result = await providers.intake.createIntakeTurn({
         message,
         transcript: discovery.transcripts.intake,
         map: discovery.map,
@@ -209,7 +209,7 @@ app.post('/api/discoveries/:id/sessions/:sid/messages', async (request, response
     response.flushHeaders();
     try {
       const now = new Date().toISOString();
-      const result = await provider.createSessionTurn({
+      const result = await providers.session.createSessionTurn({
         message,
         objective: session.objective,
         evidenceTarget: session.evidenceTarget,
