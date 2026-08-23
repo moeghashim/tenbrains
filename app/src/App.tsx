@@ -681,12 +681,17 @@ function App() {
   );
 }
 
-async function startNewDiscovery(navigate: (path: string) => void) {
-  const response = await fetch('/api/discoveries', { method: 'POST' });
-  if (!response.ok) return;
-  const discovery: ApiDiscovery = await response.json();
-  window.sessionStorage.setItem('ten-brains-live-discovery', discovery.id);
-  navigate('/discoveries/new');
+async function startNewDiscovery(navigate: (path: string) => void): Promise<boolean> {
+  try {
+    const response = await fetch('/api/discoveries', { method: 'POST' });
+    if (!response.ok) return false;
+    const discovery: ApiDiscovery = await response.json();
+    window.sessionStorage.setItem('ten-brains-live-discovery', discovery.id);
+    navigate('/discoveries/new');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function openLiveDiscovery(id: string, navigate: (path: string) => void) {
@@ -726,6 +731,7 @@ function SideNav({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [discoveries, setDiscoveries] = useState<DiscoverySummary[]>([]);
+  const [discoveryListStatus, setDiscoveryListStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const isDemoNavigation = new URLSearchParams(window.location.search).get('demo') === '1'
     || window.location.pathname.startsWith('/sessions/grilling')
     || ['/evidence', '/spec', '/how-it-works'].includes(window.location.pathname);
@@ -738,11 +744,15 @@ function SideNav({
   });
 
   useEffect(() => {
-    if (isDemoNavigation) return;
+    if (isDemoNavigation) { setDiscoveryListStatus('ready'); return; }
+    setDiscoveryListStatus('loading');
     fetch('/api/discoveries')
-      .then((response) => response.ok ? response.json() : [])
-      .then((items: DiscoverySummary[]) => setDiscoveries(items))
-      .catch(() => undefined);
+      .then((response) => {
+        if (!response.ok) throw new Error('Discoveries could not load');
+        return response.json();
+      })
+      .then((items: DiscoverySummary[]) => { setDiscoveries(items); setDiscoveryListStatus('ready'); })
+      .catch(() => setDiscoveryListStatus('error'));
   }, [isDemoNavigation]);
 
   useEffect(() => {
@@ -794,8 +804,10 @@ function SideNav({
           setMobileOpen(false);
           if (value === 'all-discoveries') navigate('/discoveries'); else openLiveDiscovery(value, navigate);
         }}>
-          <SelectTrigger className="discovery-picker" aria-label="Current discovery"><SelectValue placeholder="Select discovery" /></SelectTrigger>
+          <SelectTrigger className="discovery-picker" aria-label="Current discovery"><SelectValue placeholder={discoveryListStatus === 'loading' ? 'Loading discoveries' : discoveryListStatus === 'error' ? 'Discoveries unavailable' : 'Select discovery'} /></SelectTrigger>
           <SelectContent align="start">
+            {discoveryListStatus === 'loading' && <SelectItem value="loading-discoveries" disabled>Loading discoveries</SelectItem>}
+            {discoveryListStatus === 'error' && <SelectItem value="discoveries-unavailable" disabled>Discoveries unavailable</SelectItem>}
             {discoveries.map((discovery) => <SelectItem key={discovery.id} value={discovery.id}>{discovery.name}</SelectItem>)}
             <SelectItem value="all-discoveries">View all discoveries</SelectItem>
           </SelectContent>
@@ -883,10 +895,11 @@ function SideNav({
 }
 
 function MoreMenu({ label, disabled = false }: { label: string; disabled?: boolean }) {
+  const accessibleLabel = disabled ? `${label}. Available after a reviewed Wayfinder update.` : label;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" className="menu-button" aria-label={label} disabled={disabled} title={disabled ? 'Available after a reviewed update' : undefined}>
+        <Button variant="ghost" size="icon-sm" className="menu-button" aria-label={accessibleLabel} disabled={disabled} title={disabled ? 'Available after a reviewed Wayfinder update' : undefined}>
           <MoreHorizontal aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
@@ -956,7 +969,7 @@ function MapOverview({
           <div className="breadcrumb">
             <DiscoveriesCrumb navigate={navigate} />
             <span aria-hidden="true" className="breadcrumb-slash">/</span>
-            <strong>{isEmptyMap ? 'Untitled discovery' : (isDemoMap ? 'AI onboarding assistant' : (liveDiscovery?.name ?? 'Untitled discovery'))}</strong>
+            <strong>{isDemoMap ? 'AI onboarding assistant' : (liveDiscovery?.name ?? 'Untitled discovery')}</strong>
             <Badge variant="outline" className="status-badge active">
               {isLoadingMap ? <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" /> : <Circle aria-hidden="true" className="status-icon" />} {mapStatus}
             </Badge>
@@ -969,7 +982,7 @@ function MapOverview({
         ) : hasMapError ? (
           <MapLoadErrorState onRetry={onRetryLiveMap} />
         ) : isEmptyMap ? (
-          <EmptyMapState navigate={navigate} />
+          <EmptyMapState navigate={navigate} discoveryId={liveDiscovery?.id} />
         ) : (
           <>
             <Card className="destination-card">
@@ -980,8 +993,8 @@ function MapOverview({
                     <h1>{liveMap ? (liveMap.destination ?? 'Destination awaits approval') : 'Enough clarity to write a thin PRD or decide go / no-go'}</h1>
                   </div>
                   <div className="destination-actions">
-                    <Button size="lg" className="primary-action" disabled={!isDemoMap} title={!isDemoMap ? 'Use a reviewed Wayfinder update' : undefined}>Add Open Frontier ticket</Button>
-                    <Button size="lg" variant="outline" disabled={!isDemoMap} title={!isDemoMap ? 'Use a reviewed Wayfinder update' : undefined}>Review map update</Button>
+                    <Button size="lg" className="primary-action" disabled={!isDemoMap} title={!isDemoMap ? 'Use a reviewed Wayfinder update' : undefined} aria-label={!isDemoMap ? 'Add Open Frontier ticket unavailable. Use a reviewed Wayfinder update.' : undefined}>Add Open Frontier ticket</Button>
+                    <Button size="lg" variant="outline" disabled={!isDemoMap} title={!isDemoMap ? 'Use a reviewed Wayfinder update' : undefined} aria-label={!isDemoMap ? 'Review map update unavailable. Use a reviewed Wayfinder update.' : undefined}>Review map update</Button>
                   </div>
                 </div>
                 <div className="clarity-row">
@@ -1005,6 +1018,7 @@ function MapOverview({
 
               <section className="map-grid" aria-label="Decision map">
                 <MapColumn title="Open Frontier" count={displayedTickets.length} tone="frontier" active={segment === 'frontier'}>
+                  {!isDemoMap && displayedTickets.length === 0 && <MapColumnEmptyState tone="frontier" onOpenSession={() => navigate('/discoveries/new')} />}
                   {displayedTickets.map((ticket) => (
                     <TicketCard
                       key={ticket.title}
@@ -1013,21 +1027,23 @@ function MapOverview({
                       live={!isDemoMap}
                     />
                   ))}
-                  <Button variant="ghost" className="add-row" disabled={!isDemoMap} title={!isDemoMap ? 'Use a reviewed Wayfinder update' : undefined}><Plus aria-hidden="true" /> Add ticket</Button>
+                  <Button variant="ghost" className="add-row" disabled={!isDemoMap} title={!isDemoMap ? 'Use a reviewed Wayfinder update' : undefined} aria-label={!isDemoMap ? 'Add ticket unavailable. Use a reviewed Wayfinder update.' : undefined}><Plus aria-hidden="true" /> Add ticket</Button>
                 </MapColumn>
 
                 <MapColumn title="Fog of War" count={displayedFog.length} tone="fog" active={segment === 'fog'}>
+                  {!isDemoMap && displayedFog.length === 0 && <MapColumnEmptyState tone="fog" onOpenSession={() => navigate('/discoveries/new')} />}
                   {displayedFog.map((question) => (
                     <FogCard key={question} question={question} live={!isDemoMap} />
                   ))}
-                  <Button variant="ghost" className="add-row" disabled={!isDemoMap} title={!isDemoMap ? 'Use a reviewed Wayfinder update' : undefined}><Plus aria-hidden="true" /> Add question</Button>
+                  <Button variant="ghost" className="add-row" disabled={!isDemoMap} title={!isDemoMap ? 'Use a reviewed Wayfinder update' : undefined} aria-label={!isDemoMap ? 'Add Fog of War question unavailable. Use a reviewed Wayfinder update.' : undefined}><Plus aria-hidden="true" /> Add question</Button>
                 </MapColumn>
 
                 <MapColumn title="Closed Decisions" count={displayedDecisions.length} tone="closed" active={segment === 'closed'}>
+                  {!isDemoMap && displayedDecisions.length === 0 && <MapColumnEmptyState tone="closed" onOpenSession={() => navigate('/discoveries/new')} />}
                   {displayedDecisions.map((decision) => (
                     <DecisionCard key={decision.title} decision={decision} navigate={navigate} live={!isDemoMap} />
                   ))}
-                  <Button variant="ghost" className="add-row" disabled={!isDemoMap} title={!isDemoMap ? 'Use a reviewed Wayfinder update' : undefined}><Plus aria-hidden="true" /> Add decision</Button>
+                  <Button variant="ghost" className="add-row" disabled={!isDemoMap} title={!isDemoMap ? 'Use a reviewed Wayfinder update' : undefined} aria-label={!isDemoMap ? 'Add Closed Decision unavailable. Use a reviewed Wayfinder update.' : undefined}><Plus aria-hidden="true" /> Add decision</Button>
                 </MapColumn>
               </section>
             </Tabs>
@@ -1041,28 +1057,20 @@ function MapOverview({
 
 function MapLoadingState() {
   return (
-    <Card className="mt-4 border-[var(--border-subtle)] bg-card shadow-none">
-      <CardContent className="flex min-h-[360px] flex-col items-center justify-center px-6 py-16 text-center" role="status" aria-live="polite">
-        <LoaderCircle aria-hidden="true" className="mb-4 size-5 animate-spin text-[var(--workbench-accent)]" />
-        <h1 className="text-base font-semibold text-[var(--text)]">Loading the approved map</h1>
-        <p className="mt-2 max-w-md text-sm text-[var(--text-muted)]">Ten Brains is reading the latest approved items.</p>
-      </CardContent>
-    </Card>
+    <div className="map-runtime-state" role="status" aria-live="polite">
+      <LoaderCircle aria-hidden="true" className="animate-spin" />
+      <span><strong>Loading approved map</strong><small>Reading the latest approved items.</small></span>
+    </div>
   );
 }
 
 function MapLoadErrorState({ onRetry }: { onRetry: () => void }) {
   return (
-    <Card className="mt-4 border-[var(--danger-border)] bg-[var(--danger-soft)] shadow-none">
-      <CardContent className="flex min-h-[360px] flex-col items-center justify-center px-6 py-16 text-center" role="alert">
-        <AlertCircle aria-hidden="true" className="mb-4 size-5 text-[var(--danger)]" />
-        <h1 className="text-base font-semibold text-[var(--text)]">The approved map did not load</h1>
-        <p className="mt-2 max-w-md text-sm text-[var(--text-muted)]">Your approved items remain saved. Retry the map request.</p>
-        <Button variant="outline" className="mt-5 border-[var(--danger-border)] bg-[var(--surface)]" onClick={onRetry}>
-          <RotateCcw aria-hidden="true" /> Retry map
-        </Button>
-      </CardContent>
-    </Card>
+    <div className="map-runtime-state is-error" role="alert">
+      <AlertCircle aria-hidden="true" />
+      <span><strong>Approved map unavailable</strong><small>Your approved items remain saved.</small></span>
+      <Button variant="outline" size="sm" onClick={onRetry}><RotateCcw aria-hidden="true" /> Retry map</Button>
+    </div>
   );
 }
 
@@ -1087,6 +1095,30 @@ function MapColumn({
       </CardHeader>
       <CardContent className="column-stack">{children}</CardContent>
     </Card>
+  );
+}
+
+function MapColumnEmptyState({
+  tone,
+  onOpenSession,
+}: {
+  tone: 'frontier' | 'fog' | 'closed';
+  onOpenSession: () => void;
+}) {
+  const copy = tone === 'frontier'
+    ? { title: 'No approved tickets', detail: 'Wayfinder can stage a ticket for You to review.' }
+    : tone === 'fog'
+      ? { title: 'No Fog of War questions', detail: 'Wayfinder can stage one question for You to review.' }
+      : { title: 'No Closed Decisions', detail: 'Capture evidence before Wayfinder stages a Closed Decision.' };
+  const Icon = tone === 'frontier' ? PlusCircle : tone === 'fog' ? CircleHelp : CheckCircle2;
+
+  return (
+    <div className={`map-column-empty ${tone}`}>
+      <Icon aria-hidden="true" />
+      <strong>{copy.title}</strong>
+      <p>{copy.detail}</p>
+      <Button variant="ghost" size="sm" onClick={onOpenSession}><MessageSquareText aria-hidden="true" /> Open discovery session</Button>
+    </div>
   );
 }
 
@@ -1122,7 +1154,7 @@ function FogCard({ question, live = false }: { question: string; live?: boolean 
           <Badge variant="secondary" className="mini-tag fog-tag">Fog question</Badge>
         </div>
         <div className="card-actions two-up">
-          <Button variant="outline" size="sm" disabled={live} title={live ? 'Use a reviewed Wayfinder update' : undefined}>Make actionable</Button>
+          <Button variant="outline" size="sm" disabled={live} title={live ? 'Use a reviewed Wayfinder update' : undefined} aria-label={live ? 'Make actionable unavailable. Use a reviewed Wayfinder update.' : undefined}>Make actionable</Button>
           <MoreMenu label={`More options for ${question}`} disabled={live} />
         </div>
       </CardContent>
@@ -1158,7 +1190,24 @@ function DecisionCard({ decision, navigate, live = false }: { decision: Decision
   );
 }
 
-function EmptyMapState({ navigate }: { navigate: (path: string) => void }) {
+function EmptyMapState({ navigate, discoveryId }: { navigate: (path: string) => void; discoveryId?: string }) {
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState('');
+
+  async function openDiscoverySession() {
+    setStartError('');
+    if (discoveryId) {
+      navigate('/discoveries/new');
+      return;
+    }
+    setStarting(true);
+    const started = await startNewDiscovery(navigate);
+    if (!started) {
+      setStarting(false);
+      setStartError('The discovery session did not start. Retry when the connection is ready.');
+    }
+  }
+
   return (
     <Card className="mt-4 border-dashed border-[var(--border-strong)] bg-card shadow-xs">
       <CardContent className="flex min-h-[520px] flex-col items-center justify-center px-6 py-16 text-center">
@@ -1175,9 +1224,11 @@ function EmptyMapState({ navigate }: { navigate: (path: string) => void }) {
           Start a focused discovery session with Wayfinder. It asks concrete questions, stages a Destination and candidate tickets, then waits for You to review.
         </p>
         <Separator className="mt-6 max-w-[360px]" />
-        <Button size="lg" className="mt-6 h-11 bg-[var(--workbench-accent)] px-6 hover:bg-[var(--workbench-accent-hover)] max-sm:h-auto max-sm:min-h-11 max-sm:w-full max-sm:whitespace-normal max-sm:px-3 max-sm:py-2 max-sm:text-xs max-sm:leading-5" onClick={() => void startNewDiscovery(navigate)}>
-          <MessageSquareText aria-hidden="true" /> Start a discovery session with Wayfinder
+        <Button size="lg" className="mt-6 h-11 bg-[var(--workbench-accent)] px-6 hover:bg-[var(--workbench-accent-hover)] max-sm:h-auto max-sm:min-h-11 max-sm:w-full max-sm:whitespace-normal max-sm:px-3 max-sm:py-2 max-sm:text-xs max-sm:leading-5" disabled={starting} onClick={() => void openDiscoverySession()}>
+          {starting ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <MessageSquareText aria-hidden="true" />}
+          {starting ? 'Starting discovery' : 'Start a discovery session with Wayfinder'}
         </Button>
+        {startError && <p className="empty-map-error" role="alert">{startError}</p>}
         <Button asChild variant="link" size="sm" className="mt-2 h-auto px-2 text-[var(--text-muted)] hover:text-[var(--workbench-accent)]">
           <a href="/map?demo=1" onClick={(event) => { event.preventDefault(); navigate('/map?demo=1'); }}>
             View demo map
@@ -1755,26 +1806,42 @@ function ReviewCheckbox({ label, helper, checked, disabled, onCheckedChange }: {
 function DiscoveriesList({ navigate }: { navigate: (path: string) => void }) {
   const [discoveries, setDiscoveries] = useState<DiscoverySummary[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+
   useEffect(() => {
+    setStatus('loading');
     fetch('/api/discoveries')
       .then((response) => { if (!response.ok) throw new Error('Load failed'); return response.json(); })
       .then((items: DiscoverySummary[]) => { setDiscoveries(items); setStatus('ready'); })
       .catch(() => setStatus('error'));
-  }, []);
+  }, [loadAttempt]);
+
+  async function createDiscovery() {
+    setCreateError('');
+    setCreating(true);
+    const started = await startNewDiscovery(navigate);
+    if (!started) {
+      setCreating(false);
+      setCreateError('The discovery did not start. Retry when the connection is ready.');
+    }
+  }
+
   const rows = [
+    {
+      id: 'demo', name: 'AI onboarding assistant', status: 'Demo', clarity: '62%',
+      counts: '4 / 3 / 8', lastActivity: 'Scripted example', demo: true,
+    },
     ...discoveries.map((discovery) => ({
       id: discovery.id,
       name: discovery.name,
       status: discovery.status,
       clarity: `${discovery.clarity}%`,
-      counts: `${discovery.counts.open} Open Frontier / ${discovery.counts.fog} Fog of War / ${discovery.counts.closed} Closed Decisions`,
-      lastActivity: new Date(discovery.updatedAt).toLocaleString(),
+      counts: `${discovery.counts.open} / ${discovery.counts.fog} / ${discovery.counts.closed}`,
+      lastActivity: new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(discovery.updatedAt)),
       demo: false,
     })),
-    {
-      id: 'demo', name: 'AI onboarding assistant · Demo', status: 'Demo', clarity: '62%',
-      counts: '4 Open Frontier / 3 Fog of War / 8 Closed Decisions', lastActivity: 'Scripted demo map', demo: true,
-    },
   ];
 
   return (
@@ -1787,8 +1854,9 @@ function DiscoveriesList({ navigate }: { navigate: (path: string) => void }) {
             <span aria-hidden="true" className="breadcrumb-slash">/</span>
             <strong>All maps</strong>
           </div>
-          <Button className="bg-[var(--workbench-accent)] hover:bg-[var(--workbench-accent-hover)]" onClick={() => void startNewDiscovery(navigate)}>
-            <Plus aria-hidden="true" /> New discovery
+          <Button className="bg-[var(--workbench-accent)] hover:bg-[var(--workbench-accent-hover)]" disabled={creating} onClick={() => void createDiscovery()}>
+            {creating ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Plus aria-hidden="true" />}
+            {creating ? 'Starting discovery' : 'New discovery'}
           </Button>
         </header>
 
@@ -1797,8 +1865,9 @@ function DiscoveriesList({ navigate }: { navigate: (path: string) => void }) {
             <p className="eyebrow">Discoveries</p>
             <h1 className="mt-2 text-[22px] font-medium tracking-[-0.03em] text-[var(--text)]">Decision maps</h1>
             <p className="mt-2 max-w-[620px] text-[13px] leading-[1.7] text-muted-foreground">
-              Open an existing map or return to the empty discovery that starts with a Wayfinder session.
+              Open a live decision map or inspect the demo.
             </p>
+            {createError && <p className="discoveries-create-error" role="alert"><AlertCircle aria-hidden="true" /> {createError}</p>}
           </div>
 
           <div className="workspace-list discoveries-list">
@@ -1806,25 +1875,46 @@ function DiscoveriesList({ navigate }: { navigate: (path: string) => void }) {
               <span>Name</span>
               <span>Status</span>
               <span>Clarity</span>
-              <span>Counts</span>
+              <span>Open / Fog / Closed</span>
               <span>Last activity</span>
             </div>
-            {status === 'loading' && <p className="p-4 text-sm text-muted-foreground" role="status">Loading discoveries.</p>}
-            {status === 'error' && <p className="p-4 text-sm text-destructive" role="alert">Discoveries could not load. Try again.</p>}
-            {status === 'ready' && discoveries.length === 0 && <p className="p-4 text-sm text-muted-foreground">No live discoveries yet.</p>}
+            {status === 'loading' && (
+              <div className="discoveries-runtime-row" role="status" aria-live="polite">
+                <LoaderCircle aria-hidden="true" className="animate-spin" />
+                <span><strong>Loading discoveries</strong><small>Reading saved decision maps.</small></span>
+              </div>
+            )}
+            {status === 'error' && (
+              <div className="discoveries-runtime-row is-error" role="alert">
+                <AlertCircle aria-hidden="true" />
+                <span><strong>Discoveries unavailable</strong><small>Your saved maps remain unchanged.</small></span>
+                <Button variant="outline" size="sm" onClick={() => setLoadAttempt((attempt) => attempt + 1)}><RotateCcw aria-hidden="true" /> Retry</Button>
+              </div>
+            )}
+            {status === 'ready' && discoveries.length === 0 && (
+              <div className="discoveries-runtime-row is-empty">
+                <Inbox aria-hidden="true" />
+                <span><strong>No live discoveries</strong><small>Start a discovery session to create the first map.</small></span>
+                <Button variant="outline" size="sm" disabled={creating} onClick={() => void createDiscovery()}>
+                  {creating ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Plus aria-hidden="true" />}
+                  {creating ? 'Starting' : 'New discovery'}
+                </Button>
+              </div>
+            )}
             {rows.map((discovery) => (
               <button
                 key={discovery.id}
                 type="button"
-                className="discoveries-row"
+                className={`discoveries-row ${discovery.demo ? 'is-demo' : ''}`}
+                aria-label={`${discovery.name}. ${discovery.demo ? 'Open demo map' : 'Open discovery'}`}
                 onClick={() => discovery.demo ? navigate('/map?demo=1') : openLiveDiscovery(discovery.id, navigate)}
               >
                 <span className="discoveries-title">{discovery.name}</span>
-                <Badge variant="outline" className={`discoveries-status ${discovery.status === 'Active' ? 'is-active' : 'is-empty'}`}>
+                <Badge variant="outline" className={`discoveries-status ${discovery.status === 'Active' ? 'is-active' : discovery.demo ? 'is-demo' : 'is-empty'}`}>
                   {discovery.status}
                 </Badge>
                 <span className="discoveries-clarity" data-label="Clarity">{discovery.clarity}</span>
-                <span className="discoveries-meta" data-label="Counts">{discovery.counts}</span>
+                <span className="discoveries-counts" data-label="Open / Fog / Closed">{discovery.counts}</span>
                 <span className="discoveries-meta" data-label="Last activity">{discovery.lastActivity}</span>
               </button>
             ))}

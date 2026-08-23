@@ -93,3 +93,13 @@ passed
 - Demo regression: `../qa-live-intake/grilling-demo-{dark|light}-{1440|700|390}.png` covers the unchanged `/sessions/grilling` route; no demo component markup or demo-scoped style was modified.
 - Build and console: the Node 22 production build completed without TypeScript errors, and the Playwright run passed the live flow, recovery, approval, both themes, and all three QA viewports.
 - Final result: passed
+
+## Store-driven surfaces
+
+- Discoveries: live summaries now use compact aligned rows with tabular clarity and Open / Fog / Closed counts, a quiet first-row demo label, truncated long names, open-row navigation, and compact loading, empty, create-failure, and retryable error states. Evidence: `../qa-live-intake/store-driven/discoveries-{dark|light}-{1440|700|390}.png`, `discoveries-loading-dark-700.png`, `discoveries-empty-dark-700.png`, and `discoveries-error-light-390.png`.
+- Live map: approved API data drives Destination, counts, clarity, and all three columns. Empty columns use one honest discovery-session action; loading and error states are compact; empty maps resume their selected discovery; unavailable direct-edit actions remain visible, disabled, and accessibly described. Evidence: `../qa-live-intake/store-driven/map-{dark|light}-{1440|700|390}.png`, `map-empty-dark-1440.png`, `map-loading-dark-700.png`, and `map-error-light-390.png`.
+- Landing and selector: `/map` preserves the selected discovery, otherwise opens the most recently updated Active discovery, and falls back to the intentional empty landing only when no Active discovery exists. New discovery opens live intake, while the desktop and mobile selectors show real names, loading/error labels, switching, and ellipsis truncation for long names.
+- End-to-end: one real mock-provider flow created a discovery, streamed an intake turn, approved staged items, rendered the GET-backed map, opened its Grilling ticket, and streamed a live session turn. The resulting discovery and live session were used for responsive screenshots of intake and session in both themes.
+- Responsive and regression QA: dark and light passed at 1440 × 900, 700 × 900, and 390 × 844 across discoveries, map, intake, and session with zero document-level horizontal overflow. Demo map, grilling, Evidence, and Discovery Spec regression captures remained visually unchanged; exact image comparisons were zero-difference for the demo map, grilling, and spec captures.
+- Build: the Node 22 production build completed without TypeScript errors.
+- Final result: passed
