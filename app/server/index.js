@@ -39,6 +39,24 @@ app.get('/api/discoveries', async (_request, response, next) => {
   }
 });
 
+app.post('/api/discoveries/:id/duplicate', async (request, response, next) => {
+  try {
+    const source = await getDiscovery(request.params.id);
+    if (!source) return publicError(response, 404, 'Discovery not found');
+    const now = new Date().toISOString();
+    const duplicate = structuredClone(source);
+    duplicate.id = crypto.randomUUID();
+    duplicate.name = `${source.name} copy`.slice(0, 80);
+    duplicate.status = 'Active';
+    duplicate.createdAt = now;
+    duplicate.updatedAt = now;
+    await saveDiscovery(duplicate);
+    response.status(201).json(duplicate);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.patch('/api/discoveries/:id', async (request, response, next) => {
   try {
     const discovery = await getDiscovery(request.params.id);
@@ -308,6 +326,8 @@ app.use((error, _request, response, _next) => {
 });
 
 await initializeStore();
-app.listen(port, () => {
-  console.log(`Ten Brains API listening on http://localhost:${port}`);
+const server = app.listen(port, () => {
+  const address = server.address();
+  const listeningPort = typeof address === 'object' && address ? address.port : port;
+  console.log(`Ten Brains API listening on http://localhost:${listeningPort}`);
 });

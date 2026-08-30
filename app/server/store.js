@@ -2,15 +2,21 @@ import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const dataDirectory = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
+const defaultDataDirectory = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
+
+function dataDirectory() {
+  return process.env.TEN_BRAINS_DATA_DIR
+    ? path.resolve(process.env.TEN_BRAINS_DATA_DIR)
+    : defaultDataDirectory;
+}
 
 function fileFor(id) {
   if (!/^[a-zA-Z0-9-]+$/.test(id)) throw new Error('Invalid discovery id');
-  return path.join(dataDirectory, `${id}.json`);
+  return path.join(dataDirectory(), `${id}.json`);
 }
 
 export async function initializeStore() {
-  await mkdir(dataDirectory, { recursive: true });
+  await mkdir(dataDirectory(), { recursive: true });
 }
 
 export async function createDiscovery({ name = 'Untitled discovery' } = {}) {
@@ -82,7 +88,7 @@ export function discoverySummary(discovery) {
 
 export async function listDiscoveries() {
   await initializeStore();
-  const names = (await readdir(dataDirectory)).filter((name) => name.endsWith('.json'));
+  const names = (await readdir(dataDirectory())).filter((name) => name.endsWith('.json'));
   const discoveries = await Promise.all(names.map((name) => getDiscovery(name.slice(0, -5))));
   return discoveries
     .filter(Boolean)
