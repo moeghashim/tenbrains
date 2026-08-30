@@ -611,6 +611,50 @@ a,
   width: 156px;
 }
 
+.discovery-action-error,
+.discovery-rename-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.discovery-action-error {
+  margin: 2px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
+  border-radius: 9px;
+  background: var(--danger-soft);
+}
+
+.discovery-action-error svg,
+.discovery-rename-error svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.discovery-rename-dialog {
+  max-width: 430px;
+  border-radius: 16px;
+}
+
+.discovery-rename-dialog form {
+  display: grid;
+  gap: 12px;
+}
+
+.discovery-rename-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.discovery-rename-dialog [data-slot="dialog-footer"] {
+  margin-top: 6px;
+}
+
 .destination-card,
 .map-column,
 .ticket-card,
@@ -2274,7 +2318,7 @@ a,
 .discoveries-list-head,
 .discoveries-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) 92px 72px minmax(150px, 1fr) minmax(170px, 1fr);
+  grid-template-columns: minmax(200px, 1.35fr) 92px 72px minmax(140px, 0.9fr) minmax(150px, 1fr) 112px;
   align-items: center;
   gap: 16px;
 }
@@ -2304,12 +2348,51 @@ a,
   color: var(--text-dim);
 }
 
+.discoveries-row.is-archived {
+  background: color-mix(in srgb, var(--surface) 32%, transparent);
+  color: var(--text-dim);
+}
+
+.discoveries-row.is-archived > :not(.discoveries-actions) {
+  opacity: 0.62;
+}
+
 .discoveries-row:last-child {
   border-bottom: 0;
 }
 
 .discoveries-row:hover {
   background: color-mix(in srgb, var(--surface-hover) 70%, transparent);
+}
+
+.discoveries-open {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.discoveries-open:hover {
+  color: var(--workbench-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.discoveries-open:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--theme-focus);
+  outline-offset: 3px;
+}
+
+.discoveries-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.discoveries-actions .button,
+.discoveries-actions button {
+  min-width: 100px;
 }
 
 .discoveries-row:focus-visible,
@@ -2814,6 +2897,11 @@ a,
     grid-column: 1 / -1;
   }
 
+  .discoveries-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
   .discoveries-counts::before,
   .discoveries-meta::before,
   .discoveries-clarity::before {
@@ -3070,6 +3158,10 @@ a,
   .discoveries-meta {
     grid-column: 1 / -1;
     text-align: left;
+  }
+
+  .discoveries-actions {
+    grid-column: 1 / -1;
   }
 
   .evidence-metadata {

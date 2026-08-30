@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import {
   AlertCircle,
@@ -159,6 +159,7 @@ type IntakeError = { kind: 'load' | 'turn'; message: string };
 type LiveSessionError = { kind: 'load' | 'stream' | 'moment' | 'approve'; message: string };
 type LiveSessionDrawer = 'inquiry' | 'signals' | null;
 type InquiryDraft = { id: string; question: string; sourceQuestion: string };
+type DiscoveryAction = 'rename' | 'archive' | 'duplicate' | null;
 
 type StagedFrontierTicket = {
   title: string;
@@ -611,14 +612,19 @@ function App() {
       setLiveDiscoveryStatus('loading');
       try {
         const pathId = window.location.pathname.match(/^\/discoveries\/([^/]+)$/)?.[1];
-        let discoveryId = pathId ?? window.sessionStorage.getItem('ten-brains-live-discovery');
+        let discoveryId = pathId ?? null;
         if (!discoveryId) {
           const listResponse = await fetch('/api/discoveries');
           if (!listResponse.ok) throw new Error('Discoveries could not load');
           const discoveries: DiscoverySummary[] = await listResponse.json();
-          discoveryId = discoveries.find((item) => item.status === 'Active')?.id ?? null;
+          const activeDiscoveries = discoveries.filter((item) => item.status === 'Active');
+          const storedId = window.sessionStorage.getItem('ten-brains-live-discovery');
+          discoveryId = activeDiscoveries.find((item) => item.id === storedId)?.id
+            ?? activeDiscoveries[0]?.id
+            ?? null;
         }
         if (!discoveryId) {
+          window.sessionStorage.removeItem('ten-brains-live-discovery');
           if (!cancelled) setLiveDiscoveryStatus('ready');
           return;
         }
@@ -675,6 +681,7 @@ function App() {
           liveDiscovery={liveDiscovery}
           liveDiscoveryStatus={liveDiscoveryStatus}
           onRetryLiveMap={() => setMapLoadAttempt((attempt) => attempt + 1)}
+          onLiveDiscoveryChange={setLiveDiscovery}
         />
       )}
     </TooltipProvider>
@@ -697,6 +704,19 @@ async function startNewDiscovery(navigate: (path: string) => void): Promise<bool
 function openLiveDiscovery(id: string, navigate: (path: string) => void) {
   window.sessionStorage.setItem('ten-brains-live-discovery', id);
   navigate(`/discoveries/${id}`);
+}
+
+async function apiErrorMessage(response: Response, fallback: string) {
+  try {
+    const result = await response.json() as { error?: string };
+    return result.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function announceDiscoveryChange() {
+  window.dispatchEvent(new Event('ten-brains-discoveries-changed'));
 }
 
 function NavLink({
@@ -745,14 +765,22 @@ function SideNav({
 
   useEffect(() => {
     if (isDemoNavigation) { setDiscoveryListStatus('ready'); return; }
-    setDiscoveryListStatus('loading');
-    fetch('/api/discoveries')
-      .then((response) => {
-        if (!response.ok) throw new Error('Discoveries could not load');
-        return response.json();
-      })
-      .then((items: DiscoverySummary[]) => { setDiscoveries(items); setDiscoveryListStatus('ready'); })
-      .catch(() => setDiscoveryListStatus('error'));
+    const loadDiscoveries = () => {
+      setDiscoveryListStatus('loading');
+      fetch('/api/discoveries')
+        .then((response) => {
+          if (!response.ok) throw new Error('Discoveries could not load');
+          return response.json();
+        })
+        .then((items: DiscoverySummary[]) => {
+          setDiscoveries(items.filter((item) => item.status === 'Active'));
+          setDiscoveryListStatus('ready');
+        })
+        .catch(() => setDiscoveryListStatus('error'));
+    };
+    loadDiscoveries();
+    window.addEventListener('ten-brains-discoveries-changed', loadDiscoveries);
+    return () => window.removeEventListener('ten-brains-discoveries-changed', loadDiscoveries);
   }, [isDemoNavigation]);
 
   useEffect(() => {
@@ -894,20 +922,40 @@ function SideNav({
   );
 }
 
-function MoreMenu({ label, disabled = false }: { label: string; disabled?: boolean }) {
-  const accessibleLabel = disabled ? `${label}. Available after a reviewed Wayfinder update.` : label;
+function MoreMenu({
+  label,
+  disabled = false,
+  disabledMessage = 'Available after a reviewed Wayfinder update.',
+  loading = false,
+  items,
+}: {
+  label: string;
+  disabled?: boolean;
+  disabledMessage?: string;
+  loading?: boolean;
+  items?: Array<{ label: string; destructive?: boolean; onSelect: () => void }>;
+}) {
+  const accessibleLabel = disabled ? `${label}. ${disabledMessage}` : label;
+  const menuItems = items ?? [
+    { label: 'Duplicate', onSelect: () => undefined },
+    { label: 'Archive', destructive: true, onSelect: () => undefined },
+  ];
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" className="menu-button" aria-label={accessibleLabel} disabled={disabled} title={disabled ? 'Available after a reviewed Wayfinder update' : undefined}>
-          <MoreHorizontal aria-hidden="true" />
+        <Button variant="ghost" size="icon-sm" className="menu-button" aria-label={accessibleLabel} disabled={disabled} title={disabled ? disabledMessage : undefined}>
+          {loading ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <MoreHorizontal aria-hidden="true" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="menu-content">
-        <DropdownMenuItem>Open details</DropdownMenuItem>
-        <DropdownMenuItem>Duplicate</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>Archive</DropdownMenuItem>
+        {menuItems.map((item, index) => (
+          <Fragment key={item.label}>
+            {item.destructive && index > 0 ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuItem className={item.destructive ? 'text-[var(--danger)] focus:text-[var(--danger)]' : undefined} onSelect={item.onSelect}>
+              {item.label}
+            </DropdownMenuItem>
+          </Fragment>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -926,13 +974,20 @@ function MapOverview({
   liveDiscovery,
   liveDiscoveryStatus,
   onRetryLiveMap,
+  onLiveDiscoveryChange,
 }: {
   navigate: (path: string) => void;
   liveDiscovery: ApiDiscovery | null;
   liveDiscoveryStatus: LiveDiscoveryStatus;
   onRetryLiveMap: () => void;
+  onLiveDiscoveryChange: (discovery: ApiDiscovery | null) => void;
 }) {
   const [segment, setSegment] = useState<MapSegment>('frontier');
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [renameError, setRenameError] = useState('');
+  const [discoveryAction, setDiscoveryAction] = useState<DiscoveryAction>(null);
+  const [discoveryActionError, setDiscoveryActionError] = useState('');
   const isDemoMap = new URLSearchParams(window.location.search).get('demo') === '1';
   const isLoadingMap = !isDemoMap && liveDiscoveryStatus === 'loading';
   const hasMapError = !isDemoMap && liveDiscoveryStatus === 'error';
@@ -944,6 +999,81 @@ function MapOverview({
   const isEmptyMap = !isDemoMap && liveDiscoveryStatus === 'ready' && !hasLiveMap;
   const clarity = isDemoMap ? 62 : Math.min(100, (liveMap?.destination ? 30 : 10) + (displayedTickets.length + displayedFog.length + displayedDecisions.length) * 10);
   const mapStatus = isLoadingMap ? 'Loading' : hasMapError ? 'Unavailable' : isEmptyMap ? 'Empty' : 'Active';
+
+  function openRename() {
+    setRenameDraft(liveDiscovery?.name ?? '');
+    setRenameError('');
+    setRenameOpen(true);
+  }
+
+  async function renameDiscovery() {
+    if (!liveDiscovery) return;
+    setDiscoveryAction('rename');
+    setRenameError('');
+    try {
+      const response = await fetch(`/api/discoveries/${liveDiscovery.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: renameDraft }),
+      });
+      if (!response.ok) {
+        setRenameError(await apiErrorMessage(response, 'The discovery name could not change.'));
+        return;
+      }
+      const discovery: ApiDiscovery = await response.json();
+      onLiveDiscoveryChange(discovery);
+      announceDiscoveryChange();
+      setRenameOpen(false);
+    } catch {
+      setRenameError('The discovery name could not change. Retry when the connection is ready.');
+    } finally {
+      setDiscoveryAction(null);
+    }
+  }
+
+  async function archiveDiscovery() {
+    if (!liveDiscovery) return;
+    setDiscoveryAction('archive');
+    setDiscoveryActionError('');
+    try {
+      const response = await fetch(`/api/discoveries/${liveDiscovery.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Archived' }),
+      });
+      if (!response.ok) {
+        setDiscoveryActionError(await apiErrorMessage(response, 'The discovery could not archive.'));
+        return;
+      }
+      window.sessionStorage.removeItem('ten-brains-live-discovery');
+      announceDiscoveryChange();
+      navigate('/discoveries');
+    } catch {
+      setDiscoveryActionError('The discovery could not archive. Retry when the connection is ready.');
+    } finally {
+      setDiscoveryAction(null);
+    }
+  }
+
+  async function duplicateDiscovery() {
+    if (!liveDiscovery) return;
+    setDiscoveryAction('duplicate');
+    setDiscoveryActionError('');
+    try {
+      const response = await fetch(`/api/discoveries/${liveDiscovery.id}/duplicate`, { method: 'POST' });
+      if (!response.ok) {
+        setDiscoveryActionError(await apiErrorMessage(response, 'The discovery could not duplicate.'));
+        return;
+      }
+      const duplicate: ApiDiscovery = await response.json();
+      announceDiscoveryChange();
+      openLiveDiscovery(duplicate.id, navigate);
+    } catch {
+      setDiscoveryActionError('The discovery could not duplicate. Retry when the connection is ready.');
+    } finally {
+      setDiscoveryAction(null);
+    }
+  }
 
   async function startSession(ticket: Ticket & { id?: string }) {
     if (isDemoMap || !liveDiscovery || !ticket.id) {
@@ -974,8 +1104,20 @@ function MapOverview({
               {isLoadingMap ? <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" /> : <Circle aria-hidden="true" className="status-icon" />} {mapStatus}
             </Badge>
           </div>
-          <MoreMenu label="Discovery options" disabled={!isDemoMap} />
+          <MoreMenu
+            label="Discovery options"
+            disabled={!isDemoMap && (!liveDiscovery || discoveryAction !== null)}
+            disabledMessage={discoveryAction ? 'Discovery change in progress.' : 'Available after the discovery loads.'}
+            loading={!isDemoMap && discoveryAction !== null}
+            items={isDemoMap ? undefined : [
+              { label: 'Rename', onSelect: openRename },
+              { label: 'Duplicate', onSelect: () => void duplicateDiscovery() },
+              { label: 'Archive', destructive: true, onSelect: () => void archiveDiscovery() },
+            ]}
+          />
         </header>
+
+        {discoveryActionError ? <p className="discovery-action-error" role="alert"><AlertCircle aria-hidden="true" /> {discoveryActionError}</p> : null}
 
         {isLoadingMap ? (
           <MapLoadingState />
@@ -1051,6 +1193,28 @@ function MapOverview({
         )}
       </main>
       {!isEmptyMap && !isLoadingMap && !hasMapError && <WayfinderPill status={isDemoMap ? 'synthesizing 2 evidence statements' : 'showing approved map items'} />}
+      {!isDemoMap ? (
+        <Dialog open={renameOpen} onOpenChange={(open) => { if (discoveryAction !== 'rename') setRenameOpen(open); }}>
+          <DialogContent className="discovery-rename-dialog">
+            <DialogHeader>
+              <DialogTitle>Rename discovery</DialogTitle>
+              <DialogDescription>Use a clear name for this decision map.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={(event) => { event.preventDefault(); void renameDiscovery(); }}>
+              <label className="discovery-rename-label" htmlFor="discovery-name">Discovery name</label>
+              <Input id="discovery-name" value={renameDraft} maxLength={80} autoFocus onChange={(event) => setRenameDraft(event.target.value)} aria-invalid={Boolean(renameError)} aria-describedby={renameError ? 'discovery-name-error' : undefined} />
+              {renameError ? <p id="discovery-name-error" className="discovery-rename-error" role="alert"><AlertCircle aria-hidden="true" /> {renameError}</p> : null}
+              <DialogFooter>
+                <Button type="button" variant="outline" disabled={discoveryAction === 'rename'} onClick={() => setRenameOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={discoveryAction === 'rename'}>
+                  {discoveryAction === 'rename' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Pencil aria-hidden="true" />}
+                  {discoveryAction === 'rename' ? 'Saving name' : 'Save name'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }
@@ -1809,6 +1973,8 @@ function DiscoveriesList({ navigate }: { navigate: (path: string) => void }) {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [updatingId, setUpdatingId] = useState('');
+  const [updateError, setUpdateError] = useState('');
 
   useEffect(() => {
     setStatus('loading');
@@ -1825,6 +1991,28 @@ function DiscoveriesList({ navigate }: { navigate: (path: string) => void }) {
     if (!started) {
       setCreating(false);
       setCreateError('The discovery did not start. Retry when the connection is ready.');
+    }
+  }
+
+  async function unarchiveDiscovery(discovery: { id: string; name: string }) {
+    setUpdatingId(discovery.id);
+    setUpdateError('');
+    try {
+      const response = await fetch(`/api/discoveries/${discovery.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Active' }),
+      });
+      if (!response.ok) {
+        setUpdateError(await apiErrorMessage(response, `${discovery.name} could not unarchive.`));
+        return;
+      }
+      announceDiscoveryChange();
+      setLoadAttempt((attempt) => attempt + 1);
+    } catch {
+      setUpdateError(`${discovery.name} could not unarchive. Retry when the connection is ready.`);
+    } finally {
+      setUpdatingId('');
     }
   }
 
@@ -1868,6 +2056,7 @@ function DiscoveriesList({ navigate }: { navigate: (path: string) => void }) {
               Open a live decision map or inspect the demo.
             </p>
             {createError && <p className="discoveries-create-error" role="alert"><AlertCircle aria-hidden="true" /> {createError}</p>}
+            {updateError && <p className="discoveries-create-error" role="alert"><AlertCircle aria-hidden="true" /> {updateError}</p>}
           </div>
 
           <div className="workspace-list discoveries-list">
@@ -1877,6 +2066,7 @@ function DiscoveriesList({ navigate }: { navigate: (path: string) => void }) {
               <span>Clarity</span>
               <span>Open / Fog / Closed</span>
               <span>Last activity</span>
+              <span>Actions</span>
             </div>
             {status === 'loading' && (
               <div className="discoveries-runtime-row" role="status" aria-live="polite">
@@ -1902,21 +2092,37 @@ function DiscoveriesList({ navigate }: { navigate: (path: string) => void }) {
               </div>
             )}
             {rows.map((discovery) => (
-              <button
+              <div
                 key={discovery.id}
-                type="button"
-                className={`discoveries-row ${discovery.demo ? 'is-demo' : ''}`}
-                aria-label={`${discovery.name}. ${discovery.demo ? 'Open demo map' : 'Open discovery'}`}
-                onClick={() => discovery.demo ? navigate('/map?demo=1') : openLiveDiscovery(discovery.id, navigate)}
+                className={`discoveries-row ${discovery.demo ? 'is-demo' : ''} ${discovery.status === 'Archived' ? 'is-archived' : ''}`}
               >
-                <span className="discoveries-title">{discovery.name}</span>
+                {discovery.status === 'Archived' ? (
+                  <span className="discoveries-title">{discovery.name}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="discoveries-title discoveries-open"
+                    aria-label={`${discovery.name}. ${discovery.demo ? 'Open demo map' : 'Open discovery'}`}
+                    onClick={() => discovery.demo ? navigate('/map?demo=1') : openLiveDiscovery(discovery.id, navigate)}
+                  >
+                    {discovery.name}
+                  </button>
+                )}
                 <Badge variant="outline" className={`discoveries-status ${discovery.status === 'Active' ? 'is-active' : discovery.demo ? 'is-demo' : 'is-empty'}`}>
                   {discovery.status}
                 </Badge>
                 <span className="discoveries-clarity" data-label="Clarity">{discovery.clarity}</span>
                 <span className="discoveries-counts" data-label="Open / Fog / Closed">{discovery.counts}</span>
                 <span className="discoveries-meta" data-label="Last activity">{discovery.lastActivity}</span>
-              </button>
+                <span className="discoveries-actions">
+                  {discovery.status === 'Archived' ? (
+                    <Button variant="ghost" size="sm" disabled={updatingId === discovery.id} onClick={() => void unarchiveDiscovery(discovery)}>
+                      {updatingId === discovery.id ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <RotateCcw aria-hidden="true" />}
+                      {updatingId === discovery.id ? 'Unarchiving' : 'Unarchive'}
+                    </Button>
+                  ) : null}
+                </span>
+              </div>
             ))}
           </div>
         </section>

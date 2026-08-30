@@ -103,3 +103,14 @@ passed
 - Responsive and regression QA: dark and light passed at 1440 × 900, 700 × 900, and 390 × 844 across discoveries, map, intake, and session with zero document-level horizontal overflow. Demo map, grilling, Evidence, and Discovery Spec regression captures remained visually unchanged; exact image comparisons were zero-difference for the demo map, grilling, and spec captures.
 - Build: the Node 22 production build completed without TypeScript errors.
 - Final result: passed
+
+## Discovery management actions — 2026-08-30
+
+- Live API workflow: renamed `Discovery actions QA` to `Renamed discovery QA`, confirmed the server `Discovery name is required` response for an empty rename, duplicated it, archived the copy, and restored it with `Unarchive`.
+- Selection behavior: rename updated the breadcrumb and discovery selector without navigation. Duplicate opened the copied live map and stored its new ID. Archive cleared the selected ID and opened `/discoveries`.
+- Archived behavior: archived discoveries use a quiet grayed row with an explicit `Unarchive` action. The map selector excludes them, and `/map` ignored a stored archived ID before choosing the most recent Active discovery.
+- Responsive and theme QA: dark and light passed at 1440 × 900 and 390 × 844. Evidence: `../qa-discovery-actions-{dark|light}-{1440|390}.png` and `../qa-discovery-rename-light-1440.png`.
+- Menu and dialog QA: the live Discovery options menu contains only Rename, Duplicate, and Archive. The rename dialog follows the 16px Warm Graphite dialog recipe, keeps keyboard focus visible, and exposes loading and error states.
+- Demo regression: `/map?demo=1` retained `AI onboarding assistant`, rendered `Target developer-led teams first`, and had zero document-level horizontal overflow. No demo data or route behavior changed.
+- Console and build: the shared dialog overlay now forwards its Radix ref, so the rename path adds no console warning. Node 22 production build and API tests passed.
+- Final result: passed
