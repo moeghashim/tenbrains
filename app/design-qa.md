@@ -114,3 +114,13 @@ passed
 - Demo regression: `/map?demo=1` retained `AI onboarding assistant`, rendered `Target developer-led teams first`, and had zero document-level horizontal overflow. No demo data or route behavior changed.
 - Console and build: the shared dialog overlay now forwards its Radix ref, so the rename path adds no console warning. Node 22 production build and API tests passed.
 - Final result: passed
+
+## Live Evidence view — 2026-08-30
+
+- Live data: `/evidence` loaded discovery `149ef834-1beb-4094-98e9-56e7c35f6bd3` through the selected-discovery fallback and rendered two captured evidence records from its real Grilling session. Session headings and `Open session` links group each record by source session.
+- Quote fidelity and selection: both list rows and expanded details matched the API `text` values exactly. The direct link `/evidence#EVID-6add0821-0d50-431f-9017-b4c627924c40` expanded the requested record, and row selection updated the hash.
+- Runtime states: loading, retryable error, no-active-discovery, and empty-evidence treatments use the store-driven state pattern. The verified empty state exposed one action, `Open a session`, for a selected discovery with no captured evidence.
+- Responsive and theme QA: the actual theme controls switched dark and light at 1440 × 900 and 390 × 844. Evidence: `../qa-evidence-live-{dark|light}-{1440|390}.png`. Document-level horizontal overflow was zero at both widths.
+- Demo regression: `/evidence?demo=1#INT-03` rendered all seven scripted records, selected `INT-03`, retained `Target developer-led teams first`, and rendered no live session groups. Evidence: `../qa-evidence-demo-dark-1440.png`.
+- Console and validation: the Evidence route added no page errors. The shared browser history retained a pre-existing Radix overlay ref warning from an earlier map route. Node 22 production build, API tests, and `git diff --check` passed.
+- Final result: passed

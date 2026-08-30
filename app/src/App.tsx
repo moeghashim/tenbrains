@@ -178,6 +178,11 @@ type EvidenceRecord = {
   detail: string;
 };
 
+type LiveEvidenceGroup = {
+  session: ApiSession;
+  records: Array<ApiSession['evidence'][number] & { citedBy: string[] }>;
+};
+
 const frontierTickets: Ticket[] = [
   {
     title: 'Grill 5 solo founders on setup anxiety',
@@ -754,7 +759,7 @@ function SideNav({
   const [discoveryListStatus, setDiscoveryListStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const isDemoNavigation = new URLSearchParams(window.location.search).get('demo') === '1'
     || window.location.pathname.startsWith('/sessions/grilling')
-    || ['/evidence', '/spec', '/how-it-works'].includes(window.location.pathname);
+    || ['/spec', '/how-it-works'].includes(window.location.pathname);
   const selectedDiscoveryId = window.location.pathname.match(/^\/discoveries\/([^/]+)$/)?.[1]
     ?? window.sessionStorage.getItem('ten-brains-live-discovery')
     ?? '';
@@ -851,7 +856,7 @@ function SideNav({
         <NavLink active={active === 'session'} icon={CalendarDays} onClick={go(isDemoNavigation ? '/sessions/grilling' : '/sessions')}>
           Sessions
         </NavLink>
-        <NavLink active={active === 'evidence'} icon={Inbox} onClick={go('/evidence')}>Evidence</NavLink>
+        <NavLink active={active === 'evidence'} icon={Inbox} onClick={go(isDemoNavigation ? '/evidence?demo=1' : '/evidence')}>Evidence</NavLink>
         <NavLink active={active === 'spec'} icon={FileText} onClick={go('/spec')}>Discovery Spec</NavLink>
         <NavLink active={active === 'how-it-works'} icon={GitBranch} onClick={go('/how-it-works')}>How it works</NavLink>
       </nav>
@@ -2132,12 +2137,19 @@ function DiscoveriesList({ navigate }: { navigate: (path: string) => void }) {
 }
 
 function EvidenceView({ navigate }: { navigate: (path: string) => void }) {
+  const isDemoEvidence = new URLSearchParams(window.location.search).get('demo') === '1';
+  return isDemoEvidence
+    ? <DemoEvidenceView navigate={navigate} />
+    : <LiveEvidenceView navigate={navigate} />;
+}
+
+function DemoEvidenceView({ navigate }: { navigate: (path: string) => void }) {
   const initialId = decodeURIComponent(window.location.hash.replace('#', ''));
   const [selectedId, setSelectedId] = useState(() => evidenceRecords.some((item) => item.id === initialId) ? initialId : evidenceRecords[0]?.id);
 
   function selectEvidence(id: string) {
     setSelectedId((current) => current === id ? '' : id);
-    window.history.replaceState({}, '', `/evidence#${id}`);
+    window.history.replaceState({}, '', `/evidence?demo=1#${id}`);
   }
 
   return (
@@ -2195,6 +2207,180 @@ function EvidenceView({ navigate }: { navigate: (path: string) => void }) {
                 </div>
               );
             })}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function LiveEvidenceView({ navigate }: { navigate: (path: string) => void }) {
+  const initialId = decodeURIComponent(window.location.hash.replace('#', ''));
+  const [discovery, setDiscovery] = useState<ApiDiscovery | null>(null);
+  const [status, setStatus] = useState<LiveDiscoveryStatus>('loading');
+  const [attempt, setAttempt] = useState(0);
+  const [selectedId, setSelectedId] = useState(initialId);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadEvidence() {
+      setDiscovery(null);
+      setStatus('loading');
+      try {
+        const listResponse = await fetch('/api/discoveries');
+        if (!listResponse.ok) throw new Error('Discoveries could not load');
+        const discoveries: DiscoverySummary[] = await listResponse.json();
+        const activeDiscoveries = discoveries.filter((item) => item.status === 'Active');
+        const storedId = window.sessionStorage.getItem('ten-brains-live-discovery');
+        const discoveryId = activeDiscoveries.find((item) => item.id === storedId)?.id
+          ?? activeDiscoveries[0]?.id
+          ?? null;
+        if (!discoveryId) {
+          window.sessionStorage.removeItem('ten-brains-live-discovery');
+          if (!cancelled) setStatus('ready');
+          return;
+        }
+        window.sessionStorage.setItem('ten-brains-live-discovery', discoveryId);
+        const response = await fetch(`/api/discoveries/${discoveryId}`);
+        if (!response.ok) throw new Error('Evidence could not load');
+        const loaded: ApiDiscovery = await response.json();
+        if (!cancelled) {
+          setDiscovery(loaded);
+          setStatus('ready');
+        }
+      } catch {
+        if (!cancelled) setStatus('error');
+      }
+    }
+    void loadEvidence();
+    return () => { cancelled = true; };
+  }, [attempt]);
+
+  const liveSessions = discovery?.sessions.filter((item): item is ApiSession => item.type === 'grilling') ?? [];
+  const groups: LiveEvidenceGroup[] = liveSessions
+    .map((session) => ({
+      session,
+      records: session.evidence.map((record) => ({
+        ...record,
+        citedBy: discovery?.map.closedDecisions
+          .filter((decision) => decision.evidence.includes(record.id))
+          .map((decision) => decision.title) ?? [],
+      })),
+    }))
+    .filter((group) => group.records.length > 0);
+  const evidenceCount = groups.reduce((count, group) => count + group.records.length, 0);
+
+  useEffect(() => {
+    if (status !== 'ready' || evidenceCount === 0) return;
+    const hasSelectedEvidence = groups.some((group) => group.records.some((record) => record.id === selectedId));
+    if (!hasSelectedEvidence) setSelectedId(groups[0].records[0].id);
+  }, [evidenceCount, groups, selectedId, status]);
+
+  function selectEvidence(id: string) {
+    setSelectedId((current) => current === id ? '' : id);
+    window.history.replaceState({}, '', `/evidence#${encodeURIComponent(id)}`);
+  }
+
+  return (
+    <div className="app-shell">
+      <SideNav active="evidence" navigate={navigate} />
+      <main className="main-surface workspace-main">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <DiscoveriesCrumb navigate={navigate} />
+            <span aria-hidden="true" className="breadcrumb-slash">/</span>
+            <strong>Evidence</strong>
+          </div>
+          <Badge variant="outline" className="border-[var(--border-subtle)] text-muted-foreground">
+            {status === 'loading' ? 'Loading evidence' : `${evidenceCount} evidence ${evidenceCount === 1 ? 'item' : 'items'}`}
+          </Badge>
+        </header>
+
+        <section className="workspace-collection evidence-collection">
+          <div className="workspace-intro">
+            <p className="eyebrow">Evidence ledger</p>
+            <h1 className="mt-2 text-[22px] font-medium tracking-[-0.03em] text-[var(--text)]">Captured evidence</h1>
+            <p className="mt-2 max-w-[680px] text-[13px] leading-[1.7] text-muted-foreground">
+              Review verbatim evidence from each session. Select a quote to see which Closed Decisions cite it.
+            </p>
+          </div>
+
+          <div className="workspace-list evidence-list">
+            {status === 'loading' && (
+              <div className="evidence-runtime-state" role="status">
+                <LoaderCircle aria-hidden="true" className="animate-spin" />
+                <span><strong>Loading evidence</strong><small>Reading captured session evidence.</small></span>
+              </div>
+            )}
+            {status === 'error' && (
+              <div className="evidence-runtime-state is-error" role="alert">
+                <AlertCircle aria-hidden="true" />
+                <span><strong>Evidence unavailable</strong><small>Wayfinder could not read the selected discovery.</small></span>
+                <Button variant="outline" size="sm" onClick={() => setAttempt((current) => current + 1)}><RotateCcw aria-hidden="true" /> Retry</Button>
+              </div>
+            )}
+            {status === 'ready' && !discovery && (
+              <div className="evidence-runtime-state is-empty">
+                <Inbox aria-hidden="true" />
+                <span><strong>No active discovery</strong><small>Open a discovery to review its evidence.</small></span>
+                <Button variant="outline" size="sm" onClick={() => navigate('/discoveries')}>View discoveries</Button>
+              </div>
+            )}
+            {status === 'ready' && discovery && evidenceCount === 0 && (
+              <div className="evidence-runtime-state is-empty">
+                <Inbox aria-hidden="true" />
+                <span><strong>Capture the first evidence</strong><small>Open a session and mark one concrete moment.</small></span>
+                <Button variant="outline" size="sm" onClick={() => navigate(liveSessions[0] ? `/sessions/${liveSessions[0].id}` : '/sessions')}>
+                  Open a session <ArrowRight aria-hidden="true" />
+                </Button>
+              </div>
+            )}
+            {status === 'ready' && groups.map(({ session, records }) => (
+              <section className="evidence-session-group" key={session.id} aria-labelledby={`evidence-session-${session.id}`}>
+                <div className="evidence-session-header">
+                  <div>
+                    <p className="eyebrow">Grilling session</p>
+                    <h2 id={`evidence-session-${session.id}`}>{session.title}</h2>
+                  </div>
+                  <a href={`/sessions/${session.id}`} onClick={(event) => { event.preventDefault(); navigate(`/sessions/${session.id}`); }}>
+                    Open session <ArrowRight aria-hidden="true" />
+                  </a>
+                </div>
+                {records.map((item) => {
+                  const expanded = selectedId === item.id;
+                  const capturedDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(item.createdAt));
+                  return (
+                    <div key={item.id} id={item.id} className={`evidence-row-shell ${expanded ? 'is-expanded' : ''}`}>
+                      <button type="button" className="evidence-row" aria-expanded={expanded} onClick={() => selectEvidence(item.id)}>
+                        <span className="evidence-row-copy">
+                          <span className="evidence-title">{item.text}</span>
+                          <span className="evidence-metadata">
+                            <span className="evidence-id">{item.id}</span>
+                            <span>{capturedDate}</span>
+                            <span>{item.citedBy.length > 0 ? `${item.citedBy.length} Closed ${item.citedBy.length === 1 ? 'Decision cites' : 'Decisions cite'} this evidence` : 'No Closed Decision cites this evidence'}</span>
+                          </span>
+                        </span>
+                        <ChevronDown aria-hidden="true" className="evidence-chevron" />
+                      </button>
+                      {expanded && (
+                        <div className="evidence-detail-wrap">
+                          <div className="evidence-detail">
+                            <span className="evidence-detail-label">Verbatim quote</span>
+                            <pre>{item.text}</pre>
+                            {item.citedBy.length > 0 && (
+                              <div className="evidence-citations">
+                                <span className="evidence-detail-label">Closed Decisions</span>
+                                <ul>{item.citedBy.map((title) => <li key={title}>{title}</li>)}</ul>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </section>
+            ))}
           </div>
         </section>
       </main>
