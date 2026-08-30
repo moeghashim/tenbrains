@@ -759,7 +759,7 @@ function SideNav({
   const [discoveryListStatus, setDiscoveryListStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const isDemoNavigation = new URLSearchParams(window.location.search).get('demo') === '1'
     || window.location.pathname.startsWith('/sessions/grilling')
-    || ['/spec', '/how-it-works'].includes(window.location.pathname);
+    || window.location.pathname === '/how-it-works';
   const selectedDiscoveryId = window.location.pathname.match(/^\/discoveries\/([^/]+)$/)?.[1]
     ?? window.sessionStorage.getItem('ten-brains-live-discovery')
     ?? '';
@@ -857,7 +857,7 @@ function SideNav({
           Sessions
         </NavLink>
         <NavLink active={active === 'evidence'} icon={Inbox} onClick={go(isDemoNavigation ? '/evidence?demo=1' : '/evidence')}>Evidence</NavLink>
-        <NavLink active={active === 'spec'} icon={FileText} onClick={go('/spec')}>Discovery Spec</NavLink>
+        <NavLink active={active === 'spec'} icon={FileText} onClick={go(isDemoNavigation ? '/spec?demo=1' : '/spec')}>Discovery Spec</NavLink>
         <NavLink active={active === 'how-it-works'} icon={GitBranch} onClick={go('/how-it-works')}>How it works</NavLink>
       </nav>
 
@@ -2666,6 +2666,13 @@ function HowItWorksView({ navigate }: { navigate: (path: string) => void }) {
 }
 
 function DiscoverySpecView({ navigate }: { navigate: (path: string) => void }) {
+  const isDemoSpec = new URLSearchParams(window.location.search).get('demo') === '1';
+  return isDemoSpec
+    ? <DemoDiscoverySpecView navigate={navigate} />
+    : <LiveDiscoverySpecView navigate={navigate} />;
+}
+
+function DemoDiscoverySpecView({ navigate }: { navigate: (path: string) => void }) {
   return (
     <div className="app-shell">
       <SideNav active="spec" navigate={navigate} />
@@ -2731,6 +2738,169 @@ function DiscoverySpecView({ navigate }: { navigate: (path: string) => void }) {
           </SpecSection>
         </article>
       </main>
+    </div>
+  );
+}
+
+function LiveDiscoverySpecView({ navigate }: { navigate: (path: string) => void }) {
+  const [discovery, setDiscovery] = useState<ApiDiscovery | null>(null);
+  const [status, setStatus] = useState<LiveDiscoveryStatus>('loading');
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSpec() {
+      setDiscovery(null);
+      setStatus('loading');
+      try {
+        const listResponse = await fetch('/api/discoveries');
+        if (!listResponse.ok) throw new Error('Discoveries could not load');
+        const discoveries: DiscoverySummary[] = await listResponse.json();
+        const activeDiscoveries = discoveries.filter((item) => item.status === 'Active');
+        const storedId = window.sessionStorage.getItem('ten-brains-live-discovery');
+        const discoveryId = activeDiscoveries.find((item) => item.id === storedId)?.id
+          ?? activeDiscoveries[0]?.id
+          ?? null;
+        if (!discoveryId) {
+          window.sessionStorage.removeItem('ten-brains-live-discovery');
+          if (!cancelled) setStatus('ready');
+          return;
+        }
+        window.sessionStorage.setItem('ten-brains-live-discovery', discoveryId);
+        const response = await fetch(`/api/discoveries/${discoveryId}`);
+        if (!response.ok) throw new Error('Discovery Spec could not load');
+        const loaded: ApiDiscovery = await response.json();
+        if (!cancelled) {
+          setDiscovery(loaded);
+          setStatus('ready');
+        }
+      } catch {
+        if (!cancelled) setStatus('error');
+      }
+    }
+    void loadSpec();
+    return () => { cancelled = true; };
+  }, [attempt]);
+
+  const liveSessions = discovery?.sessions.filter((item): item is ApiSession => item.type === 'grilling') ?? [];
+
+  return (
+    <div className="app-shell">
+      <SideNav active="spec" navigate={navigate} />
+      <main className="main-surface workspace-main">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <DiscoveriesCrumb navigate={navigate} />
+            <span aria-hidden="true" className="breadcrumb-slash">/</span>
+            <strong>Discovery Spec</strong>
+          </div>
+          <Badge variant="outline" className="spec-maintainer-badge">
+            Maintained by You + Wayfinder
+          </Badge>
+        </header>
+
+        <article className="spec-reading-column live-spec-reading-column">
+          {status === 'loading' && (
+            <div className="spec-runtime-state" role="status">
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
+              <span><strong>Loading Discovery Spec</strong><small>Reading approved map content.</small></span>
+            </div>
+          )}
+          {status === 'error' && (
+            <div className="spec-runtime-state is-error" role="alert">
+              <AlertCircle aria-hidden="true" />
+              <span><strong>Discovery Spec unavailable</strong><small>Wayfinder could not read the selected discovery.</small></span>
+              <Button variant="outline" size="sm" onClick={() => setAttempt((current) => current + 1)}><RotateCcw aria-hidden="true" /> Retry</Button>
+            </div>
+          )}
+          {status === 'ready' && !discovery && (
+            <div className="spec-runtime-state is-empty">
+              <FileText aria-hidden="true" />
+              <span><strong>No active discovery</strong><small>Open a discovery to review its Discovery Spec.</small></span>
+              <Button variant="outline" size="sm" onClick={() => navigate('/discoveries')}>View discoveries</Button>
+            </div>
+          )}
+          {status === 'ready' && discovery && (
+            <>
+              <p className="eyebrow">Living Discovery Spec</p>
+              <h1>{discovery.name}</h1>
+              <p className="spec-deck">
+                This spec mirrors approved map content. Wayfinder proposes updates. You approve them before they enter this spec.
+              </p>
+
+              <SpecSection title="Destination">
+                {discovery.map.destination ? (
+                  <p className="spec-destination">{discovery.map.destination}</p>
+                ) : (
+                  <SpecEmptyState copy="Set the Destination on the discovery map." action="Open map" onAction={() => navigate('/map')} />
+                )}
+              </SpecSection>
+
+              <SpecSection title="Open Frontier">
+                {discovery.map.openFrontier.length > 0 ? (
+                  <ul className="spec-map-list">
+                    {discovery.map.openFrontier.map((ticket) => (
+                      <li key={ticket.id}>
+                        <Badge variant="outline" className={`type-badge ${typeClass[ticket.type]}`}>{ticket.type}</Badge>
+                        <span>{ticket.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <SpecEmptyState copy="Add the next ticket on the discovery map." action="Open map" onAction={() => navigate('/map')} />
+                )}
+              </SpecSection>
+
+              <SpecSection title="Fog of War">
+                {discovery.map.fogOfWar.length > 0 ? (
+                  <ul className="spec-map-list spec-fog-list">
+                    {discovery.map.fogOfWar.map((item) => <li key={item.id}><CircleHelp aria-hidden="true" /><span>{item.question}</span></li>)}
+                  </ul>
+                ) : (
+                  <SpecEmptyState copy="Add one unresolved question on the discovery map." action="Open map" onAction={() => navigate('/map')} />
+                )}
+              </SpecSection>
+
+              <SpecSection title="Closed Decisions">
+                {discovery.map.closedDecisions.length > 0 ? (
+                  <ul className="spec-map-list spec-decisions-list">
+                    {discovery.map.closedDecisions.map((decision) => (
+                      <li key={decision.id}>
+                        <div className="spec-decision-copy">
+                          <span>{decision.title}</span>
+                          <Badge variant="outline" className={`confidence-badge ${decision.confidence.toLowerCase()}`}>{decision.confidence}</Badge>
+                        </div>
+                        {decision.evidence.length > 0 && (
+                          <div className="spec-evidence-links" aria-label={`Evidence for ${decision.title}`}>
+                            {decision.evidence.map((id) => (
+                              <a key={id} href={`/evidence#${encodeURIComponent(id)}`} onClick={(event) => { event.preventDefault(); navigate(`/evidence#${encodeURIComponent(id)}`); }}>{id}</a>
+                            ))}
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <SpecEmptyState
+                    copy="Capture evidence before Wayfinder stages a Closed Decision."
+                    action="Open a session"
+                    onAction={() => navigate(liveSessions[0] ? `/sessions/${liveSessions[0].id}` : '/sessions')}
+                  />
+                )}
+              </SpecSection>
+            </>
+          )}
+        </article>
+      </main>
+    </div>
+  );
+}
+
+function SpecEmptyState({ copy, action, onAction }: { copy: string; action: string; onAction: () => void }) {
+  return (
+    <div className="spec-empty-state">
+      <span>{copy}</span>
+      <Button variant="outline" size="sm" onClick={onAction}>{action} <ArrowRight aria-hidden="true" /></Button>
     </div>
   );
 }

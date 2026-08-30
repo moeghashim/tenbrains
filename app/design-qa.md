@@ -124,3 +124,14 @@ passed
 - Demo regression: `/evidence?demo=1#INT-03` rendered all seven scripted records, selected `INT-03`, retained `Target developer-led teams first`, and rendered no live session groups. Evidence: `../qa-evidence-demo-dark-1440.png`.
 - Console and validation: the Evidence route added no page errors. The shared browser history retained a pre-existing Radix overlay ref warning from an earlier map route. Node 22 production build, API tests, and `git diff --check` passed.
 - Final result: passed
+
+## Store-driven Discovery Spec — 2026-08-30
+
+- Live store data: `/spec` loaded discovery `149ef834-1beb-4094-98e9-56e7c35f6bd3` through the selected-discovery fallback. It rendered the saved discovery name, seven typed Open Frontier tickets, seven Fog of War questions, six Closed Decisions, and nine cited evidence links.
+- Evidence navigation: selecting `EVID-a8aaa572-05d2-4972-8ce0-d7f218f0974c` opened `/evidence#EVID-a8aaa572-05d2-4972-8ce0-d7f218f0974c` and expanded that live evidence record.
+- Empty and runtime states: the selected map had no Destination, so the Spec rendered one quiet `Open map` action. A separate empty discovery rendered one action for each empty section; loading, retryable error, and no-active-discovery states follow the same store-driven treatment.
+- Responsive and theme QA: dark and light passed at 1440 × 900 and 390 × 844 with zero document-level horizontal overflow. Evidence: `../qa-spec-live-{dark|light}-{1440|390}.png`; complete long-form captures: `../qa-spec-live-{dark|light}-full-1440.png`.
+- Demo regression: `/spec?demo=1` retained `AI onboarding assistant` and the six scripted sections without live map lists. Evidence: `../qa-spec-demo-dark-1440.png`.
+- Framing and console: `Maintained by You + Wayfinder` remained visible at both widths. The Spec route produced no page errors during data, navigation, theme, or viewport checks.
+- Validation: Node 22 production build, API tests, and `git diff --check` passed.
+- Final result: passed
