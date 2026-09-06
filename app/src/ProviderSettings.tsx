@@ -8,6 +8,23 @@ type SettingsData = {
   providers: { id: string; status: 'available' | 'needs-login' | 'unsupported'; reason: string; expiresAt?: string | null; loginCommand?: string }[];
 };
 
+function LoginCommand({ provider, command }: { provider: string; command: string }) {
+  const [message, setMessage] = useState('');
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(command);
+      setMessage('Command copied. Run it in your terminal, then refresh status.');
+    } catch {
+      setMessage('Copy failed. Select the command and copy it manually.');
+    }
+  }
+  return <>
+    <p>Run this command in your terminal, then refresh status.</p>
+    <div className="settings-login"><code>{command}</code><Button type="button" variant="outline" aria-label={`Copy ${provider} login command`} onClick={() => void copy()}>Copy command</Button></div>
+    <p role="status">{message}</p>
+  </>;
+}
+
 export function ProviderSettings() {
   const [data, setData] = useState<SettingsData | null>(null);
   const [draft, setDraft] = useState<Routing | null>(null);
@@ -16,7 +33,6 @@ export function ProviderSettings() {
   const [saving, setSaving] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [copyNotice, setCopyNotice] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -28,7 +44,7 @@ export function ProviderSettings() {
       .then((result: SettingsData) => {
         if (cancelled) return;
         setData(result);
-        setDraft(result.routing);
+        setDraft((current) => current ?? result.routing);
         setStatus('ready');
       })
       .catch(() => { if (!cancelled) setStatus('error'); });
@@ -62,15 +78,6 @@ export function ProviderSettings() {
     }
   }
 
-  async function copyCommand(command: string) {
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopyNotice('Command copied. Run it in your terminal, then refresh status.');
-    } catch {
-      setCopyNotice('Copy failed. Select the command and copy it manually.');
-    }
-  }
-
   const busy = status !== 'ready' || Boolean(saving);
   return <main className="main-surface workspace-main settings-main">
     <header className="topbar">
@@ -89,31 +96,42 @@ export function ProviderSettings() {
           <h2 id="routing-heading">Routing</h2>
           <p>Current routing comes from the API. Environment settings take priority over your saved choices.</p>
           <p>Clear the model field to use the provider default.</p>
-          {(['intake', 'sessions'] as const).map((surface) => (
+          {(['intake', 'sessions'] as const).map((surface) => {
+            const selected = data.providers.find((provider) => provider.id === draft[surface].provider);
+            const needsAccess = selected && selected.status !== 'available';
+            return (
             <form className="settings-routing-row" aria-label={surface === 'intake' ? 'Intake routing' : 'Grilling sessions routing'} key={surface} onSubmit={(event) => { event.preventDefault(); void save(surface); }}>
               <h3>{surface === 'intake' ? 'Intake' : 'Grilling sessions'}</h3>
               <p className="settings-current">Current: <strong>{data.routing[surface].provider}</strong> / <strong>{data.routing[surface].model}</strong></p>
               <fieldset disabled={busy}>
-                <label htmlFor={`${surface}-provider`}>Provider<select id={`${surface}-provider`} value={draft[surface].provider} onChange={(event) => setDraft({ ...draft, [surface]: { provider: event.target.value, model: '' } })}>{data.providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.id}</option>)}</select></label>
+                <label htmlFor={`${surface}-provider`}>Provider<select id={`${surface}-provider`} aria-describedby={needsAccess ? `${surface}-auth-notice` : undefined} value={draft[surface].provider} onChange={(event) => setDraft({ ...draft, [surface]: { provider: event.target.value, model: '' } })}>{data.providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.id}</option>)}</select></label>
                 <label htmlFor={`${surface}-model`}>Model<input id={`${surface}-model`} value={draft[surface].model} placeholder="Provider default" onChange={(event) => setDraft({ ...draft, [surface]: { ...draft[surface], model: event.target.value } })} /></label>
-                <Button type="submit">{saving === surface ? 'Saving…' : 'Save routing'}</Button>
+                <Button type="submit" aria-describedby={needsAccess ? `${surface}-auth-notice` : undefined}>{saving === surface ? 'Saving…' : 'Save routing'}</Button>
               </fieldset>
+              <div aria-live="polite" aria-atomic="true">
+                {needsAccess && <div className="settings-auth-notice" id={`${surface}-auth-notice`}>
+                  <p><strong>{selected.id}</strong> {selected.status === 'unsupported' ? 'is unsupported.' : 'is not signed in.'}</p>
+                  <p>{selected.reason}</p>
+                  <p>{selected.status === 'unsupported'
+                    ? 'You can save this choice. Turns on this surface will fail with this provider.'
+                    : 'You can save this choice. Turns on this surface will fail until you authenticate.'}</p>
+                  {selected.status === 'needs-login' && (selected.loginCommand
+                    ? <LoginCommand key={selected.id} provider={selected.id} command={selected.loginCommand} />
+                    : <p>Configure the provider API key in the server environment, restart the server, then refresh status.</p>)}
+                </div>}
+              </div>
             </form>
-          ))}
+          ); })}
         </section>
         <section aria-labelledby="auth-heading">
           <h2 id="auth-heading">Provider access</h2>
           <p>Available means local access is configured. Remote acceptance is not verified.</p>
-          <p role="status">{copyNotice}</p>
           <ul className="settings-provider-list">{data.providers.map((provider) => (
             <li key={provider.id}>
               <div className="settings-provider-heading"><h3>{provider.id}</h3><span className={`settings-provider-state ${provider.status}`}>{provider.status === 'needs-login' ? 'Needs login' : provider.status === 'available' ? 'Available' : 'Unsupported'}</span></div>
               <p>{provider.reason}</p>
               {provider.expiresAt && <p className="settings-expiry">Expires: <time dateTime={provider.expiresAt}>{new Date(provider.expiresAt).toLocaleString()}</time></p>}
-              {provider.status === 'needs-login' && provider.loginCommand && <>
-                <p>Run this command in your terminal, then refresh status.</p>
-                <div className="settings-login"><code>{provider.loginCommand}</code><Button variant="outline" aria-label={`Copy ${provider.id} login command`} onClick={() => void copyCommand(provider.loginCommand!)}>Copy command</Button></div>
-              </>}
+              {provider.status === 'needs-login' && provider.loginCommand && <LoginCommand provider={provider.id} command={provider.loginCommand} />}
             </li>
           ))}</ul>
         </section>

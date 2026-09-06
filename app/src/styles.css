@@ -3546,3 +3546,6 @@ a,
   .settings-login { align-items: start; flex-direction: column; }
 }
 .secondary-row[aria-current="page"] { background: var(--theme-accent-soft); color: var(--theme-accent); }
+.settings-auth-notice { margin-top: 14px; padding: 14px; border-left: 2px solid var(--theme-warning); border-radius: 4px; background: var(--theme-warning-soft); overflow-wrap: anywhere; }
+.settings-auth-notice > p:first-child { color: var(--theme-warning); }
+.settings-auth-notice > p + p { margin-top: 4px; }

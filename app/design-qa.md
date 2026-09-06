@@ -147,3 +147,14 @@ passed
 - Validation: Node 22 production build and all six API tests passed. No server code changed and no commit was made. Browser errors were limited to the existing missing favicon and deliberately rejected requests; Settings produced no page exceptions in final responsive QA.
 - Implementation note: the view lives in `src/ProviderSettings.tsx`, with route/sidebar wiring in `src/App.tsx` and scoped styles in `src/styles.css`.
 - Final result: passed.
+
+## Provider selection authentication notice — 2026-09-06
+
+- Both routing forms now show an inline notice immediately when a selected provider needs login or is unsupported. Notices use existing provider status data and remain visible after saving. Save stays enabled, with an explicit warning that turns on that surface will fail until authentication.
+- Shared login-command controls now serve the forms and Provider access list. Each control has a provider-specific accessible label, keyboard activation, and local copy feedback. Form notices use a persistent polite live region; provider selectors and save buttons reference the notice through `aria-describedby`.
+- Real API QA: selected `grok-subscription` in Grilling sessions, saw the sign-in notice and `grok login`, copied that exact command, and saved successfully to `grok-subscription / grok-build`. The warning persisted after save and reload. Restored the original `openai / gpt-5.6-luna` routing afterward; Intake remained unchanged.
+- Also verified Intake selection and refresh with Grok. Refresh preserves the pending selection while updating access status. Browser-only response fixtures confirmed that Available clears the notice and Unsupported shows the reason without a command. The real Anthropic needs-login row showed API-key configuration instructions without inventing a login command. No provider login or server credential changes were performed.
+- Dark and light passed at 1440 × 900 and 390 × 844 with no document horizontal overflow. Inspected desktop dark and mobile light captures. Evidence: `../qa-settings-auth-{dark|light}-{1440|390}.png`.
+- Demo regression: `/map?demo=1` still renders `Target developer-led teams first`. No demo components, App routing, or server code changed.
+- Validation: Node 22 `npm run build`, all six `npm test` tests, and `git diff --check` passed. No commit was made.
+- Final result: passed.
