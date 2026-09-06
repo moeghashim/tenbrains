@@ -2,7 +2,9 @@ import { AnthropicProvider } from './anthropic-provider.js';
 import { MockProvider } from './mock-provider.js';
 import { OpenAIProvider } from './openai-provider.js';
 
-const PROVIDERS = new Set(['mock', 'anthropic', 'openai']);
+import { SubscriptionProvider } from './subscription-provider.js';
+import { defaultModels, providerIds } from '../provider-config.js';
+const PROVIDERS = new Set(providerIds);
 
 function globalProviderName(environment) {
   return environment.WAYFINDER_PROVIDER
@@ -19,6 +21,7 @@ export function createProvider(environment = process.env, surface = 'global') {
   if (!PROVIDERS.has(providerName)) throw new Error(`Unsupported Wayfinder provider: ${providerName}`);
   const surfaceModel = surfaceSetting(environment, surface, 'MODEL');
   if (providerName === 'mock') return new MockProvider();
+  if (providerName.endsWith('-subscription')) return new SubscriptionProvider({ id: providerName, model: surfaceModel ?? environment.WAYFINDER_MODEL ?? defaultModels[providerName], environment });
   if (providerName === 'anthropic') {
     return new AnthropicProvider({
       apiKey: environment.ANTHROPIC_API_KEY,

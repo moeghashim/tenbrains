@@ -1,14 +1,20 @@
 import express from 'express';
 import { loadServerEnvironment } from './env.js';
 import { applyCandidates, selectCandidates } from './candidates.js';
-import { createProviders } from './providers/index.js';
+import { createProvider } from './providers/index.js';
+import { loadSelection, saveSelection, validateSelection, providerStatus, routing } from './provider-config.js';
 import { createDiscovery, getDiscovery, initializeStore, listDiscoveries, saveDiscovery } from './store.js';
 
 await loadServerEnvironment();
 
 const port = Number(process.env.PORT ?? 5174);
 const app = express();
-const providers = createProviders();
+let selection = await loadSelection();
+let selectionQueue = Promise.resolve();
+function selectedProvider(surface) {
+  const selected = routing(process.env, selection)[surface];
+  return createProvider({ ...process.env, WAYFINDER_PROVIDER: selected.provider, WAYFINDER_MODEL: selected.model });
+}
 
 app.use(express.json({ limit: '32kb' }));
 
@@ -19,6 +25,22 @@ function sendEvent(response, event, data) {
 function publicError(response, status, message) {
   response.status(status).json({ error: message });
 }
+
+app.get('/api/providers', async (_request, response, next) => {
+  try { response.json(await providerStatus(process.env, selection)); } catch (error) { next(error); }
+});
+
+app.patch('/api/providers', async (request, response, next) => {
+  let update;
+  try { update = validateSelection(request.body); } catch { return publicError(response, 400, 'Invalid provider selection'); }
+  const operation = selectionQueue.then(async () => {
+    const updated = { ...selection, ...update };
+    await saveSelection(updated);
+    selection = updated;
+  });
+  selectionQueue = operation.catch(() => {});
+  try { await operation; response.json(await providerStatus(process.env, selection)); } catch (error) { next(error); }
+});
 
 app.post('/api/discoveries', async (request, response, next) => {
   try {
@@ -109,7 +131,7 @@ app.post('/api/discoveries/:id/intake/messages', async (request, response, next)
 
     try {
       const now = new Date().toISOString();
-      const result = await providers.intake.createIntakeTurn({
+      const result = await selectedProvider('intake').createIntakeTurn({
         message,
         transcript: discovery.transcripts.intake,
         map: discovery.map,
@@ -227,7 +249,7 @@ app.post('/api/discoveries/:id/sessions/:sid/messages', async (request, response
     response.flushHeaders();
     try {
       const now = new Date().toISOString();
-      const result = await providers.session.createSessionTurn({
+      const result = await selectedProvider('sessions').createSessionTurn({
         message,
         objective: session.objective,
         evidenceTarget: session.evidenceTarget,
@@ -321,7 +343,7 @@ app.post('/api/discoveries/:id/sessions/:sid/updates/approve', async (request, r
 });
 
 app.use((error, _request, response, _next) => {
-  console.error(error);
+  console.error('Ten Brains request failed');
   if (!response.headersSent) response.status(500).json({ error: 'Server error' });
 });
 

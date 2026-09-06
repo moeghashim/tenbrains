@@ -287,4 +287,4 @@ export class AnthropicProvider {
   }
 }
 
-export { SESSION_PROMPT, STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, SYSTEM_PROMPT };
+export { SESSION_PROMPT, STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, SYSTEM_PROMPT, contextBlock, sessionContextBlock, buildMessages };

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { tmpdir } from 'node:os';
@@ -10,7 +10,7 @@ import test from 'node:test';
 
 const appDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-async function startServer(dataDirectory) {
+async function startServer(dataDirectory, overrides = {}) {
   const child = spawn(process.execPath, ['server/index.js'], {
     cwd: appDirectory,
     env: {
@@ -22,6 +22,12 @@ async function startServer(dataDirectory) {
       WAYFINDER_SESSION_PROVIDER: 'mock',
       ANTHROPIC_API_KEY: '',
       OPENAI_API_KEY: '',
+      WAYFINDER_AUTH_HOME: path.join(dataDirectory, 'home'),
+      WAYFINDER_CONFIG_PATH: path.join(dataDirectory, 'settings', 'providers.json'),
+      WAYFINDER_MODEL: '',
+      WAYFINDER_INTAKE_MODEL: '',
+      WAYFINDER_SESSION_MODEL: '',
+      ...overrides,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -307,4 +313,58 @@ test('Ten Brains discovery API workflow', async (t) => {
 
   const persistedFiles = (await readdir(dataDirectory)).filter((name) => name.endsWith('.json'));
   assert.equal(persistedFiles.length, 2);
+});
+
+test('provider status, redaction, selection persistence and subscription SSE errors', async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'ten-brains-providers-'));
+  let server;
+  t.after(async () => { await stopServer(server?.child); await rm(directory, { recursive: true, force: true }); });
+  const home = path.join(directory, 'home');
+  const secrets = ['sk-ant-secret-test-access', 'refresh-secret-test', 'grok-secret-test', 'codex-secret-test'];
+  for (const name of ['.claude', '.codex', '.grok']) await mkdir(path.join(home, name), { recursive: true });
+  await writeFile(path.join(home, '.claude/.credentials.json'), JSON.stringify({ claudeAiOauth: { accessToken: secrets[0], refreshToken: secrets[1], expiresAt: Date.now() + 3600000 } }));
+  await writeFile(path.join(home, '.codex/auth.json'), JSON.stringify({ tokens: { access_token: secrets[3], refresh_token: secrets[1], account_id: 'private-account' } }));
+  await writeFile(path.join(home, '.grok/auth.json'), JSON.stringify({ 'https://auth.x.ai::fixture': { key: secrets[2], expires_at: new Date(Date.now() + 3600000).toISOString() } }));
+  const overrides = { WAYFINDER_PROVIDER: '', WAYFINDER_INTAKE_PROVIDER: '', WAYFINDER_SESSION_PROVIDER: '' };
+  server = await startServer(directory, overrides);
+  const status = await jsonRequest(server.baseUrl, '/api/providers');
+  assert.equal(status.response.status, 200);
+  assert.deepEqual(status.body.routing, { intake: { provider: 'mock', model: 'mock' }, sessions: { provider: 'mock', model: 'mock' } });
+  for (const id of ['claude-subscription', 'codex-subscription', 'grok-subscription']) {
+    const auth = status.body.providers.find(p => p.id === id);
+    assert.equal(auth.status, 'available'); assert.equal(auth.found, true);
+  }
+  for (const secret of [...secrets, 'private-account', 'accessToken', 'refresh_token']) assert.ok(!JSON.stringify(status.body).includes(secret));
+  const changed = await jsonRequest(server.baseUrl, '/api/providers', { method: 'PATCH', body: { intake: { provider: 'claude-subscription', model: 'claude-sonnet-5' }, sessions: { provider: 'grok-subscription' } } });
+  assert.equal(changed.response.status, 200);
+  assert.equal(changed.body.routing.sessions.provider, 'grok-subscription');
+  const persisted = await readFile(path.join(directory, 'settings/providers.json'), 'utf8');
+  for (const secret of secrets) assert.ok(!persisted.includes(secret));
+  for (const body of [{ intake: { provider: 'invalid' } }, { intake: { provider: 'mock', token: secrets[0] } }, { intake: { provider: 'mock', model: secrets[0] } }, { session: { provider: 'mock' } }]) {
+    const invalid = await jsonRequest(server.baseUrl, '/api/providers', { method: 'PATCH', body });
+    assert.equal(invalid.response.status, 400);
+    assert.ok(!JSON.stringify(invalid.body).includes(secrets[0]));
+  }
+  await stopServer(server.child); server = await startServer(directory, overrides);
+  assert.equal((await jsonRequest(server.baseUrl, '/api/providers')).body.routing.intake.provider, 'claude-subscription');
+  await stopServer(server.child); server = await startServer(directory, { ...overrides, WAYFINDER_PROVIDER: 'mock', WAYFINDER_SESSION_PROVIDER: 'codex-subscription', WAYFINDER_MODEL: 'env-model' });
+  const envStatus = (await jsonRequest(server.baseUrl, '/api/providers')).body;
+  assert.deepEqual(envStatus.routing.intake, { provider: 'mock', model: 'env-model' });
+  assert.deepEqual(envStatus.routing.sessions, { provider: 'codex-subscription', model: 'env-model' });
+  await stopServer(server.child); server = await startServer(directory, overrides);
+  await rm(home, { recursive: true, force: true });
+  const discovery = (await jsonRequest(server.baseUrl, '/api/discoveries', { method: 'POST', body: {} })).body;
+  for (const id of ['claude-subscription', 'codex-subscription', 'grok-subscription']) {
+    await jsonRequest(server.baseUrl, '/api/providers', { method: 'PATCH', body: { intake: { provider: id } } });
+    const result = await eventRequest(server.baseUrl, `/api/discoveries/${discovery.id}/intake/messages`, { message: 'Test missing login' });
+    assert.deepEqual(result.events.map(e => e.event), ['error']);
+    assert.match(result.events[0].data.message, /login/);
+  }
+  const session = (await jsonRequest(server.baseUrl, `/api/discoveries/${discovery.id}/sessions`, { method: 'POST', body: { objective: 'Test evidence', evidenceTarget: 'One example' } })).body;
+  const sessionFailure = await eventRequest(server.baseUrl, `/api/discoveries/${discovery.id}/sessions/${session.id}/messages`, { message: 'An example' });
+  assert.deepEqual(sessionFailure.events.map(e => e.event), ['error']);
+  const after = (await jsonRequest(server.baseUrl, `/api/discoveries/${discovery.id}`)).body;
+  assert.deepEqual(after.map, emptyMap); assert.equal(after.transcripts.intake.length, 1);
+  const missing = (await jsonRequest(server.baseUrl, '/api/providers')).body;
+  assert.equal(missing.providers.find(p => p.id === 'claude-subscription').status, 'needs-login');
 });

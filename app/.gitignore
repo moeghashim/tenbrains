@@ -4,3 +4,5 @@ dist
 *.local
 server/data/
 server/.env
+server/provider-config.local.json
+server/provider-config.local.json.*.tmp

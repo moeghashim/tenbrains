@@ -58,3 +58,20 @@ Planned 2026-08-30. Stages dispatch in order; each stage is reviewed and committ
 Out of scope: Research/Prototype/Synthesis ticket flows (own arc), delete (still intentionally unavailable), auth/DB/deploy.
 
 Invariants unchanged: two actors only; map mutation only via explicit approve; voice.md; Node 22; build green per stage.
+
+## Phase 6 — subscription auth for Wayfinder providers
+
+Planned 2026-09-06. Let users run Wayfinder on subscriptions they already pay for — Claude (Pro/Max), Codex (ChatGPT plan), Grok — instead of metered API keys. Stages reviewed + committed one at a time.
+
+1. **Server + CLI** (Pi)
+   - Provider ids `claude-subscription`, `codex-subscription`, `grok-subscription`, valid anywhere a provider id is accepted (global + per-surface env vars).
+   - Credential sourcing: reuse existing local CLI credentials where present (Claude Code, Codex CLI, Grok CLI); refresh tokens where the stored material allows. No credentials in logs, repo, or API responses.
+   - `npm run auth -- status|login <provider>` CLI; login may delegate to the provider's own CLI login when that is the honest path — document limitations rather than fake flows.
+   - API for the UI: GET /api/providers (routing + auth status per surface, secrets redacted), plus whatever start-login endpoint is actually feasible; provider selection persisted server-side (gitignored config), env vars still win.
+   - Tests for detection/status/selection with fake credential files (home-dir override); mock provider stays the keyless default.
+2. **Settings UI** (Codex)
+   - Settings view: current provider + model per surface (intake, sessions), auth status per provider, sign-in affordance driven by the stage-1 API, provider switching. voice.md/theme.md compliant; demo untouched.
+
+Notes: subscription OAuth for third-party apps is ToS-gray for some providers — single local user, personal use; revisit before any deployment.
+
+Invariants unchanged: two actors; approve-only map mutation; Node 22; green build per stage.
