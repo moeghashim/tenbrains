@@ -85,7 +85,7 @@ npm run auth -- login grok-subscription
 | Provider | Login command | Credential source | Default model / transport |
 | --- | --- | --- | --- |
 | `claude-subscription` | `claude auth login --claudeai` | `~/.claude/.credentials.json`, `claudeAiOauth` | `claude-sonnet-5`; Anthropic Messages with Bearer OAuth and `anthropic-beta: oauth-2025-04-20` |
-| `codex-subscription` | `codex login` | `~/.codex/auth.json`, `tokens` | `gpt-5.4`; ChatGPT Codex Responses, **not** the metered OpenAI API |
+| `codex-subscription` | `codex login` | `~/.codex/auth.json`, `tokens` | `gpt-5.4-mini`; ChatGPT Codex Responses, **not** the metered OpenAI API |
 | `grok-subscription` | `grok login` | `~/.grok/auth.json` | `grok-build`; CLI chat proxy with `X-XAI-Token-Auth` and model-override headers |
 
 The installed Grok CLI documents direct proxy access in its README. Its current credential store uses an `https://auth.x.ai::<client>` entry with `key`, `refresh_token`, `expires_at`, and OIDC metadata; the older `https://accounts.x.ai/sign-in` entry is also recognized. Multiple matching accounts are intentionally refused rather than guessed. Other issuers/custom credential helpers are not executed. Grok OIDC refresh only uses the trusted `https://auth.x.ai` discovery/token endpoints; legacy session credentials without refresh material require `grok login`.
@@ -96,7 +96,7 @@ Status inspection is offline and read-only: `available` means an unexpired local
 
 On a turn, expiring access tokens are refreshed when supported material exists. Refresh requests have timeouts, reject redirects, and concurrent refreshes are coalesced. Refreshed access/refresh tokens stay **in process memory only**: Ten Brains never writes credential files, overwrites CLI-owned credentials, or stores credentials in its repo/config/discovery documents. **Limitation:** rotating refresh tokens can leave the CLI's disk copy stale after a restart; run the provider's login again if that happens. Do not concurrently refresh the same CLI account in several processes. Status does not refresh or call a remote service.
 
-Authentication failures, revoked tokens, rate limits, network errors, and unsupported models end the existing SSE stream with an `error` event and a safe login/settings instruction, not a process crash or an upstream error dump. Subscription adapters disable SDK logging. Remote eligibility, subscription limits, and provider terms still apply; third-party subscription OAuth is not guaranteed supported. This is a local personal-use integration, not deployment authentication. No real inference or token-refresh smoke is performed by the automated suite.
+Status and turns share the credential loader, in-memory refresh cache, and validity rules. `available` confirms local validity only: remote model eligibility and quota are not verified. A valid token without refresh material remains usable inside the 30-second proactive refresh window. Authentication failures (missing/expired credentials, rejected refresh, or HTTP 401) end the SSE stream with a safe login instruction; HTTP 400/404 model/request failures, 403 access denial, 429 rate limits, and network failures instead return distinct safe settings/retry instructions. Upstream bodies are never forwarded. The Codex default is `gpt-5.4-mini`, verified against this account's live model list; account eligibility varies, and explicit saved model overrides are preserved (reselect without a model to reset to the default). Subscription adapters disable SDK logging. Remote eligibility, subscription limits, and provider terms still apply; third-party subscription OAuth is not guaranteed supported. This is a local personal-use integration, not deployment authentication. No real inference or token-refresh smoke is performed by the automated suite; HTTP/SSE tests launch the real server with fixture credential homes and a network-intercepting preload, exercising valid tokens, expired-token refresh/cache reuse, missing login, and honest upstream failures for both Claude and Codex.
 
 ## Provider settings API
 
@@ -106,7 +106,7 @@ Authentication failures, revoked tokens, rate limits, network errors, and unsupp
 {
   "routing": {
     "intake": { "provider": "mock", "model": "mock" },
-    "sessions": { "provider": "codex-subscription", "model": "gpt-5.4" }
+    "sessions": { "provider": "codex-subscription", "model": "gpt-5.4-mini" }
   },
   "providers": [
     { "id": "mock", "status": "available", "reason": "Deterministic local provider; no login required." },
@@ -126,7 +126,7 @@ The actual `providers` array includes all six ids. Status uses `available` or `n
 ```json
 {
   "intake": { "provider": "mock" },
-  "sessions": { "provider": "codex-subscription", "model": "gpt-5.4" }
+  "sessions": { "provider": "codex-subscription", "model": "gpt-5.4-mini" }
 }
 ```
 

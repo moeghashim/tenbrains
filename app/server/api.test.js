@@ -97,6 +97,70 @@ async function jsonRequest(baseUrl, pathname, { method = 'GET', body } = {}) {
   };
 }
 
+test('subscription status and actual intake SSE share credentials and report honest upstream failures', async t => {
+  for (const id of ['codex-subscription', 'claude-subscription']) {
+    for (const scenario of ['valid', 'near-expiry', 'refresh', 'missing', 'refresh-rejected', '400', '401', '403', '404', '429', '0']) {
+      await t.test(`${id}: ${scenario}`, async t => {
+        const directory = await mkdtemp(path.join(tmpdir(), 'ten-brains-subscription-sse-'));
+        t.after(() => rm(directory, { recursive: true, force: true }));
+        const home = path.join(directory, 'home');
+        const expired = ['refresh', 'refresh-rejected'].includes(scenario);
+        const expires = expired ? 1000 : Date.now() + (scenario === 'near-expiry' ? 20000 : 3600000);
+        const token = id === 'codex-subscription' ? `fixture.${Buffer.from(JSON.stringify({ exp: Math.floor(expires / 1000) })).toString('base64url')}.fixture` : 'fixture-access';
+        const file = path.join(home, id === 'codex-subscription' ? '.codex/auth.json' : '.claude/.credentials.json');
+        await mkdir(path.dirname(file), { recursive: true });
+        if (scenario !== 'missing') await writeFile(file, JSON.stringify(id === 'codex-subscription'
+          ? { tokens: { access_token: token, account_id: 'fixture-account', ...(expired ? { refresh_token: 'fixture-refresh' } : {}) } }
+          : { claudeAiOauth: { accessToken: token, expiresAt: expires, ...(expired ? { refreshToken: 'fixture-refresh' } : {}) } }));
+        const requestLog = path.join(directory, 'requests.log');
+        await writeFile(requestLog, '');
+        const server = await startServer(directory, {
+          WAYFINDER_PROVIDER: '', WAYFINDER_INTAKE_PROVIDER: '', WAYFINDER_SESSION_PROVIDER: '',
+          NODE_OPTIONS: `--import=${path.join(appDirectory, 'server/fixtures/subscription-fetch.js')}`,
+          TEST_REQUEST_LOG: requestLog, TEST_EXPECTED_TOKEN: expired ? 'fixture-fresh' : token,
+          TEST_REFRESH_FAIL: scenario === 'refresh-rejected' ? '1' : '',
+          TEST_UPSTREAM_STATUS: /^\d+$/.test(scenario) ? scenario : '200',
+        });
+        t.after(() => stopServer(server.child));
+        const selected = await jsonRequest(server.baseUrl, '/api/providers', { method: 'PATCH', body: { intake: { provider: id } } });
+        assert.equal(selected.body.routing.intake.provider, id);
+        const status = selected.body.providers.find(p => p.id === id);
+        assert.equal(status.status, expired || scenario === 'missing' ? 'needs-login' : 'available');
+        assert.equal(await readFile(requestLog, 'utf8'), '', 'status never makes remote calls');
+        const discovery = (await jsonRequest(server.baseUrl, '/api/discoveries', { method: 'POST', body: { name: 'Subscription regression' } })).body;
+        const originalMap = discovery.map;
+        const send = () => eventRequest(server.baseUrl, `/api/discoveries/${discovery.id}/intake/messages`, { message: 'Hello' });
+        const result = await send();
+        const success = ['valid', 'near-expiry', 'refresh'].includes(scenario);
+        assert.equal(result.response.status, 200);
+        assert.deepEqual(result.events.map(e => e.event), success ? ['token', 'done'] : ['error']);
+        if (success) {
+          assert.equal(result.events[0].data.text, 'Fixture reply.');
+          assert.equal((await jsonRequest(server.baseUrl, '/api/providers')).body.providers.find(p => p.id === id).status, 'available');
+          if (expired) {
+            assert.deepEqual((await send()).events.map(e => e.event), ['token', 'done']);
+            assert.equal(await readFile(requestLog, 'utf8'), 'refresh\nturn\nturn\n', 'refreshed credentials reused across provider instances and status');
+          }
+        } else {
+          const message = result.events[0].data.message;
+          if (['missing', 'refresh-rejected', '401'].includes(scenario)) assert.equal(message, `${id} authentication unavailable. Run npm run auth -- login ${id}.`);
+          else {
+            assert.doesNotMatch(message, /authentication unavailable|login/);
+            assert.match(message, scenario === '429' ? /rate limited/ : scenario === '403' ? /access denied/ : scenario === '400' ? /request rejected/ : scenario === '404' ? /model or endpoint unavailable/ : /connectivity/);
+          }
+          assert.doesNotMatch(JSON.stringify(result.events), /fixture-secret|fixture-refresh|fixture-access/);
+        }
+        const saved = (await jsonRequest(server.baseUrl, `/api/discoveries/${discovery.id}`)).body;
+        assert.deepEqual(saved.map, originalMap, 'turn never approves map mutations');
+        assert.ok(saved.transcripts.intake.every(entry => ['You', 'Wayfinder'].includes(entry.actor)));
+        assert.equal(saved.transcripts.intake.length, discovery.transcripts.intake.length + (success ? expired ? 4 : 2 : 0));
+        if (scenario === 'missing') assert.equal(await readFile(requestLog, 'utf8'), '');
+        if (id === 'codex-subscription' && scenario === 'valid') assert.equal(selected.body.routing.intake.model, 'gpt-5.4-mini');
+      });
+    }
+  }
+});
+
 function parseEvents(source) {
   return source.trim().split(/\n\n+/).filter(Boolean).map((block) => {
     const lines = block.split('\n');

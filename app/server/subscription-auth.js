@@ -24,14 +24,19 @@ async function load(id, env) {
   if (cached?.original === token) return { ...cached, source, found: true };
   return { source, found: true, token, refresh, expires, account, client, original: token };
 }
+function usableCredential(id, v, leeway = 0) {
+  return Boolean(v.token && (id !== 'codex-subscription' || v.account) && (!v.expires || v.expires > Date.now() + leeway));
+}
 export async function subscriptionStatus(id, env = process.env) {
   const v = await load(id, env);
-  const usable = Boolean(v.token && (id !== 'codex-subscription' || v.account) && (!v.expires || v.expires > Date.now()));
+  const usable = usableCredential(id, v);
   return { id, status: usable ? 'available' : 'needs-login', reason: usable ? 'Local credential present; remote acceptance not verified.' : v.reason || (v.refresh ? 'Access token expired; refresh will be attempted on the next turn.' : 'Missing or expired subscription token. Sign in with the provider CLI.'), source: files[id], found: v.found, expiresAt: v.expires ? new Date(v.expires).toISOString() : null, loginCommand: loginCommands[id] };
 }
 export async function subscriptionCredential(id, env = process.env, fetcher = fetch) {
   const v = await load(id, env);
-  if (v.token && (!v.expires || v.expires > Date.now() + 30000)) return v;
+  // A still-valid token without refresh material is usable, even inside the
+  // proactive refresh window. Status and turns use the same validity rules.
+  if (usableCredential(id, v, v.refresh ? 30000 : 0)) return v;
   if (!v.refresh) throw authError(id);
   if (pending.has(v.source)) return pending.get(v.source);
   const work = (async () => {
@@ -53,7 +58,9 @@ export async function subscriptionCredential(id, env = process.env, fetcher = fe
       if (!text(result.access_token) || !Number.isFinite(result.expires_in) || result.expires_in <= 0) throw authError(id);
       const expires = expiry(Date.now() + result.expires_in * 1000);
       if (!expires) throw authError(id);
-      const fresh = { ...v, token: result.access_token, refresh: text(result.refresh_token) || v.refresh, expires };
+      const fresh = { ...v, token: result.access_token, refresh: text(result.refresh_token) || v.refresh, expires,
+        account: text(jwt(result.access_token)['https://api.openai.com/auth']?.chatgpt_account_id) || v.account };
+      if (!usableCredential(id, fresh)) throw authError(id);
       cache.set(v.source, fresh);
       return fresh;
     } catch { throw authError(id); }

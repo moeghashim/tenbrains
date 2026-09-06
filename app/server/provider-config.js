@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { subscriptionIds, subscriptionStatus } from './subscription-auth.js';
 
 export const providerIds = ['mock', 'anthropic', 'openai', ...subscriptionIds];
-export const defaultModels = { mock: 'mock', anthropic: 'claude-sonnet-5', openai: 'gpt-5.6-luna', 'claude-subscription': 'claude-sonnet-5', 'codex-subscription': 'gpt-5.4', 'grok-subscription': 'grok-build' };
+export const defaultModels = { mock: 'mock', anthropic: 'claude-sonnet-5', openai: 'gpt-5.6-luna', 'claude-subscription': 'claude-sonnet-5', 'codex-subscription': 'gpt-5.4-mini', 'grok-subscription': 'grok-build' };
 const configPath = (env) => env.WAYFINDER_CONFIG_PATH || fileURLToPath(new URL('./provider-config.local.json', import.meta.url));
 const validModel = (x) => typeof x === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,99}$/.test(x) && !/^(sk-|eyJ|Bearer)/i.test(x);
 export function validateSelection(value) {
