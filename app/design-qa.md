@@ -135,3 +135,15 @@ passed
 - Framing and console: `Maintained by You + Wayfinder` remained visible at both widths. The Spec route produced no page errors during data, navigation, theme, or viewport checks.
 - Validation: Node 22 production build, API tests, and `git diff --check` passed.
 - Final result: passed
+
+## Provider Settings and subscription sign-in — 2026-09-06
+
+- Added `/settings` through the live desktop sidebar and mobile navigation. Intake and Grilling sessions show effective provider/model routing, API-backed provider choices, editable model IDs, and separate save actions. Clearing a model uses the provider default.
+- Real API end-to-end: changed Grilling sessions from `openai / gpt-5.6-luna` to `codex-subscription / gpt-6-astra` through the form (HTTP 200), then reverted through the form. A fresh GET confirmed both surfaces at the original `openai / gpt-5.6-luna` routing. No inference or login was performed.
+- Provider access: all six API rows render their states and reasons. Claude and Codex reported Available; Grok reported Needs login with expiry and `grok login`. The copy action placed exactly `grok login` on the clipboard. Login remains a terminal instruction.
+- Recovery: verified loading, manual refresh, injected HTTP 503 with Retry recovery, and a real HTTP 400 for an invalid model ID. A browser-only PATCH response fixture verified environment-override messaging and restoration of effective routing in the form; the running server environment was not changed.
+- Responsive and theme QA: dark and light passed at 1440 × 900, 700 × 900, and 390 × 844 with no document horizontal overflow. Native controls remain labeled and usable. Screenshots: `../qa-settings-{dark|light}-{1440|700|390}.png`, `../qa-settings-error-light-390.png`, and `../qa-settings-loading-light-1440.png`.
+- Demo preservation: Settings remains inert on existing demo navigation, matching prior behavior. Demo component/data markup is unchanged, and `/map?demo=1` still renders `Target developer-led teams first`. Evidence: `../qa-settings-demo-light-1440.png`.
+- Validation: Node 22 production build and all six API tests passed. No server code changed and no commit was made. Browser errors were limited to the existing missing favicon and deliberately rejected requests; Settings produced no page exceptions in final responsive QA.
+- Implementation note: the view lives in `src/ProviderSettings.tsx`, with route/sidebar wiring in `src/App.tsx` and scoped styles in `src/styles.css`.
+- Final result: passed.

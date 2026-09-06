@@ -1,3 +1,4 @@
+import { ProviderSettings } from './ProviderSettings';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import {
@@ -71,7 +72,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-type RouteName = 'map' | 'session' | 'session-map' | 'intake' | 'intake-session-map' | 'discoveries' | 'evidence' | 'spec' | 'how-it-works';
+type RouteName = 'settings' | 'map' | 'session' | 'session-map' | 'intake' | 'intake-session-map' | 'discoveries' | 'evidence' | 'spec' | 'how-it-works';
 type ThemeMode = 'dark' | 'light' | 'system';
 type MapSegment = 'frontier' | 'fog' | 'closed';
 type DrawerName = 'inquiry' | 'signals' | null;
@@ -557,6 +558,7 @@ const typeClass: Record<TicketType, string> = {
 
 function getRouteFromPath(): RouteName {
   const { pathname } = window.location;
+  if (pathname === '/settings') return 'settings';
 
   if (pathname === '/sessions/grilling/map' || /^\/sessions\/[^/]+\/map$/.test(pathname)) {
     return 'session-map';
@@ -664,7 +666,12 @@ function App() {
 
   return (
     <TooltipProvider delayDuration={350} key={locationKey}>
-      {route === 'intake' ? (
+      {route === 'settings' ? (
+        <div className="app-shell">
+          <SideNav active="settings" navigate={navigate} />
+          <ProviderSettings />
+        </div>
+      ) : route === 'intake' ? (
         <DiscoveryIntake navigate={navigate} onCreateMap={createMap} />
       ) : route === 'session' ? (
         <GrillingSession navigate={navigate} />
@@ -876,7 +883,7 @@ function SideNav({
           <HelpCircle aria-hidden="true" /> Help
         </Button>
       )}
-      <Button variant="ghost" className="secondary-row">
+      <Button variant="ghost" className="secondary-row" aria-current={active === 'settings' ? 'page' : undefined} onClick={isDemoNavigation ? undefined : () => { setMobileOpen(false); navigate('/settings'); }}>
         <Settings aria-hidden="true" /> Settings
       </Button>
       <DropdownMenu>
