@@ -158,3 +158,15 @@ passed
 - Demo regression: `/map?demo=1` still renders `Target developer-led teams first`. No demo components, App routing, or server code changed.
 - Validation: Node 22 `npm run build`, all six `npm test` tests, and `git diff --check` passed. No commit was made.
 - Final result: passed.
+
+## Live Wayfinder turn error details — 2026-09-06
+
+- Live intake and Grilling now preserve the safe SSE error message. Non-SSE failures and empty messages retain generic fallback copy. Provider/authentication, rate-limit, model/settings, login, and related errors expose one quiet `Open Settings` link beside retry.
+- Messages render as React text inside the existing `role="alert"` regions. Long text wraps and clamps to four visual lines, with the full text retained in the DOM and title. Mobile actions wrap beneath the message; no HTML is interpreted.
+- Real failure QA: both surfaces used `openai / gpt-5.6-luna` and displayed `OpenAI authentication failed. Check OPENAI_API_KEY.` with Retry and Open Settings. Verified the mobile Grilling link opens `/settings`. No failure fixtures were used.
+- Real success QA: both surfaces completed Codex turns using the server's verified default `gpt-5.4-mini`. SSE included `done` without `error`, inputs cleared, transcripts rendered, and no error banners remained. An initial `gpt-5.4` attempt was rejected and correctly surfaced the server's model/settings message; final success captures use `gpt-5.4-mini`.
+- Restored both surfaces to `openai / gpt-5.6-luna`. QA discovery: `291bc52c-aa6f-4a18-bc44-9e5e335a3566` (`P6 turn error QA`); session: `1ed43382-4e39-4c71-9b7f-2b22cd6f8fb4`.
+- Dark/light error captures at 1440 × 900 and 390 × 844 had no document horizontal overflow. Evidence: `../qa-turn-error-{intake|session}-{dark|light}-{1440|390}.png`. Success evidence: `../qa-turn-success-{intake|session}-codex-1440.png`. Mobile Grilling errors are shown in the existing Ask Wayfinder sheet.
+- Demo code is unchanged, and `/map?demo=1` retains `Target developer-led teams first`. No server code changed and no commit was made.
+- Validation: Node 22 build, all 29 tests, and `git diff --check` passed.
+- Final result: passed.

@@ -3549,3 +3549,15 @@ a,
 .settings-auth-notice { margin-top: 14px; padding: 14px; border-left: 2px solid var(--theme-warning); border-radius: 4px; background: var(--theme-warning-soft); overflow-wrap: anywhere; }
 .settings-auth-notice > p:first-child { color: var(--theme-warning); }
 .settings-auth-notice > p + p { margin-top: 4px; }
+
+.turn-error-message { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; overflow-wrap: anywhere; min-width: 0; }
+.turn-error-actions { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+@media (max-width: 650px) {
+  .intake-error-state, .live-session-error { flex-wrap: wrap; }
+  .intake-error-state .turn-error-message, .live-session-error .turn-error-message { flex-basis: calc(100% - 32px); }
+  .turn-error-actions { margin-left: 28px; }
+}
+@media (max-width: 650px) {
+  .live-session-error { grid-template-columns: auto minmax(0, 1fr); }
+  .live-session-error .turn-error-actions { grid-column: 2; margin-left: 0; }
+}

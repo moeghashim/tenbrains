@@ -1515,7 +1515,7 @@ function DiscoveryIntake({
               staged: [...current.staged.filter((item) => item.id !== data.id), data as ApiCandidate],
             } : current);
           } else if (event === 'error') {
-            throw new Error(data.message);
+            throw new ServerTurnError(typeof data.message === 'string' ? data.message : '');
           }
         }
         if (done) break;
@@ -1526,13 +1526,13 @@ function DiscoveryIntake({
       setDiscovery(await refreshed.json());
       setStreamedReply('');
       setMessage((current) => current.trim() === text ? '' : current);
-    } catch {
+    } catch (cause) {
       const refreshed = await fetch(`/api/discoveries/${discovery.id}`).catch(() => null);
       if (refreshed?.ok) setDiscovery(await refreshed.json());
       setStreamedReply('');
       setMessage(text);
       setWorking(false);
-      setError({ kind: 'turn', message: 'Wayfinder could not complete this turn. Your message is ready to retry.' });
+      setError({ kind: 'turn', message: turnErrorMessage(cause, 'Wayfinder could not complete this turn. Your message is ready to retry.') });
     } finally {
       setWorking(false);
     }
@@ -1671,14 +1671,28 @@ function DiscoveryIntake({
   );
 }
 
+class ServerTurnError extends Error {}
+
+function turnErrorMessage(cause: unknown, fallback: string) {
+  return cause instanceof ServerTurnError && cause.message.trim() ? cause.message : fallback;
+}
+
+function TurnSettingsAction({ message }: { message: string }) {
+  if (!/auth|rate.?limit|model|settings?|log.?in|sign.?in|api.?key|provider|subscription|quota/i.test(message)) return null;
+  return <Button asChild variant="ghost" size="sm"><a href="/settings">Open Settings</a></Button>;
+}
+
 function IntakeErrorState({ error, onRetry }: { error: IntakeError; onRetry: () => void }) {
   return (
     <div className="intake-error-state mx-auto mt-2 flex max-w-[800px] items-center gap-3 rounded-lg border border-[var(--danger-border)] bg-[var(--danger-soft)] px-3 py-2.5" role="alert">
       <AlertCircle aria-hidden="true" className="size-4 shrink-0 text-[var(--danger)]" />
-      <p className="min-w-0 flex-1 text-xs leading-5 text-[var(--text-secondary)]">{error.message}</p>
+      <p className="turn-error-message min-w-0 flex-1 text-xs leading-5 text-[var(--text-secondary)]" title={error.message}>{error.message}</p>
+      <div className="turn-error-actions">
       <Button variant="outline" size="sm" className="shrink-0 border-[var(--danger-border)] bg-[var(--surface)]" onClick={onRetry}>
         <RotateCcw aria-hidden="true" /> {error.kind === 'load' ? 'Retry connection' : 'Retry turn'}
       </Button>
+      {error.kind === 'turn' && <TurnSettingsAction message={error.message} />}
+      </div>
     </div>
   );
 }
@@ -3062,7 +3076,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
               ? current
               : [...current, { id: `local-inquiry-${Date.now()}`, question: data.question, sourceQuestion: data.question }]);
           } else if (event === 'error') {
-            throw new Error(data.message || 'Wayfinder could not complete this turn.');
+            throw new ServerTurnError(typeof data.message === 'string' ? data.message : '');
           }
         }
         if (done) break;
@@ -3072,10 +3086,10 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
       setMessage((current) => current.trim() === text ? '' : current);
       setStreamedReply('');
       setComposerOpen(false);
-    } catch {
+    } catch (cause) {
       setMessage(text);
       setStreamedReply('');
-      setError({ kind: 'stream', message: 'Wayfinder lost the connection. Your message and transcript are ready to retry.' });
+      setError({ kind: 'stream', message: turnErrorMessage(cause, 'Wayfinder lost the connection. Your message and transcript are ready to retry.') });
     } finally {
       setWorking(false);
     }
@@ -3252,7 +3266,7 @@ function LiveSessionComposer({ message, working, momentStatus, markDisabled, err
       <Input aria-label="Send to Wayfinder" placeholder="Give Wayfinder one concrete example." value={message} disabled={working} onChange={(event) => onMessageChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onSend(); }} />
       {!mobile && <Button variant="outline" size="sm" disabled={working || markDisabled || momentStatus === 'saving'} onClick={onMark}>{momentStatus === 'saving' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : momentStatus === 'saved' ? <CheckCircle2 aria-hidden="true" /> : <Bookmark aria-hidden="true" />}{momentStatus === 'saving' ? 'Saving moment' : momentStatus === 'saved' ? 'Moment saved' : 'Mark moment'}</Button>}
       <Button size="sm" disabled={working || !message.trim()} onClick={onSend}>{working ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <SendHorizontal aria-hidden="true" />}{working ? 'Working' : 'Send'}</Button>
-      {error && error.kind !== 'approve' && <div className="live-session-error" role="alert"><AlertCircle aria-hidden="true" /><p>{error.message}</p><Button variant="outline" size="sm" onClick={onRetry}><RotateCcw aria-hidden="true" /> Retry</Button></div>}
+      {error && error.kind !== 'approve' && <div className="live-session-error" role="alert"><AlertCircle aria-hidden="true" /><p className="turn-error-message" title={error.message}>{error.message}</p><div className="turn-error-actions"><Button variant="outline" size="sm" onClick={onRetry}><RotateCcw aria-hidden="true" /> Retry</Button>{error.kind === 'stream' && <TurnSettingsAction message={error.message} />}</div></div>}
     </div>
   );
 }
