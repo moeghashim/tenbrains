@@ -3561,3 +3561,21 @@ a,
   .live-session-error { grid-template-columns: auto minmax(0, 1fr); }
   .live-session-error .turn-error-actions { grid-column: 2; margin-left: 0; }
 }
+
+/* Live composers use one outer focus indicator; action buttons retain their own focus. */
+:is(.intake-composer-shell, .live-session-composer, .live-mobile-composer):has(input:focus-visible) {
+  outline: 2px solid var(--theme-focus);
+  outline-offset: 2px;
+}
+:is(.intake-composer-shell, .live-session-composer, .live-mobile-composer) input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: transparent;
+}
+.live-intake-transcript, .live-transcript-viewport {
+  overflow-y: auto;
+  overflow-anchor: none;
+  overscroll-behavior-y: contain;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.live-transcript-list { padding-bottom: 24px; }

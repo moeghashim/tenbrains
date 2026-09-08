@@ -170,3 +170,16 @@ passed
 - Demo code is unchanged, and `/map?demo=1` retains `Target developer-led teams first`. No server code changed and no commit was made.
 - Validation: Node 22 build, all 29 tests, and `git diff --check` passed.
 - Final result: passed.
+
+## Composer focus and transcript following — 2026-09-08
+
+- Reviewed `../qa-report-double-border.png` and `../qa-report-no-autoscroll.png`. Live intake attached its scrolling ref to a wrapper that does not forward refs under React 18. The global input outline also duplicated the composer's focus treatment.
+- Both live transcripts now use direct viewport refs and shared scroll-follow behavior. They follow streaming content within 120px of the bottom, stop following when You scroll up, and resume on every send or retry. A resize observer handles content and viewport geometry changes. Intake now keeps the composer in the layout instead of covering transcript content with a fixed overlay.
+- Live intake, desktop Grilling, and mobile Grilling composers use one 2px outer focus outline. Input focus outlines and shadows are suppressed only inside these live composers; action-button focus remains intact. Keyboard Tab from each desktop transcript reaches its input with the outer focus treatment.
+- Real Codex QA: multiple turns completed in both surfaces on `codex-subscription / gpt-5.4-mini`. Routing was left unchanged. Discovery: `f88cce6b-d96c-4673-949b-b04688a1b412`; session: `9d285824-3f5b-472f-b4f1-75c1b490d009`.
+- Desktop stream sampling captured 24 intake and 10 Grilling content updates while busy; bottom gaps stayed at 0px and at most 0.5px respectively. Scrolling to older history held scrollTop at 0 through a real reply in both views. Sending another message resumed following within 1px of the bottom.
+- Repeated no-yank and send-resume checks at 390px against real turns. Both held older history during the reply and resumed within 1px after send. Last-message geometry confirmed intake's last message ended above its composer and Grilling's last message ended above the bottom controls.
+- Dark/light focused screenshots passed at 1440 × 900 and 390 × 844 without document horizontal overflow. Evidence: `../qa-composer-scroll-{intake|session}-{dark|light}-{1440|390}.png`; unobscured mobile transcript endings: `../qa-scroll-last-message-{intake|session}-390.png`.
+- Demo markup remains unchanged, and `/map?demo=1` still renders `Target developer-led teams first`. No server changes or commits.
+- Validation: Node 22 `npm run build`, all 29 `npm test` tests, and `git diff --check` passed.
+- Final result: passed.

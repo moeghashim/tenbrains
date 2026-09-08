@@ -1,5 +1,5 @@
 import { ProviderSettings } from './ProviderSettings';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import {
   AlertCircle,
@@ -1610,8 +1610,8 @@ function DiscoveryIntake({
             <CardContent className="flex min-h-0 flex-1 flex-col p-0">
               <IntakeTranscriptView messages={messages} working={working} />
               <Separator />
-              <div className="fixed inset-x-0 bottom-0 z-30 bg-[var(--canvas)] p-3 md:static md:bg-transparent">
-                <div className="intake-composer-shell mx-auto grid max-w-[800px] grid-cols-[1fr_auto] items-center gap-2 border border-[var(--border-strong)] bg-[var(--surface)] p-2.5 focus-within:border-[var(--ring)] focus-within:ring-2 focus-within:ring-[var(--workbench-accent-soft)]">
+              <div className="live-intake-composer shrink-0 bg-[var(--canvas)] p-3 md:bg-transparent">
+                <div className="intake-composer-shell mx-auto grid max-w-[800px] grid-cols-[1fr_auto] items-center gap-2 border border-[var(--border-strong)] bg-[var(--surface)] p-2.5">
                   <Input
                     aria-label="Reply to Wayfinder"
                     placeholder="Reply with a concrete example, constraint, or contradiction."
@@ -1697,27 +1697,57 @@ function IntakeErrorState({ error, onRetry }: { error: IntakeError; onRetry: () 
   );
 }
 
-function IntakeTranscriptView({ messages, working }: { messages: IntakeMessage[]; working: boolean }) {
-  const transcriptRef = useRef<HTMLDivElement>(null);
-  const lastMessageText = messages.at(-1)?.text ?? '';
+function useTranscriptFollow(lastText: string, length: number, working: boolean) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const following = useRef(true);
+  const wasWorking = useRef(false);
+  const previousTop = useRef(0);
+
+  function follow() {
+    const viewport = viewportRef.current;
+    if (!viewport || !following.current) return;
+    viewport.scrollTop = viewport.scrollHeight;
+    previousTop.current = viewport.scrollTop;
+  }
+
+  useLayoutEffect(() => {
+    // Sending always resumes following, including a retry from older history.
+    if (working && !wasWorking.current) following.current = true;
+    wasWorking.current = working;
+    follow();
+  }, [lastText, length, working]);
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      const viewport = transcriptRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
-      if (viewport) viewport.scrollTop = viewport.scrollHeight;
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [lastMessageText, messages.length, working]);
+    const observer = new ResizeObserver(follow);
+    if (viewportRef.current) observer.observe(viewportRef.current);
+    if (contentRef.current) observer.observe(contentRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  function onScroll(viewport: HTMLDivElement) {
+    const distance = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    if (distance <= 120) following.current = true;
+    else if (viewport.scrollTop < previousTop.current) following.current = false;
+    previousTop.current = viewport.scrollTop;
+  }
+
+  return { viewportRef, contentRef, onScroll };
+}
+
+function IntakeTranscriptView({ messages, working }: { messages: IntakeMessage[]; working: boolean }) {
+  const { viewportRef, contentRef, onScroll } = useTranscriptFollow(messages.at(-1)?.text ?? '', messages.length, working);
+
 
   return (
-    <ScrollArea ref={transcriptRef} className="min-h-0 flex-1" aria-label="Discovery session transcript">
-      <div role="log" aria-label="Messages between You and Wayfinder" aria-busy={working} aria-live="polite" className="mx-auto max-w-[800px] space-y-5 px-5 py-5 pb-28 md:pb-6">
+    <div ref={viewportRef} className="live-intake-transcript min-h-0 flex-1" tabIndex={0} aria-label="Discovery session transcript" onScroll={(event) => onScroll(event.currentTarget)}>
+      <div ref={contentRef} role="log" aria-label="Messages between You and Wayfinder" aria-busy={working} aria-live="polite" className="mx-auto max-w-[800px] space-y-5 px-5 py-5 pb-6">
         {messages.map((message, index) => (
           <IntakeMessageRow key={message.id ?? `${message.time}-${index}`} message={message} index={index} />
         ))}
         {working && <WayfinderWorkingIndicator />}
       </div>
-    </ScrollArea>
+    </div>
   );
 }
 
@@ -3239,20 +3269,11 @@ function LiveSessionSignals({ session, onReview, drawer = false }: { session: Ap
 }
 
 function LiveSessionTranscript({ lines, working }: { lines: ApiSession['transcript']; working: boolean }) {
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const stickToBottom = useRef(true);
-  const lastText = lines.at(-1)?.text ?? '';
-  useEffect(() => {
-    if (!stickToBottom.current) return;
-    const frame = window.requestAnimationFrame(() => {
-      if (viewportRef.current) viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [lastText, lines.length, working]);
+  const { viewportRef, contentRef, onScroll } = useTranscriptFollow(lines.at(-1)?.text ?? '', lines.length, working);
 
   return (
-    <div ref={viewportRef} className="live-transcript-viewport" role="log" aria-label="Messages between You and Wayfinder" aria-busy={working} aria-live="polite" onScroll={(event) => { const viewport = event.currentTarget; stickToBottom.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 64; }}>
-      <div className="transcript-list live-transcript-list">
+    <div ref={viewportRef} className="live-transcript-viewport" role="log" aria-label="Messages between You and Wayfinder" aria-busy={working} aria-live="polite" tabIndex={0} onScroll={(event) => onScroll(event.currentTarget)}>
+      <div ref={contentRef} className="transcript-list live-transcript-list">
         {lines.map((line) => <div className={`transcript-row ${line.id === 'streamed-session-reply' ? 'is-streaming' : ''}`} key={line.id}><time>{new Date(line.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time><strong>{line.actor}</strong><div><p>{line.text}</p></div></div>)}
         {working && <div className="live-session-working" role="status"><LoaderCircle aria-hidden="true" className="animate-spin" /><span>Wayfinder is working</span></div>}
       </div>
