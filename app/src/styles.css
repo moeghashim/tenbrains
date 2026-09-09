@@ -3591,3 +3591,8 @@ a,
 .choices-history .wayfinder-choice { background: transparent; border-color: var(--theme-border-subtle); color: var(--theme-text-muted); }
 .choices-history .choice-recommendation { color: var(--theme-text-muted); }
 @media (max-width: 650px) { .wayfinder-choice { width: 100%; } }
+.candidate-citations { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; font-size: 11px; }
+.candidate-citations a { color: var(--theme-accent); text-decoration: underline; overflow-wrap: anywhere; }
+.candidate-retirement-reason { padding: 4px 10px 10px; color: var(--theme-text-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.session-type-label { display: block; margin-top: 4px; color: var(--theme-text-muted); font-size: 11px; }
+.synthesis-session-type { margin: 8px 0; }

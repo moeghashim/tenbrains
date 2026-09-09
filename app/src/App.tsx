@@ -112,6 +112,7 @@ type IntakeMessage = {
 };
 
 type ApiCandidate =
+  | { id: string; type: 'fog-retirement'; questionId: string; reason: string; stagedAfter: string }
   | { id: string; type: 'destination-draft'; title: string; stagedAfter: string }
   | { id: string; type: 'ticket'; title: string; ticketType: TicketType; mode: WorkMode; target: string; stagedAfter: string }
   | { id: string; type: 'fog-question'; question: string; stagedAfter: string }
@@ -119,7 +120,7 @@ type ApiCandidate =
 
 type ApiSession = {
   id: string;
-  type: 'grilling';
+  type: 'grilling' | 'synthesis';
   ticketId?: string | null;
   title: string;
   objective: string;
@@ -1098,7 +1099,7 @@ function MapOverview({
     const response = await fetch(`/api/discoveries/${liveDiscovery.id}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticketId: ticket.id }),
+      body: JSON.stringify({ ticketId: ticket.id, type: ticket.type === 'Synthesis' ? 'synthesis' : 'grilling' }),
     });
     if (!response.ok) return;
     const session: ApiSession = await response.json();
@@ -1179,7 +1180,7 @@ function MapOverview({
                   {displayedTickets.map((ticket) => (
                     <TicketCard
                       key={ticket.title}
-                      ticket={{ ...ticket, selected: isDemoMap ? ticket.selected : ticket.type === 'Grilling' }}
+                      ticket={{ ...ticket, selected: isDemoMap ? ticket.selected : (ticket.type === 'Grilling' || ticket.type === 'Synthesis') }}
                       onWork={() => startSession(ticket)}
                       live={!isDemoMap}
                     />
@@ -1946,6 +1947,17 @@ function StagedDecisionCard({ decision }: { decision: Extract<ApiCandidate, { ty
   );
 }
 
+function candidateText(candidate: ApiCandidate, fog: ApiDiscovery['map']['fogOfWar'] = []) {
+  if (candidate.type === 'fog-question') return candidate.question;
+  if (candidate.type === 'fog-retirement') return `Retire fog: ${fog.find((item) => item.id === candidate.questionId)?.question ?? candidate.questionId}`;
+  return candidate.title;
+}
+
+function CandidateEvidence({ candidate }: { candidate: ApiCandidate }) {
+  if (candidate.type !== 'closed-decision' || !candidate.evidence?.length) return null;
+  return <div className="candidate-citations" aria-label="Cited evidence">{candidate.evidence.map((id) => <a key={id} href={`/evidence#${encodeURIComponent(id)}`}>{id}</a>)}</div>;
+}
+
 function ReviewMapDialog({
   candidates,
   open,
@@ -1954,6 +1966,8 @@ function ReviewMapDialog({
   approving = false,
   error = '',
   context = 'intake',
+  fog = [],
+  synthesis = false,
 }: {
   candidates: ApiCandidate[];
   open: boolean;
@@ -1962,6 +1976,8 @@ function ReviewMapDialog({
   approving?: boolean;
   error?: string;
   context?: 'intake' | 'session';
+  fog?: ApiDiscovery['map']['fogOfWar'];
+  synthesis?: boolean;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -1989,8 +2005,8 @@ function ReviewMapDialog({
         <ScrollArea className="min-h-0">
           <div className="space-y-3 p-5">
             {candidates.map((candidate) => {
-              const label = candidate.type === 'fog-question' ? candidate.question : candidate.title;
-              const helper = candidate.type === 'ticket'
+              const label = candidateText(candidate, fog);
+              const helper = candidate.type === 'fog-retirement' ? `Fog of War retirement · ${candidate.reason}` : candidate.type === 'ticket'
                 ? `${candidate.ticketType} · ${candidate.mode} · ${candidate.target}`
                 : candidate.type === 'fog-question'
                   ? 'Fog of War · candidate fog question'
@@ -1998,14 +2014,16 @@ function ReviewMapDialog({
                     ? `Closed Decision · ${candidate.confidence ?? 'Medium'} confidence`
                     : 'Destination draft';
               return (
+                <div key={candidate.id}>
                 <ReviewCheckbox
-                  key={candidate.id}
                   label={label}
                   helper={helper}
                   checked={selectedIds.has(candidate.id)}
                   disabled={approving}
                   onCheckedChange={(checked) => setSelected(candidate.id, checked)}
                 />
+                <CandidateEvidence candidate={candidate} />
+                </div>
               );
             })}
             {error && (
@@ -2020,7 +2038,7 @@ function ReviewMapDialog({
           </div>
         </ScrollArea>
         <DialogFooter className="mx-0 mb-0 border-t border-border bg-[var(--surface-subtle)] px-5 py-3 sm:justify-between">
-          <Button variant="outline" disabled={approving} onClick={() => onOpenChange(false)}>Continue grilling</Button>
+          <Button variant="outline" disabled={approving} onClick={() => onOpenChange(false)}>{synthesis ? 'Continue synthesis' : 'Continue grilling'}</Button>
           <Button className="bg-[var(--workbench-accent)] hover:bg-[var(--workbench-accent-hover)]" disabled={approving || selectedIds.size === 0} onClick={() => void onApprove([...selectedIds])}>
             {approving ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null}
             {approving ? (context === 'session' ? 'Applying updates' : 'Creating map') : (context === 'session' ? 'Approve map updates' : 'Approve and create map')}
@@ -2328,7 +2346,7 @@ function LiveEvidenceView({ navigate }: { navigate: (path: string) => void }) {
     return () => { cancelled = true; };
   }, [attempt]);
 
-  const liveSessions = discovery?.sessions.filter((item): item is ApiSession => item.type === 'grilling') ?? [];
+  const liveSessions = discovery?.sessions.filter((item): item is ApiSession => (item.type === 'grilling' || item.type === 'synthesis')) ?? [];
   const groups: LiveEvidenceGroup[] = liveSessions
     .map((session) => ({
       session,
@@ -2486,12 +2504,12 @@ function sessionMapData(session: ApiSession): SessionMapData {
     candidateUpdates: session.staged.map((candidate) => ({
       id: candidate.id,
       type: candidate.type === 'ticket' ? 'open-frontier-ticket' : candidate.type,
-      title: candidate.type === 'fog-question' ? candidate.question : candidate.title,
+      title: candidateText(candidate),
       sourceTurnIndex: Math.min(
         Math.max(0, session.transcript.length - 1),
         Math.max(0, Number(candidate.stagedAfter.match(/\d+/)?.[0] ?? session.transcript.length) - 1),
       ),
-      evidenceIds: candidate.type === 'closed-decision' ? [...new Set([...(candidate.evidence ?? []), ...evidenceIds])] : evidenceIds,
+      evidenceIds: candidate.type === 'closed-decision' ? (session.type === 'synthesis' ? candidate.evidence ?? [] : [...new Set([...(candidate.evidence ?? []), ...evidenceIds])]) : evidenceIds,
     })),
     outcome: {
       stagedCount: session.staged.length,
@@ -2520,7 +2538,7 @@ function LiveSessionMapView({ navigate, sessionId }: { navigate: (path: string) 
         return response.json();
       })
       .then((discovery: ApiDiscovery | null) => {
-        const found = discovery?.sessions.find((item): item is ApiSession => item.id === sessionId && item.type === 'grilling');
+        const found = discovery?.sessions.find((item): item is ApiSession => item.id === sessionId && (item.type === 'grilling' || item.type === 'synthesis'));
         if (!found) throw new Error('Session map could not load');
         setSession(found);
         setStatus('ready');
@@ -2854,7 +2872,7 @@ function LiveDiscoverySpecView({ navigate }: { navigate: (path: string) => void 
     return () => { cancelled = true; };
   }, [attempt]);
 
-  const liveSessions = discovery?.sessions.filter((item): item is ApiSession => item.type === 'grilling') ?? [];
+  const liveSessions = discovery?.sessions.filter((item): item is ApiSession => (item.type === 'grilling' || item.type === 'synthesis')) ?? [];
 
   return (
     <div className="app-shell">
@@ -2996,7 +3014,7 @@ function SessionsList({ navigate }: { navigate: (path: string) => void }) {
       .then((item: ApiDiscovery | null) => item && setDiscovery(item))
       .catch(() => undefined);
   }, [discoveryId]);
-  const sessions = discovery?.sessions.filter((item): item is ApiSession => item.type === 'grilling') ?? [];
+  const sessions = discovery?.sessions.filter((item): item is ApiSession => (item.type === 'grilling' || item.type === 'synthesis')) ?? [];
   return (
     <div className="app-shell">
       <SideNav active="session" navigate={navigate} />
@@ -3006,7 +3024,7 @@ function SessionsList({ navigate }: { navigate: (path: string) => void }) {
           <div className="workspace-intro"><p className="eyebrow">Sessions</p><h1 className="mt-2 text-[22px] font-medium">Focused sessions</h1><p className="mt-2 text-sm text-muted-foreground">Open a session for the selected discovery.</p></div>
           <div className="workspace-list discoveries-list">
             {sessions.length === 0 && <p className="p-4 text-sm text-muted-foreground">No live sessions yet.</p>}
-            {sessions.map((session) => <button key={session.id} type="button" className="discoveries-row" onClick={() => navigate(`/sessions/${session.id}`)}><span className="discoveries-title">{session.title}</span><Badge variant="outline" className="discoveries-status is-active">{session.status}</Badge><span className="discoveries-meta">{session.evidence.length} evidence</span><span className="discoveries-meta">{session.staged.length} staged updates</span><span className="discoveries-meta">{session.mode}</span></button>)}
+            {sessions.map((session) => <button key={session.id} type="button" className="discoveries-row" onClick={() => navigate(`/sessions/${session.id}`)}><span className="discoveries-title">{session.title}<span className="session-type-label">{session.type === 'synthesis' ? 'Synthesis' : 'Grilling'}</span></span><Badge variant="outline" className="discoveries-status is-active">{session.status}</Badge><span className="discoveries-meta">{session.evidence.length} evidence</span><span className="discoveries-meta">{session.staged.length} staged updates</span><span className="discoveries-meta">{session.mode}</span></button>)}
             <button type="button" className="discoveries-row" onClick={() => navigate('/sessions/grilling')}><span className="discoveries-title">Clarify setup anxiety · Demo</span><Badge variant="outline" className="discoveries-status is-empty">Demo</Badge><span className="discoveries-meta">Scripted session</span><span className="discoveries-meta">3 staged updates</span><span className="discoveries-meta">You + Wayfinder</span></button>
           </div>
         </section>
@@ -3039,7 +3057,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
   const [momentStatus, setMomentStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const dismissedInquiryQuestions = useRef(new Set<string>());
   const discoveryId = window.sessionStorage.getItem('ten-brains-live-discovery');
-  const session = discovery?.sessions.find((item): item is ApiSession => item.id === sessionId && item.type === 'grilling') ?? null;
+  const session = discovery?.sessions.find((item): item is ApiSession => item.id === sessionId && (item.type === 'grilling' || item.type === 'synthesis')) ?? null;
 
   function mergeInquiries(found: ApiSession) {
     setInquiries((current) => found.lineOfInquiry
@@ -3055,7 +3073,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
     const response = await fetch(`/api/discoveries/${discoveryId}`);
     if (!response.ok) throw new Error('Session could not load');
     const updated: ApiDiscovery = await response.json();
-    const found = updated.sessions.find((item): item is ApiSession => item.id === sessionId && item.type === 'grilling');
+    const found = updated.sessions.find((item): item is ApiSession => item.id === sessionId && (item.type === 'grilling' || item.type === 'synthesis'));
     if (!found) throw new Error('Session could not load');
     setDiscovery(updated);
     mergeInquiries(found);
@@ -3080,7 +3098,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
   function updateLiveSession(update: (current: ApiSession) => ApiSession) {
     setDiscovery((current) => current ? {
       ...current,
-      sessions: current.sessions.map((item) => item.id === sessionId && item.type === 'grilling' ? update(item) : item),
+      sessions: current.sessions.map((item) => item.id === sessionId && (item.type === 'grilling' || item.type === 'synthesis') ? update(item) : item),
     } : current);
   }
 
@@ -3217,7 +3235,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
   const transcriptLines = [...session.transcript, ...(streamedReply ? [{ id: 'streamed-session-reply', actor: 'Wayfinder' as const, text: streamedReply, choices: streamedChoices, createdAt: new Date().toISOString() }] : [])];
   const lastUserTurn = [...session.transcript].reverse().find((turn) => turn.actor === 'You' && turn.id !== 'local-pending-session-turn');
   const lastTurnMarked = Boolean(lastUserTurn && session.evidence.some((item) => String(item.sourceTurn) === lastUserTurn.id));
-  const signals = <LiveSessionSignals session={session} onReview={() => { setApprovalError(''); setReviewOpen(true); }} />;
+  const signals = <LiveSessionSignals fog={discovery?.map.fogOfWar} session={session} onReview={() => { setApprovalError(''); setReviewOpen(true); }} />;
   const inquiryPanel = <LiveLineOfInquiry inquiries={inquiries} onChange={(id, question) => setInquiries((current) => current.map((item) => item.id === id ? { ...item, question } : item))} onDismiss={dismissInquiry} />;
 
   return (
@@ -3228,6 +3246,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
           <div className="breadcrumb session-breadcrumb"><DiscoveriesCrumb navigate={navigate} /><span aria-hidden="true" className="breadcrumb-slash">/</span><strong>{session.title}</strong><Badge className="live-badge"><Circle aria-hidden="true" className="live-dot" /> LIVE</Badge></div>
           <div className="session-header-actions"><Button variant="secondary" size="lg" className="session-map-action" onClick={() => navigate(`/sessions/${session.id}/map`)}>Session map</Button></div>
         </header>
+        {session.type === 'synthesis' && <div className="synthesis-session-type"><Badge variant="outline">Synthesis · You + Wayfinder</Badge></div>}
         <Card className="objective-card">
           <div className="objective-section wide"><Target aria-hidden="true" className="target-icon" /><div><p className="eyebrow">Objective</p><strong>{session.objective}</strong></div></div>
           <Separator orientation="vertical" /><div className="objective-section"><Target aria-hidden="true" className="target-icon" /><div><p className="eyebrow">Evidence target</p><strong>{session.evidenceTarget}</strong></div></div>
@@ -3236,7 +3255,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
 
         <Sheet open={drawer !== null} onOpenChange={(open) => !open && setDrawer(null)}>
           <div className="mobile-session-actions" aria-label="Session drawers"><Button variant="outline" size="sm" onClick={() => setDrawer('inquiry')}>Line of Inquiry</Button><Button variant="outline" size="sm" onClick={() => setDrawer('signals')}>Session Signals</Button></div>
-          <SheetContent className="mobile-drawer live-session-drawer" side="right"><SheetHeader><SheetTitle>{drawer === 'inquiry' ? 'Line of Inquiry' : 'Session Signals'}</SheetTitle><SheetDescription className="sr-only">Live session details</SheetDescription></SheetHeader><div className="drawer-body">{drawer === 'inquiry' ? <LiveLineOfInquiry inquiries={inquiries} onChange={(id, question) => setInquiries((current) => current.map((item) => item.id === id ? { ...item, question } : item))} onDismiss={dismissInquiry} drawer /> : <LiveSessionSignals session={session} onReview={() => { setDrawer(null); setApprovalError(''); setReviewOpen(true); }} drawer />}</div></SheetContent>
+          <SheetContent className="mobile-drawer live-session-drawer" side="right"><SheetHeader><SheetTitle>{drawer === 'inquiry' ? 'Line of Inquiry' : 'Session Signals'}</SheetTitle><SheetDescription className="sr-only">Live session details</SheetDescription></SheetHeader><div className="drawer-body">{drawer === 'inquiry' ? <LiveLineOfInquiry inquiries={inquiries} onChange={(id, question) => setInquiries((current) => current.map((item) => item.id === id ? { ...item, question } : item))} onDismiss={dismissInquiry} drawer /> : <LiveSessionSignals fog={discovery?.map.fogOfWar} session={session} onReview={() => { setDrawer(null); setApprovalError(''); setReviewOpen(true); }} drawer />}</div></SheetContent>
         </Sheet>
 
         <section className="session-grid live-session-grid">
@@ -3254,7 +3273,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
         <Button size="sm" onClick={() => setComposerOpen(true)}><Mic aria-hidden="true" /> Ask Wayfinder</Button>
       </div>
       <Sheet open={composerOpen} onOpenChange={setComposerOpen}><SheetContent side="bottom" className="live-session-composer-sheet"><SheetHeader><SheetTitle>Ask Wayfinder</SheetTitle><SheetDescription>Give one concrete example, constraint, or contradiction.</SheetDescription></SheetHeader><LiveSessionComposer message={message} working={working} momentStatus={momentStatus} markDisabled error={error} mobile onMessageChange={(value) => { setMessage(value); if (error?.kind === 'stream') setError(null); }} onSend={() => sendSessionMessage()} onMark={markMoment} onRetry={retry} /></SheetContent></Sheet>
-      <ReviewMapDialog candidates={session.staged} open={reviewOpen} onOpenChange={(open) => { setReviewOpen(open); if (open) setApprovalError(''); }} onApprove={approveUpdates} approving={approving} error={approvalError} context="session" />
+      <ReviewMapDialog synthesis={session.type === 'synthesis'} fog={discovery?.map.fogOfWar} candidates={session.staged} open={reviewOpen} onOpenChange={(open) => { setReviewOpen(open); if (open) setApprovalError(''); }} onApprove={approveUpdates} approving={approving} error={approvalError} context="session" />
     </div>
   );
 }
@@ -3275,18 +3294,18 @@ function LiveLineOfInquiry({ inquiries, onChange, onDismiss, drawer = false }: {
   );
 }
 
-function LiveSessionSignals({ session, onReview, drawer = false }: { session: ApiSession; onReview: () => void; drawer?: boolean }) {
+function LiveSessionSignals({ session, onReview, drawer = false, fog = [] }: { session: ApiSession; onReview: () => void; drawer?: boolean; fog?: ApiDiscovery['map']['fogOfWar'] }) {
   return (
     <PanelShell title="Session Signals" drawer={drawer}>
       <div className="signal-section">
         <h3>Evidence captured</h3>
-        {session.evidence.length === 0 && <p className="live-signal-empty">Mark a concrete moment to add evidence.</p>}
+        {session.evidence.length === 0 && <p className="live-signal-empty">{session.type === 'synthesis' ? 'Wayfinder uses evidence from all sessions. Capture an example in a Grilling session if none exists.' : 'Mark a concrete moment to add evidence.'}</p>}
         {session.evidence.map((item) => <Card className="evidence-item live-arrival" key={item.id}><CardContent className="evidence-content live-evidence-content"><Bookmark aria-hidden="true" /><span><strong>{item.id}</strong>{item.text}</span></CardContent></Card>)}
       </div>
       <div className="signal-section map-updates">
-        <h3>Candidate map updates</h3>
+        <h3>{session.type === 'synthesis' ? 'Consolidated update' : 'Candidate map updates'}</h3>
         {session.staged.length === 0 && <p className="live-signal-empty">Wayfinder has not staged an update.</p>}
-        {session.staged.map((candidate) => <div className="live-arrival" key={candidate.id}><CandidateUpdate tone={candidate.type === 'fog-question' ? 'fog' : candidate.type === 'closed-decision' ? 'decision' : 'frontier'} label={candidate.type === 'fog-question' ? 'Candidate Fog of War question' : candidate.type === 'closed-decision' ? 'Candidate Closed Decision' : 'Candidate Open Frontier ticket'} text={candidate.type === 'fog-question' ? candidate.question : candidate.title} /></div>)}
+        {session.staged.map((candidate) => <div className="live-arrival" key={candidate.id}><CandidateUpdate tone={candidate.type === 'fog-question' || candidate.type === 'fog-retirement' ? 'fog' : candidate.type === 'closed-decision' ? 'decision' : 'frontier'} label={candidate.type === 'fog-retirement' ? 'Retire Fog of War question' : candidate.type === 'fog-question' ? 'Candidate Fog of War question' : candidate.type === 'closed-decision' ? 'Candidate Closed Decision' : candidate.type === 'destination-draft' ? 'Destination refinement' : 'Candidate Open Frontier ticket'} text={candidateText(candidate, fog)} />{candidate.type === 'fog-retirement' && <p className="candidate-retirement-reason">{candidate.reason}</p>}<CandidateEvidence candidate={candidate} /></div>)}
         <Button className="review-button" disabled={session.staged.length === 0} onClick={onReview}>Review {session.staged.length} map {session.staged.length === 1 ? 'update' : 'updates'}</Button>
       </div>
     </PanelShell>

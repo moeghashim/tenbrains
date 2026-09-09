@@ -3,7 +3,7 @@ import type { SVGProps } from 'react';
 
 export type SessionMapActor = 'You' | 'Wayfinder';
 export type SessionMapMode = 'You' | 'Wayfinder' | 'You + Wayfinder';
-export type SessionMapUpdateType = 'destination-draft' | 'fog-question' | 'closed-decision' | 'open-frontier-ticket';
+export type SessionMapUpdateType = 'destination-draft' | 'fog-retirement' | 'fog-question' | 'closed-decision' | 'open-frontier-ticket';
 
 export type SessionMapTranscriptTurn = {
   id?: string;
@@ -153,6 +153,7 @@ function sourceIndexFor(
 
 function getCandidateLabel(type: SessionMapUpdateType) {
   if (type === 'destination-draft') return 'Destination draft';
+  if (type === 'fog-retirement') return 'Fog of War retirement';
   if (type === 'fog-question') return 'Fog of War question';
   if (type === 'closed-decision') return 'Closed Decision';
   return 'Open Frontier ticket';
@@ -160,19 +161,19 @@ function getCandidateLabel(type: SessionMapUpdateType) {
 
 function getCandidateClass(type: SessionMapUpdateType) {
   if (type === 'destination-draft') return 'session-map-candidate-destination';
-  if (type === 'fog-question') return 'session-map-candidate-fog';
+  if (type === 'fog-question' || type === 'fog-retirement') return 'session-map-candidate-fog';
   if (type === 'closed-decision') return 'session-map-candidate-closed';
   return 'session-map-candidate-frontier';
 }
 
 function getCandidateEdgeClass(type: SessionMapUpdateType) {
-  if (type === 'fog-question') return 'session-map-path-fog';
+  if (type === 'fog-question' || type === 'fog-retirement') return 'session-map-path-fog';
   if (type === 'closed-decision') return 'session-map-path-success';
   return 'session-map-path-neutral';
 }
 
 function getCandidateMarker(type: SessionMapUpdateType, markerIds: Record<'accent' | 'neutral' | 'warning' | 'success', string>) {
-  if (type === 'fog-question') return markerIds.warning;
+  if (type === 'fog-question' || type === 'fog-retirement') return markerIds.warning;
   if (type === 'closed-decision') return markerIds.success;
   return markerIds.neutral;
 }
