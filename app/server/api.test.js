@@ -155,7 +155,7 @@ test('subscription status and actual intake SSE share credentials and report hon
         assert.ok(saved.transcripts.intake.every(entry => ['You', 'Wayfinder'].includes(entry.actor)));
         assert.equal(saved.transcripts.intake.length, discovery.transcripts.intake.length + (success ? expired ? 4 : 2 : 0));
         if (scenario === 'missing') assert.equal(await readFile(requestLog, 'utf8'), '');
-        if (id === 'codex-subscription' && scenario === 'valid') assert.equal(selected.body.routing.intake.model, 'gpt-5.4-mini');
+        if (id === 'codex-subscription' && scenario === 'valid') assert.equal(selected.body.routing.intake.model, 'gpt-6-astra');
       });
     }
   }
@@ -263,6 +263,86 @@ test('fixture transport malformed choices silently degrade on both SSE surfaces'
       }
     } finally { await stopServer(server.child); await rm(directory, { recursive: true, force: true }); }
   }
+});
+
+test('malformed synthesis transport output completes as a plain reply without staged writes', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'tenbrains-synthesis-invalid-'));
+  await mkdir(path.join(directory, 'home/.codex'), { recursive: true });
+  await writeFile(path.join(directory, 'home/.codex/auth.json'), JSON.stringify({ tokens: { access_token: 'fixture-access', account_id: 'fixture-account' } }));
+  const server = await startServer(directory, {
+    WAYFINDER_SESSION_PROVIDER: 'codex-subscription',
+    NODE_OPTIONS: `--import=${path.join(appDirectory, 'server/fixtures/subscription-fetch.js')}`,
+    TEST_REQUEST_LOG: path.join(directory, 'requests'), TEST_EXPECTED_TOKEN: 'fixture-access', TEST_SYNTHESIS_ARGUMENTS: '{broken',
+  });
+  t.after(async () => { await stopServer(server.child); await rm(directory, { recursive: true, force: true }); });
+  const { baseUrl } = server;
+  const { body: discovery } = await jsonRequest(baseUrl, '/api/discoveries', { method: 'POST', body: {} });
+  const root = `/api/discoveries/${discovery.id}`;
+  const { body: session } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { type: 'synthesis', objective: 'Compare', evidenceTarget: 'Examples' } });
+  const { events } = await eventRequest(baseUrl, `${root}/sessions/${session.id}/messages`, { message: 'Compare evidence' });
+  assert.deepEqual(events.map(event => event.event), ['token', 'done']);
+  assert.equal(events.at(-1).data.message.text, 'Fixture reply.');
+  const doc = (await jsonRequest(baseUrl, root)).body;
+  assert.deepEqual(doc.sessions.find(item => item.id === session.id).staged, []);
+  assert.deepEqual(doc.map, emptyMap);
+});
+
+test('Synthesis sessions stage one grounded update and retire fog only on approval', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'tenbrains-synthesis-api-'));
+  const server = await startServer(directory);
+  t.after(async () => { await stopServer(server.child); await rm(directory, { recursive: true, force: true }); });
+  const { baseUrl } = server;
+  const { body: discovery } = await jsonRequest(baseUrl, '/api/discoveries', { method: 'POST', body: {} });
+  const root = `/api/discoveries/${discovery.id}`;
+  const first = await eventRequest(baseUrl, `${root}/intake/messages`, { message: 'Receipt sorting repeats' });
+  const fog = first.events.find(event => event.event === 'candidate' && event.data.type === 'fog-question').data;
+  await jsonRequest(baseUrl, `${root}/intake/approve`, { method: 'POST', body: { candidateIds: [fog.id] } });
+  const evidenceIds = [];
+  for (const text of [`${fog.question} Receipt sorting repeats every week.`, 'Sorting took twelve minutes on Monday.']) {
+    const { body: grilling } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { objective: 'Examine repeated sorting', evidenceTarget: 'One example' } });
+    assert.equal(grilling.type, 'grilling');
+    await eventRequest(baseUrl, `${root}/sessions/${grilling.id}/messages`, { message: text });
+    const doc = (await jsonRequest(baseUrl, root)).body;
+    const sourceTurn = doc.sessions.find(session => session.id === grilling.id).transcript.at(-2).id;
+    const { body: evidence } = await jsonRequest(baseUrl, `${root}/sessions/${grilling.id}/evidence`, { method: 'POST', body: { text, sourceTurn } });
+    evidenceIds.push(evidence.id);
+  }
+  const createBody = { type: 'synthesis', objective: 'Reduce repeated sorting', evidenceTarget: 'Recorded examples' };
+  const { body: synthesis } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: createBody });
+  assert.equal(synthesis.type, 'synthesis');
+  const doc = (await jsonRequest(baseUrl, root)).body;
+  // Fixture represents an already-approved Synthesis ticket (no new ticket UI).
+  doc.map.openFrontier.push({ id: 'approved-synthesis', type: 'Synthesis', title: 'Compare recorded examples', target: 'Two examples', mode: 'You + Wayfinder' });
+  await writeFile(path.join(directory, `${doc.id}.json`), JSON.stringify(doc));
+  const fromTicket = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { ticketId: 'approved-synthesis' } });
+  assert.equal(fromTicket.body.type, 'synthesis');
+  assert.equal(fromTicket.body.objective, 'Compare recorded examples');
+  assert.equal((await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { ticketId: 'approved-synthesis', type: 'grilling' } })).response.status, 400);
+  assert.equal((await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { ...createBody, type: 'unknown' } })).response.status, 400);
+  const before = (await jsonRequest(baseUrl, root)).body.map;
+  const endpoint = `${root}/sessions/${synthesis.id}`;
+  const { events } = await eventRequest(baseUrl, `${endpoint}/messages`, { message: 'Compare all evidence' });
+  assert.deepEqual(events.slice(-2).map(event => event.event), ['choices', 'done']);
+  const offered = events.filter(event => event.event === 'candidate').map(event => event.data);
+  assert.deepEqual(offered.map(candidate => candidate.type), ['closed-decision', 'destination-draft', 'fog-retirement']);
+  assert.deepEqual(offered[0].evidence, evidenceIds);
+  assert.equal(offered[2].questionId, fog.id);
+  const staged = (await jsonRequest(baseUrl, root)).body;
+  assert.deepEqual(staged.map, before);
+  assert.deepEqual(staged.sessions.find(session => session.id === synthesis.id).staged, offered);
+  const approved = await jsonRequest(baseUrl, `${endpoint}/updates/approve`, { method: 'POST', body: { candidateIds: offered.map(candidate => candidate.id) } });
+  assert.equal(approved.response.status, 200);
+  assert.equal(approved.body.map.fogOfWar.some(question => question.id === fog.id), false);
+  assert.equal(approved.body.map.destination, offered[1].title);
+  assert.deepEqual(approved.body.map.closedDecisions.at(-1).evidence, evidenceIds);
+  assert.deepEqual(approved.body.sessions.find(session => session.id === synthesis.id).staged, []);
+  // Revalidate persisted output too: neither invalid citations nor arbitrary
+  // map-write types become applicable through approval.
+  const invalid = { id: 'invalid', type: 'closed-decision', title: 'Invented', evidence: ['nonexistent'], confidence: 'High', stagedAfter: 'turn 9' };
+  approved.body.sessions.find(session => session.id === synthesis.id).staged.push(invalid);
+  await writeFile(path.join(directory, `${doc.id}.json`), JSON.stringify(approved.body));
+  const retry = await jsonRequest(baseUrl, `${endpoint}/updates/approve`, { method: 'POST', body: { candidateIds: ['invalid'] } });
+  assert.deepEqual(retry.body.map, approved.body.map);
 });
 
 const emptyMap = {

@@ -24,6 +24,10 @@ export function applyCandidates(discovery, candidates, { evidenceIds = [] } = {}
         question: candidate.question,
         ...(evidenceIds.length ? { evidence: evidenceIds } : {}),
       });
+    } else if (candidate.type === 'fog-retirement') {
+      if (typeof candidate.questionId === 'string' && typeof candidate.reason === 'string' && candidate.reason.trim()) {
+        discovery.map.fogOfWar = discovery.map.fogOfWar.filter(question => question.id !== candidate.questionId);
+      }
     } else if (candidate.type === 'closed-decision') {
       discovery.map.closedDecisions.push({
         id: candidate.id,

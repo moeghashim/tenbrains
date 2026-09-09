@@ -23,6 +23,9 @@ globalThis.fetch = async (url, options) => {
     ...(process.env.TEST_CHOICE_ARGUMENTS ? [{ type: 'response.output_item.done', item: {
       type: 'function_call', name: 'offer_choices', arguments: process.env.TEST_CHOICE_ARGUMENTS,
     } }] : []),
+    ...(process.env.TEST_SYNTHESIS_ARGUMENTS ? [{ type: 'response.output_item.done', item: {
+      type: 'function_call', name: 'stage_synthesis', arguments: process.env.TEST_SYNTHESIS_ARGUMENTS,
+    } }] : []),
     { type: 'response.completed', response: { status: 'completed' } },
   ]);
   return sse([

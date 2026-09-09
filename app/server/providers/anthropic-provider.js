@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { SYNTHESIS_TOOL, synthesisPrompt, synthesisResult } from '../synthesis.js';
 import { OFFER_CHOICES_TOOL, choicesFromTools } from '../choices.js';
 
 const SYSTEM_PROMPT = `You are Wayfinder inside Ten Brains. You run a focused intake session that turns a vague idea into reviewable map candidates.
@@ -259,6 +260,7 @@ export class AnthropicProvider {
     onToken = () => {},
     onCandidate = () => {},
     onInquiry = () => {},
+    synthesisContext,
   }) {
     if (!this.apiKey) {
       throw new ProviderError('Anthropic API key is missing', {
@@ -270,9 +272,11 @@ export class AnthropicProvider {
       const stream = client.messages.stream({
         model: this.model,
         max_tokens: 1400,
-        system: sessionContextBlock({ objective, evidenceTarget, mode, lineOfInquiry, transcript, evidence, map, staged }),
+        system: synthesisContext
+          ? synthesisPrompt(SYSTEM_PROMPT, { synthesisContext, transcript, objective, evidenceTarget, staged })
+          : sessionContextBlock({ objective, evidenceTarget, mode, lineOfInquiry, transcript, evidence, map, staged }),
         messages: buildMessages(transcript, message),
-        tools: [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, OFFER_CHOICES_TOOL],
+        tools: synthesisContext ? [SYNTHESIS_TOOL, OFFER_CHOICES_TOOL] : [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, OFFER_CHOICES_TOOL],
       });
       stream.on('text', (text) => onToken(text));
       const finalMessage = await stream.finalMessage();
@@ -280,6 +284,7 @@ export class AnthropicProvider {
         .filter((block) => block.type === 'text')
         .map((block) => block.text)
         .join('');
+      if (synthesisContext) return synthesisResult(reply, finalMessage.content.filter(block => block.type === 'tool_use'), synthesisContext);
       const candidates = finalMessage.content
         .filter((block) => block.type === 'tool_use' && block.name === 'stage_candidates')
         .flatMap((block) => candidatesFromToolInput(block.input))

@@ -1,4 +1,5 @@
 import express from 'express';
+import { synthesisContext, validateSynthesisCandidates } from './synthesis.js';
 import { validateChoices, pickedChoice } from './choices.js';
 import { loadServerEnvironment } from './env.js';
 import { applyCandidates, selectCandidates } from './candidates.js';
@@ -201,9 +202,12 @@ app.post('/api/discoveries/:id/sessions', async (request, response, next) => {
     if (!discovery) return publicError(response, 404, 'Discovery not found');
     const ticketId = typeof request.body?.ticketId === 'string' ? request.body.ticketId : null;
     const ticket = ticketId ? discovery.map.openFrontier.find((item) => item.id === ticketId) : null;
-    if (ticketId && (!ticket || ticket.type !== 'Grilling')) {
-      return publicError(response, 400, 'Select an approved Grilling ticket');
+    if (ticketId && (!ticket || !['Grilling', 'Synthesis'].includes(ticket.type))) {
+      return publicError(response, 400, 'Select an approved Grilling or Synthesis ticket');
     }
+    const type = request.body?.type ?? (ticket?.type === 'Synthesis' ? 'synthesis' : 'grilling');
+    if (!['grilling', 'synthesis'].includes(type)) return publicError(response, 400, 'Session type is invalid');
+    if (ticket && type !== ticket.type.toLowerCase()) return publicError(response, 400, 'Session type must match the ticket');
     const objective = (typeof request.body?.objective === 'string' && request.body.objective.trim()) || ticket?.title;
     const evidenceTarget = (typeof request.body?.evidenceTarget === 'string' && request.body.evidenceTarget.trim()) || ticket?.target;
     const mode = request.body?.mode ?? ticket?.mode ?? 'You + Wayfinder';
@@ -212,7 +216,7 @@ app.post('/api/discoveries/:id/sessions', async (request, response, next) => {
     const now = new Date().toISOString();
     const session = {
       id: crypto.randomUUID(),
-      type: 'grilling',
+      type,
       ticketId,
       title: objective,
       objective,
@@ -223,7 +227,9 @@ app.post('/api/discoveries/:id/sessions', async (request, response, next) => {
       transcript: [{
         id: crypto.randomUUID(),
         actor: 'Wayfinder',
-        text: `What concrete example should this session examine first?`,
+        text: type === 'synthesis'
+          ? 'Which part of the accumulated evidence should this session examine first?'
+          : 'What concrete example should this session examine first?',
         createdAt: now,
       }],
       lineOfInquiry: [],
@@ -244,7 +250,7 @@ app.post('/api/discoveries/:id/sessions/:sid/messages', async (request, response
   try {
     const discovery = await getDiscovery(request.params.id);
     if (!discovery) return publicError(response, 404, 'Discovery not found');
-    const session = discovery.sessions.find((item) => item.id === request.params.sid && item.type === 'grilling');
+    const session = discovery.sessions.find((item) => item.id === request.params.sid && ['grilling', 'synthesis'].includes(item.type));
     if (!session) return publicError(response, 404, 'Session not found');
     response.status(200).set({
       'Content-Type': 'text/event-stream',
@@ -257,6 +263,7 @@ app.post('/api/discoveries/:id/sessions/:sid/messages', async (request, response
       const now = new Date().toISOString();
       const result = await selectedProvider('sessions').createSessionTurn({
         message,
+        synthesisContext: session.type === 'synthesis' ? synthesisContext(discovery) : undefined,
         objective: session.objective,
         evidenceTarget: session.evidenceTarget,
         mode: session.mode,
@@ -266,9 +273,14 @@ app.post('/api/discoveries/:id/sessions/:sid/messages', async (request, response
         map: discovery.map,
         staged: session.staged,
         onToken: (text) => sendEvent(response, 'token', { text }),
-        onCandidate: (candidate) => sendEvent(response, 'candidate', candidate),
-        onInquiry: (inquiry) => sendEvent(response, 'inquiry', inquiry),
+        onCandidate: (candidate) => { if (session.type !== 'synthesis') sendEvent(response, 'candidate', candidate); },
+        onInquiry: (inquiry) => { if (session.type !== 'synthesis') sendEvent(response, 'inquiry', inquiry); },
       });
+      if (session.type === 'synthesis') {
+        result.candidates = validateSynthesisCandidates(result.candidates, synthesisContext(discovery));
+        result.inquiries = [];
+        for (const candidate of result.candidates) sendEvent(response, 'candidate', candidate);
+      }
       const userEntry = { id: crypto.randomUUID(), actor: 'You', text: message, createdAt: now };
       const wayfinderEntry = { id: crypto.randomUUID(), actor: 'Wayfinder', text: result.reply, createdAt: now };
       const choices = validateChoices(result.choices);
@@ -340,11 +352,14 @@ app.post('/api/discoveries/:id/sessions/:sid/updates/approve', async (request, r
   try {
     const discovery = await getDiscovery(request.params.id);
     if (!discovery) return publicError(response, 404, 'Discovery not found');
-    const session = discovery.sessions.find((item) => item.id === request.params.sid && item.type === 'grilling');
+    const session = discovery.sessions.find((item) => item.id === request.params.sid && ['grilling', 'synthesis'].includes(item.type));
     if (!session) return publicError(response, 404, 'Session not found');
     const selection = selectCandidates(session.staged, candidateIds);
     if (!selection) return publicError(response, 400, 'A selected staged item was not found');
-    applyCandidates(discovery, selection.selected, { evidenceIds: session.evidence.map((item) => item.id) });
+    const candidates = session.type === 'synthesis'
+      ? validateSynthesisCandidates(selection.selected, synthesisContext(discovery)) : selection.selected;
+    // Revalidate at approval too: stale retirements or citations never apply.
+    applyCandidates(discovery, candidates, { evidenceIds: session.type === 'synthesis' ? [] : session.evidence.map((item) => item.id) });
     session.staged = session.staged.filter((candidate) => !selection.selectedIds.has(candidate.id));
     await saveDiscovery(discovery);
     response.json(discovery);

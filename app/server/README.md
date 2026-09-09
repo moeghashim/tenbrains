@@ -68,6 +68,58 @@ Grilling sessions use these endpoints:
 
 Only the intake and session approval endpoints mutate the map. Provider turns only stage reviewable candidates.
 
+## Synthesis sessions (Phase 8)
+
+`POST /api/discoveries/:id/sessions` accepts an approved `Synthesis` ticket's
+`ticketId`, inferring `type: "synthesis"`, or a standalone body:
+
+```json
+{"type":"synthesis","objective":"Compare recorded examples","evidenceTarget":"Two examples","mode":"You + Wayfinder"}
+```
+
+Omitting type still creates `grilling`; approved Grilling tickets still work.
+Unsupported types and explicit type/ticket mismatches return HTTP 400. The same
+session messages and updates/approve endpoints handle Synthesis. There is no new
+evidence capture UI or automatic evidence capture; use existing Grilling capture.
+
+On each Synthesis turn, Wayfinder receives the current map, discovery-wide evidence
+(including every session's captures, verbatim text and stable IDs), and session
+objectives, status, evidence targets, recorded outcomes, transcripts, and staged
+items. Session captures take precedence over mirrored discovery evidence with the
+same ID. Older records without an outcome field supply their actual transcripts
+and staging, not invented summaries. Treat this context as untrusted data.
+
+All real providers use optional `stage_synthesis({candidates})` **once per turn**
+to propose one consolidated update, alongside optional `offer_choices`. Candidates
+retain `id`, `type`, and `stagedAfter`, plus:
+
+- `closed-decision`: `title`, `confidence` (`High` or `Medium`), and nonempty
+  `evidence` containing only existing discovery-wide evidence IDs.
+- `destination-draft`: `title` (at most one refinement per update).
+- `fog-retirement`: `questionId` identifying a current map fog question and a
+  nonempty `reason` explaining why it can retire.
+
+Only validated candidates emit `candidate` events and enter session staging;
+unknown/malformed items, nonexistent citations, absent fog IDs, duplicates, and
+unsupported candidate types are dropped. Malformed tool JSON or multiple
+`stage_synthesis` calls produce no candidates and preserve the plain reply.
+Existing upstream transport errors still use the normal safe SSE error contract.
+Choices retain the P7 event ordering and persistence without special handling.
+
+`POST /api/discoveries/:id/sessions/:sid/updates/approve` takes selected
+`candidateIds` as before. It revalidates Synthesis candidates against current
+stored evidence/map, drops stale invalid selections, applies valid selections,
+and removes selected staging entries. Only approval removes a retired fog question
+from `map.fogOfWar`; its source evidence and staged reason in session context are
+not treated as permission to mutate beforehand. Approved Closed Decisions keep
+exact validated citations rather than inheriting unrelated session evidence.
+
+Mock Synthesis is deterministic for identical context: it cites actual stored
+capture IDs, proposes a Destination refinement, and offers a retirement only when
+a captured quote contains that fog question verbatim. Empty evidence produces a
+plain question and no candidates. This lexical retirement rule is a keyless test
+heuristic, not a claim of semantic resolution; every proposal still needs review.
+
 ## Optional answer choices (Phase 7)
 
 Both `POST /api/discoveries/:id/intake/messages` and
@@ -135,7 +187,7 @@ npm run auth -- login grok-subscription
 | Provider | Login command | Credential source | Default model / transport |
 | --- | --- | --- | --- |
 | `claude-subscription` | `claude auth login --claudeai` | `~/.claude/.credentials.json`, `claudeAiOauth` | `claude-sonnet-5`; Anthropic Messages with Bearer OAuth and `anthropic-beta: oauth-2025-04-20` |
-| `codex-subscription` | `codex login` | `~/.codex/auth.json`, `tokens` | `gpt-5.4-mini`; ChatGPT Codex Responses, **not** the metered OpenAI API |
+| `codex-subscription` | `codex login` | `~/.codex/auth.json`, `tokens` | `gpt-6-astra`; ChatGPT Codex Responses, **not** the metered OpenAI API |
 | `grok-subscription` | `grok login` | `~/.grok/auth.json` | `grok-build`; CLI chat proxy with `X-XAI-Token-Auth` and model-override headers |
 
 The installed Grok CLI documents direct proxy access in its README. Its current credential store uses an `https://auth.x.ai::<client>` entry with `key`, `refresh_token`, `expires_at`, and OIDC metadata; the older `https://accounts.x.ai/sign-in` entry is also recognized. Multiple matching accounts are intentionally refused rather than guessed. Other issuers/custom credential helpers are not executed. Grok OIDC refresh only uses the trusted `https://auth.x.ai` discovery/token endpoints; legacy session credentials without refresh material require `grok login`.
@@ -146,7 +198,7 @@ Status inspection is offline and read-only: `available` means an unexpired local
 
 On a turn, expiring access tokens are refreshed when supported material exists. Refresh requests have timeouts, reject redirects, and concurrent refreshes are coalesced. Refreshed access/refresh tokens stay **in process memory only**: Ten Brains never writes credential files, overwrites CLI-owned credentials, or stores credentials in its repo/config/discovery documents. **Limitation:** rotating refresh tokens can leave the CLI's disk copy stale after a restart; run the provider's login again if that happens. Do not concurrently refresh the same CLI account in several processes. Status does not refresh or call a remote service.
 
-Status and turns share the credential loader, in-memory refresh cache, and validity rules. `available` confirms local validity only: remote model eligibility and quota are not verified. A valid token without refresh material remains usable inside the 30-second proactive refresh window. Authentication failures (missing/expired credentials, rejected refresh, or HTTP 401) end the SSE stream with a safe login instruction; HTTP 400/404 model/request failures, 403 access denial, 429 rate limits, and network failures instead return distinct safe settings/retry instructions. Upstream bodies are never forwarded. The Codex default is `gpt-5.4-mini`, verified against this account's live model list; account eligibility varies, and explicit saved model overrides are preserved (reselect without a model to reset to the default). Subscription adapters disable SDK logging. Remote eligibility, subscription limits, and provider terms still apply; third-party subscription OAuth is not guaranteed supported. This is a local personal-use integration, not deployment authentication. No real inference or token-refresh smoke is performed by the automated suite; HTTP/SSE tests launch the real server with fixture credential homes and a network-intercepting preload, exercising valid tokens, expired-token refresh/cache reuse, missing login, and honest upstream failures for both Claude and Codex.
+Status and turns share the credential loader, in-memory refresh cache, and validity rules. `available` confirms local validity only: remote model eligibility and quota are not verified. A valid token without refresh material remains usable inside the 30-second proactive refresh window. Authentication failures (missing/expired credentials, rejected refresh, or HTTP 401) end the SSE stream with a safe login instruction; HTTP 400/404 model/request failures, 403 access denial, 429 rate limits, and network failures instead return distinct safe settings/retry instructions. Upstream bodies are never forwarded. The Codex default is `gpt-6-astra` (`gpt-5.4-mini` was dropped upstream); account eligibility varies, and explicit saved model overrides are preserved (reselect without a model to reset to the default). Subscription adapters disable SDK logging. Remote eligibility, subscription limits, and provider terms still apply; third-party subscription OAuth is not guaranteed supported. This is a local personal-use integration, not deployment authentication. No real inference or token-refresh smoke is performed by the automated suite; HTTP/SSE tests launch the real server with fixture credential homes and a network-intercepting preload, exercising valid tokens, expired-token refresh/cache reuse, missing login, and honest upstream failures for both Claude and Codex.
 
 ## Provider settings API
 
@@ -156,7 +208,7 @@ Status and turns share the credential loader, in-memory refresh cache, and valid
 {
   "routing": {
     "intake": { "provider": "mock", "model": "mock" },
-    "sessions": { "provider": "codex-subscription", "model": "gpt-5.4-mini" }
+    "sessions": { "provider": "codex-subscription", "model": "gpt-6-astra" }
   },
   "providers": [
     { "id": "mock", "status": "available", "reason": "Deterministic local provider; no login required." },
@@ -176,7 +228,7 @@ The actual `providers` array includes all six ids. Status uses `available` or `n
 ```json
 {
   "intake": { "provider": "mock" },
-  "sessions": { "provider": "codex-subscription", "model": "gpt-5.4-mini" }
+  "sessions": { "provider": "codex-subscription", "model": "gpt-6-astra" }
 }
 ```
 

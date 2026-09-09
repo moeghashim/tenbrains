@@ -89,7 +89,39 @@ export class MockProvider {
     return { reply, candidates, choices: labels.map((label, index) => ({ label, recommended: index === 0 })) };
   }
 
-  async createSessionTurn({ message, objective, transcript, onToken = () => {}, onCandidate = () => {}, onInquiry = () => {} }) {
+  async createSessionTurn({ message, objective, transcript, synthesisContext, onToken = () => {}, onCandidate = () => {}, onInquiry = () => {} }) {
+    if (synthesisContext) {
+      const { evidence, map } = synthesisContext;
+      const stagedAfter = `turn ${transcript.length + 2}`;
+      const candidates = [];
+      if (evidence.length) {
+        candidates.push({
+          id: candidateId('closed-decision', evidence.map(item => item.id).join(','), transcript.length),
+          type: 'closed-decision', title: 'Use recorded examples to guide the next review.',
+          confidence: 'Medium', evidence: evidence.map(item => item.id), stagedAfter,
+        });
+        candidates.push({
+          id: candidateId('destination-draft', objective, transcript.length), type: 'destination-draft',
+          title: `You can evaluate ${artifactExcerpt(objective, 12)} against recorded evidence.`, stagedAfter,
+        });
+        // Conservative keyless rule: only retire a fog question explicitly
+        // present in captured evidence, not arbitrary unrelated fog.
+        for (const question of map.fogOfWar) {
+          if (evidence.some(item => item.text.includes(question.question))) candidates.push({
+            id: candidateId('fog-retirement', question.id, transcript.length), type: 'fog-retirement',
+            questionId: question.id, reason: 'Recorded evidence addresses this fog question for review.', stagedAfter,
+          });
+        }
+      }
+      const reply = evidence.length
+        ? 'Wayfinder compared the recorded evidence across sessions. Which part of this staged update should You examine first?'
+        : 'No evidence has been captured yet. Which concrete example should You record first?';
+      for (const token of reply.match(/\S+\s*/g) ?? []) onToken(token);
+      return { reply, candidates, inquiries: [], choices: [
+        { label: evidence.length ? 'Examine the evidence' : 'Record an example', recommended: true },
+        { label: 'Revisit the Destination', recommended: false },
+      ] };
+    }
     const answer = compact(message);
     const objectiveText = artifactExcerpt(objective, 10);
     const answerText = artifactExcerpt(answer, 11);

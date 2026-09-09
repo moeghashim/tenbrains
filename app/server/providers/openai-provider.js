@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { SYNTHESIS_TOOL, synthesisPrompt, synthesisResult } from '../synthesis.js';
 import { OFFER_CHOICES_TOOL, choicesFromTools } from '../choices.js';
 import {
   SESSION_PROMPT,
@@ -160,7 +161,15 @@ export class OpenAIProvider {
     onToken = () => {},
     onCandidate = () => {},
     onInquiry = () => {},
+    synthesisContext,
   }) {
+    if (synthesisContext) {
+      const result = await this.streamTurn({
+        system: synthesisPrompt(SYSTEM_PROMPT, { synthesisContext, transcript, objective, evidenceTarget, staged }),
+        transcript, message, tools: [SYNTHESIS_TOOL, OFFER_CHOICES_TOOL], onToken,
+      });
+      return synthesisResult(result.reply, result.toolCalls, synthesisContext);
+    }
     const { reply, toolCalls } = await this.streamTurn({
       system: sessionContext({ objective, evidenceTarget, mode, lineOfInquiry, transcript, evidence, map, staged }),
       transcript,
