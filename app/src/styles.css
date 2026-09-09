@@ -3596,3 +3596,11 @@ a,
 .candidate-retirement-reason { padding: 4px 10px 10px; color: var(--theme-text-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .session-type-label { display: block; margin-top: 4px; color: var(--theme-text-muted); font-size: 11px; }
 .synthesis-session-type { margin: 8px 0; }
+.research-composer { grid-template-columns: 1fr auto auto; }
+.research-composer textarea { grid-column: 1 / -1; width: 100%; min-height: 76px; max-height: 220px; resize: vertical; padding: 10px; border: 0; border-radius: 8px; background: var(--theme-surface); color: var(--theme-text); font: inherit; font-size: 13px; }
+.research-composer:has(textarea:focus-visible) { outline: 2px solid var(--theme-focus); outline-offset: 2px; }
+.research-composer textarea:focus-visible { outline: none; box-shadow: none; }
+.finding-status { grid-column: 1 / -1; font-size: 11px; line-height: 1.5; color: var(--theme-text-muted); margin: 0; }
+.verbatim-label { display: block; margin: 4px 0; color: var(--theme-text-muted); font-size: 10px; }
+.captured-evidence-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.research-session .live-transcript-list .transcript-row p { white-space: pre-wrap; }
