@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { RESEARCH_TOOL, researchPrompt, researchResult } from '../research.js';
 import { SYNTHESIS_TOOL, synthesisPrompt, synthesisResult } from '../synthesis.js';
 import { OFFER_CHOICES_TOOL, choicesFromTools } from '../choices.js';
 import OpenAI from 'openai';
@@ -54,10 +55,11 @@ export class SubscriptionProvider extends OpenAIProvider {
     try {
       const credential = await subscriptionCredential(this.id, this.environment);
       const client = new Anthropic({ apiKey: null, authToken: credential.token, logLevel: 'off', maxRetries: 0, timeout: 60000, defaultHeaders: { 'anthropic-beta': 'oauth-2025-04-20' } });
-      const stream = client.messages.stream({ model: this.model, max_tokens: session ? 1400 : 1200, system: args.synthesisContext ? synthesisPrompt(SYSTEM_PROMPT, args) : session ? sessionContextBlock(args) : contextBlock(args), messages: buildMessages(args.transcript, args.message), tools: args.synthesisContext ? [SYNTHESIS_TOOL, OFFER_CHOICES_TOOL] : session ? [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, OFFER_CHOICES_TOOL] : [STAGE_CANDIDATES_TOOL, OFFER_CHOICES_TOOL] });
+      const stream = client.messages.stream({ model: this.model, max_tokens: session ? 1400 : 1200, system: args.researchContext ? researchPrompt(SYSTEM_PROMPT, args) : args.synthesisContext ? synthesisPrompt(SYSTEM_PROMPT, args) : session ? sessionContextBlock(args) : contextBlock(args), messages: buildMessages(args.transcript, args.message), tools: args.researchContext ? [RESEARCH_TOOL, OFFER_CHOICES_TOOL] : args.synthesisContext ? [SYNTHESIS_TOOL, OFFER_CHOICES_TOOL] : session ? [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, OFFER_CHOICES_TOOL] : [STAGE_CANDIDATES_TOOL, OFFER_CHOICES_TOOL] });
       stream.on('text', text => args.onToken?.(text));
       const final = await stream.finalMessage();
       const reply = final.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      if (args.researchContext) return researchResult(reply, final.content.filter(b => b.type === 'tool_use'), args.researchContext);
       if (args.synthesisContext) return synthesisResult(reply, final.content.filter(b => b.type === 'tool_use'), args.synthesisContext);
       const candidates = final.content.filter(b => b.type === 'tool_use' && b.name === 'stage_candidates').flatMap(b => { if (!Array.isArray(b.input?.candidates)) throw new Error('Invalid candidates'); return b.input.candidates; }).filter(c => !session || c.type !== 'destination-draft');
       const inquiries = final.content.filter(b => b.type === 'tool_use' && b.name === 'suggest_inquiry' && typeof b.input?.question === 'string').map(b => ({ question: b.input.question }));

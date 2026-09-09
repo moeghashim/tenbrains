@@ -345,6 +345,99 @@ test('Synthesis sessions stage one grounded update and retire fog only on approv
   assert.deepEqual(retry.body.map, approved.body.map);
 });
 
+test('Research persists exact findings before malformed or failed provider responses', async t => {
+  for (const status of [200, 400]) {
+    const directory = await mkdtemp(path.join(tmpdir(), 'tenbrains-research-failure-'));
+    await mkdir(path.join(directory, 'home/.codex'), { recursive: true });
+    await writeFile(path.join(directory, 'home/.codex/auth.json'), JSON.stringify({ tokens: { access_token: 'fixture-access', account_id: 'fixture-account' } }));
+    const text = '  Verbatim finding\r\nwith spaces.  ';
+    const server = await startServer(directory, {
+      WAYFINDER_SESSION_PROVIDER: 'codex-subscription',
+      NODE_OPTIONS: `--import=${path.join(appDirectory, 'server/fixtures/subscription-fetch.js')}`,
+      TEST_REQUEST_LOG: path.join(directory, 'requests'), TEST_EXPECTED_TOKEN: 'fixture-access',
+      TEST_RESEARCH_ARGUMENTS: '{broken', TEST_UPSTREAM_STATUS: String(status), TEST_FINDING_TEXT: text,
+    });
+    try {
+      const { baseUrl } = server;
+      const { body: discovery } = await jsonRequest(baseUrl, '/api/discoveries', { method: 'POST', body: {} });
+      const root = `/api/discoveries/${discovery.id}`;
+      const { body: research } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { type: 'research', objective: 'Examine findings', evidenceTarget: 'An example' } });
+      const { events } = await eventRequest(baseUrl, `${root}/sessions/${research.id}/messages`, { message: text, isFinding: true });
+      assert.deepEqual(events.map(event => event.event), status === 200 ? ['evidence', 'token', 'done'] : ['evidence', 'error']);
+      const doc = (await jsonRequest(baseUrl, root)).body;
+      const session = doc.sessions.find(item => item.id === research.id);
+      assert.equal(session.evidence.length, 1);
+      assert.deepEqual(Buffer.from(session.evidence[0].text), Buffer.from(text));
+      assert.equal(session.transcript.filter(item => item.actor === 'You').length, 1);
+      assert.deepEqual(session.staged, []);
+      assert.deepEqual(doc.map, emptyMap);
+    } finally { await stopServer(server.child); await rm(directory, { recursive: true, force: true }); }
+  }
+});
+
+test('Research opens from mock tickets, structures questions, and captures findings verbatim before staging', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'tenbrains-research-api-'));
+  const server = await startServer(directory);
+  t.after(async () => { await stopServer(server.child); await rm(directory, { recursive: true, force: true }); });
+  const { baseUrl } = server;
+  const { body: discovery } = await jsonRequest(baseUrl, '/api/discoveries', { method: 'POST', body: {} });
+  const root = `/api/discoveries/${discovery.id}`;
+  for (let i = 0; i < 4; i++) await eventRequest(baseUrl, `${root}/intake/messages`, { message: 'Repeated receipt sorting' });
+  const staged = (await jsonRequest(baseUrl, root)).body.staged;
+  const researchTicket = staged.find(candidate => candidate.ticketType === 'Research');
+  const synthesisTicket = staged.find(candidate => candidate.ticketType === 'Synthesis');
+  const fog = staged.find(candidate => candidate.type === 'fog-question');
+  assert.ok(researchTicket && synthesisTicket);
+  await jsonRequest(baseUrl, `${root}/intake/approve`, { method: 'POST', body: { candidateIds: [researchTicket.id, synthesisTicket.id, fog.id] } });
+  const { body: research } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { ticketId: researchTicket.id } });
+  assert.equal(research.type, 'research');
+  const explicit = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { type: 'research', objective: 'Examine receipts', evidenceTarget: 'One example' } });
+  assert.equal(explicit.body.type, 'research');
+  const endpoint = `${root}/sessions/${research.id}`;
+  const before = (await jsonRequest(baseUrl, root)).body.map;
+  const opening = await eventRequest(baseUrl, `${endpoint}/messages`, { message: 'Structure the research' });
+  assert.equal(opening.events.filter(event => event.event === 'inquiry').length, 3);
+  assert.equal(opening.events.filter(event => event.event === 'candidate').length, 0);
+  let doc = (await jsonRequest(baseUrl, root)).body;
+  assert.equal(doc.sessions.find(session => session.id === research.id).lineOfInquiry.length, 3);
+  assert.deepEqual(doc.map, before);
+  const text = `  ${fog.question}\r\nObserved twice.  café é 🧾\n\tKeep these spaces.  `;
+  const finding = await eventRequest(baseUrl, `${endpoint}/messages`, { message: text, isFinding: true });
+  assert.equal(finding.events[0].event, 'evidence');
+  assert.deepEqual(finding.events.slice(-2).map(event => event.event), ['choices', 'done']);
+  assert.equal(finding.events.filter(event => event.event === 'inquiry').length, 0);
+  doc = (await jsonRequest(baseUrl, root)).body;
+  const session = doc.sessions.find(session => session.id === research.id);
+  const evidence = session.evidence[0];
+  assert.deepEqual(Buffer.from(evidence.text), Buffer.from(text));
+  assert.equal(doc.evidence.find(item => item.id === evidence.id).text, text);
+  assert.equal(session.transcript.find(item => item.id === evidence.sourceTurn).text, text);
+  assert.equal(session.transcript.filter(item => item.id === evidence.sourceTurn).length, 1);
+  assert.deepEqual(session.staged.map(candidate => candidate.type), ['closed-decision', 'fog-retirement']);
+  assert.ok(session.staged.every(candidate => candidate.evidence.includes(evidence.id)));
+  assert.deepEqual(doc.map, before);
+  await eventRequest(baseUrl, `${endpoint}/messages`, { message: 'Ordinary chat', isFinding: false });
+  await eventRequest(baseUrl, `${endpoint}/messages`, { message: 'String flags are not findings', isFinding: 'true' });
+  doc = (await jsonRequest(baseUrl, root)).body;
+  assert.equal(doc.sessions.find(item => item.id === research.id).evidence.length, 1);
+  const persisted = JSON.parse(await readFile(path.join(directory, `${discovery.id}.json`), 'utf8'));
+  assert.deepEqual(Buffer.from(persisted.evidence[0].text), Buffer.from(text));
+  // Repeated synthesis turns with new generated IDs retain the original
+  // content-identical staged entries and emit no duplicate candidate events.
+  const { body: synthesis } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { ticketId: synthesisTicket.id } });
+  const synthesisEndpoint = `${root}/sessions/${synthesis.id}/messages`;
+  const first = await eventRequest(baseUrl, synthesisEndpoint, { message: 'Compare findings' });
+  const firstCandidates = first.events.filter(event => event.event === 'candidate').map(event => event.data);
+  assert.ok(firstCandidates.length > 0);
+  const second = await eventRequest(baseUrl, synthesisEndpoint, { message: 'Compare findings again' });
+  assert.equal(second.events.filter(event => event.event === 'candidate').length, 0);
+  doc = (await jsonRequest(baseUrl, root)).body;
+  assert.deepEqual(doc.sessions.find(item => item.id === synthesis.id).staged, firstCandidates);
+  const approved = await jsonRequest(baseUrl, `${endpoint}/updates/approve`, { method: 'POST', body: { candidateIds: session.staged.map(candidate => candidate.id) } });
+  assert.equal(approved.body.map.fogOfWar.some(item => item.id === fog.id), false);
+  assert.deepEqual(approved.body.map.closedDecisions.at(-1).evidence, [evidence.id]);
+});
+
 const emptyMap = {
   destination: null,
   openFrontier: [],

@@ -68,6 +68,73 @@ Grilling sessions use these endpoints:
 
 Only the intake and session approval endpoints mutate the map. Provider turns only stage reviewable candidates.
 
+## Research sessions (Phase 8)
+
+Create a session from an approved `Research` ticket's `ticketId`, or pass
+`{"type":"research","objective":"Examine recorded examples","evidenceTarget":"Two sources"}`
+to `POST /api/discoveries/:id/sessions`. Type/ticket mismatches return HTTP 400.
+The creation response contains the greeting; **the first streamed message turn**
+structures the objective into 2–4 concrete questions. Send an opening message to
+`POST /api/discoveries/:id/sessions/:sid/messages` to begin that turn.
+
+Research uses the existing `inquiry` SSE event (`{question}`) for each suggested
+question. Questions persist in `session.lineOfInquiry` with `status: "suggested"`,
+never as map candidates. Once inquiries exist, follow-up turns preserve them.
+Malformed question output silently leaves the ordinary reply and an empty inquiry
+list; a later turn may retry structuring. No model call runs during session creation.
+
+You investigate outside Ten Brains; Wayfinder structures the research and examines
+findings. A regular message is chat, not evidence. To capture a finding:
+
+```json
+{"message":"  Exact pasted finding.\r\nKeep this spacing.  ","isFinding":true}
+```
+
+Only literal boolean `true` on a **Research** turn enables capture. The server
+checks that the message is nonblank but preserves its exact decoded string,
+including outer whitespace, newlines, and Unicode, in both the You entry and
+evidence `text`. It creates `id`, `sourceTurn` (the You entry ID), `sessionId`, and
+`createdAt`; persists that You entry and the evidence in both `session.evidence`
+and discovery evidence **before calling the provider**; and emits an additive
+`evidence` SSE event containing that record before any reply tokens. Ignore the
+new event if only rendering conversation, then refresh the discovery as usual.
+
+Capture is Your action, not provider output: even a failed provider turn leaves
+the finding and source entry saved, without a duplicated You entry on success.
+An `error` event does not undo capture. To retry inference without capturing again,
+send a normal chat turn (`isFinding` omitted/false), rather than resubmitting the
+same finding flag. Ordinary chat and model claims never automatically become
+evidence; manual Grilling capture behavior is unchanged.
+
+Every real transport receives the objective/ticket, map, existing session evidence,
+Line of Inquiry, and current `findingId` through optional `stage_research`:
+
+- `questions`: optional array of 2–4 short question strings for opening inquiries.
+- `candidates`: optional `closed-decision` or `fog-retirement` items using the
+  Synthesis fields below. **Both types require nonempty `evidence` citations**
+  to existing evidence in this Research session; a finding turn must cite its
+  newly captured finding. Retirements must identify an existing map fog question.
+
+Unknown types, invented/out-of-session citations, malformed arguments, and repeated
+tool calls silently degrade to a plain reply. Valid candidates emit existing
+`candidate` events and remain staged. Approval revalidates citations, preserves
+exact cited IDs, and is still the only path that changes the map or retires fog.
+Choices retain their existing ordering and picked-label metadata.
+
+Mock Research deterministically derives three questions from the objective and
+candidates from actual captured findings. Its conservative retirement heuristic
+requires the finding to contain the fog question verbatim; this is only a testable
+proposal, not a semantic claim. Mock intake rotates ticket types across successive
+turns: **Grilling → Prototype → Synthesis → Research**, then repeats. Four intake
+turns make every ticket type available for keyless review/approval.
+
+Synthesis and Research staging is deduplicated server-side by a stable content
+hash. Provenance (`id`, `stagedAfter`) and confidence changes do not create a new
+item when type, title, and citation set match. Fog question ID/reason and ticket
+fields also distinguish applicable content. The first record wins, citation order
+is ignored, existing duplicate staging is compacted, and repeated candidates do
+not re-emit `candidate` events. Intake/Grilling staging remains unchanged.
+
 ## Synthesis sessions (Phase 8)
 
 `POST /api/discoveries/:id/sessions` accepts an approved `Synthesis` ticket's

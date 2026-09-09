@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { RESEARCH_TOOL, researchPrompt, researchResult } from '../research.js';
 import { SYNTHESIS_TOOL, synthesisPrompt, synthesisResult } from '../synthesis.js';
 import { OFFER_CHOICES_TOOL, choicesFromTools } from '../choices.js';
 
@@ -261,6 +262,7 @@ export class AnthropicProvider {
     onCandidate = () => {},
     onInquiry = () => {},
     synthesisContext,
+    researchContext,
   }) {
     if (!this.apiKey) {
       throw new ProviderError('Anthropic API key is missing', {
@@ -272,11 +274,11 @@ export class AnthropicProvider {
       const stream = client.messages.stream({
         model: this.model,
         max_tokens: 1400,
-        system: synthesisContext
+        system: researchContext ? researchPrompt(SYSTEM_PROMPT, { researchContext, transcript, staged }) : synthesisContext
           ? synthesisPrompt(SYSTEM_PROMPT, { synthesisContext, transcript, objective, evidenceTarget, staged })
           : sessionContextBlock({ objective, evidenceTarget, mode, lineOfInquiry, transcript, evidence, map, staged }),
         messages: buildMessages(transcript, message),
-        tools: synthesisContext ? [SYNTHESIS_TOOL, OFFER_CHOICES_TOOL] : [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, OFFER_CHOICES_TOOL],
+        tools: researchContext ? [RESEARCH_TOOL, OFFER_CHOICES_TOOL] : synthesisContext ? [SYNTHESIS_TOOL, OFFER_CHOICES_TOOL] : [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, OFFER_CHOICES_TOOL],
       });
       stream.on('text', (text) => onToken(text));
       const finalMessage = await stream.finalMessage();
@@ -284,6 +286,7 @@ export class AnthropicProvider {
         .filter((block) => block.type === 'text')
         .map((block) => block.text)
         .join('');
+      if (researchContext) return researchResult(reply, finalMessage.content.filter(block => block.type === 'tool_use'), researchContext);
       if (synthesisContext) return synthesisResult(reply, finalMessage.content.filter(block => block.type === 'tool_use'), synthesisContext);
       const candidates = finalMessage.content
         .filter((block) => block.type === 'tool_use' && block.name === 'stage_candidates')

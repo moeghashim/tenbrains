@@ -1,6 +1,7 @@
 // Loaded only by API regression child processes via --import. No real network.
 import assert from 'node:assert/strict';
-import { appendFile } from 'node:fs/promises';
+import { appendFile, readFile, readdir } from 'node:fs/promises';
+import path from 'node:path';
 
 const sse = events => new Response(events.map(data => `event: ${data.type}\ndata: ${JSON.stringify(data)}\n\n`).join(''), { headers: { 'content-type': 'text/event-stream' } });
 globalThis.fetch = async (url, options) => {
@@ -15,6 +16,13 @@ globalThis.fetch = async (url, options) => {
   }
   assert.ok(['chatgpt.com', 'api.anthropic.com'].includes(host));
   assert.equal(new Headers(options.headers).get('authorization'), `Bearer ${process.env.TEST_EXPECTED_TOKEN}`);
+  if (process.env.TEST_FINDING_TEXT) {
+    const files = (await readdir(process.env.TEN_BRAINS_DATA_DIR)).filter(file => file.endsWith('.json'));
+    const docs = await Promise.all(files.map(file => readFile(path.join(process.env.TEN_BRAINS_DATA_DIR, file), 'utf8').then(JSON.parse)));
+    const session = docs.flatMap(doc => doc.sessions).find(session => session.type === 'research');
+    assert.equal(session.evidence[0].text, process.env.TEST_FINDING_TEXT);
+    assert.equal(session.transcript.find(turn => turn.id === session.evidence[0].sourceTurn).text, process.env.TEST_FINDING_TEXT);
+  }
   const status = Number(process.env.TEST_UPSTREAM_STATUS || 200);
   if (status === 0) throw new TypeError('fixture-secret-do-not-echo');
   if (status !== 200) return Response.json({ error: { message: 'fixture-secret-do-not-echo' } }, { status });
@@ -22,6 +30,9 @@ globalThis.fetch = async (url, options) => {
     { type: 'response.output_text.delta', delta: 'Fixture reply.' },
     ...(process.env.TEST_CHOICE_ARGUMENTS ? [{ type: 'response.output_item.done', item: {
       type: 'function_call', name: 'offer_choices', arguments: process.env.TEST_CHOICE_ARGUMENTS,
+    } }] : []),
+    ...(process.env.TEST_RESEARCH_ARGUMENTS ? [{ type: 'response.output_item.done', item: {
+      type: 'function_call', name: 'stage_research', arguments: process.env.TEST_RESEARCH_ARGUMENTS,
     } }] : []),
     ...(process.env.TEST_SYNTHESIS_ARGUMENTS ? [{ type: 'response.output_item.done', item: {
       type: 'function_call', name: 'stage_synthesis', arguments: process.env.TEST_SYNTHESIS_ARGUMENTS,

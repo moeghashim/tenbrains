@@ -56,7 +56,7 @@ export class MockProvider {
         id: candidateId('ticket', idea, userTurn),
         type: 'ticket',
         title: `Test ${ticketIdea}`,
-        ticketType: userTurn % 2 === 0 ? 'Prototype' : 'Grilling',
+        ticketType: ['Grilling', 'Prototype', 'Synthesis', 'Research'][(userTurn - 1) % 4],
         mode: 'You + Wayfinder',
         target: '1 concrete example',
         stagedAfter,
@@ -89,7 +89,34 @@ export class MockProvider {
     return { reply, candidates, choices: labels.map((label, index) => ({ label, recommended: index === 0 })) };
   }
 
-  async createSessionTurn({ message, objective, transcript, synthesisContext, onToken = () => {}, onCandidate = () => {}, onInquiry = () => {} }) {
+  async createSessionTurn({ message, objective, transcript, synthesisContext, researchContext, onToken = () => {}, onCandidate = () => {}, onInquiry = () => {} }) {
+    if (researchContext) {
+      const { evidence, findingId, map, lineOfInquiry } = researchContext;
+      const subject = artifactExcerpt(objective, 8);
+      const inquiries = lineOfInquiry.length ? [] : [
+        { question: `What recorded example would test “${subject}”?` },
+        { question: `What observation would contradict “${subject}”?` },
+        { question: `Which source can You examine for “${subject}”?` },
+      ];
+      const finding = evidence.find(item => item.id === findingId);
+      const stagedAfter = `turn ${transcript.length + 2}`;
+      const candidates = finding ? [{
+        id: candidateId('closed-decision', finding.id, transcript.length), type: 'closed-decision',
+        title: 'Use the captured finding to guide the next review.', confidence: 'Medium',
+        evidence: [finding.id], stagedAfter,
+      }] : [];
+      if (finding) for (const question of map.fogOfWar) {
+        if (finding.text.includes(question.question)) candidates.push({
+          id: candidateId('fog-retirement', question.id, transcript.length), type: 'fog-retirement',
+          questionId: question.id, reason: 'The captured finding addresses this fog question for review.',
+          evidence: [finding.id], stagedAfter,
+        });
+      }
+      const reply = finding ? 'Your finding is captured without changes. Which claim should You check against it first?'
+        : 'Wayfinder can structure the research while You investigate outside Ten Brains. Which source should You examine first?';
+      for (const token of reply.match(/\S+\s*/g) ?? []) onToken(token);
+      return { reply, candidates, inquiries, choices: [{ label: 'Examine a recorded example', recommended: true }, { label: 'Look for contradictory evidence', recommended: false }] };
+    }
     if (synthesisContext) {
       const { evidence, map } = synthesisContext;
       const stagedAfter = `turn ${transcript.length + 2}`;
