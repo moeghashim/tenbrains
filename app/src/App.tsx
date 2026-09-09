@@ -100,7 +100,10 @@ type TranscriptLine = {
   annotation?: string;
 };
 
+type WayfinderChoice = { label: string; detail?: string; recommended: boolean };
+
 type IntakeMessage = {
+  choices?: WayfinderChoice[];
   id?: string;
   time: string;
   actor: 'You' | 'Wayfinder';
@@ -123,7 +126,7 @@ type ApiSession = {
   evidenceTarget: string;
   mode: WorkMode;
   status: string;
-  transcript: Array<{ id: string; actor: 'You' | 'Wayfinder'; text: string; createdAt: string }>;
+  transcript: Array<{ id: string; actor: 'You' | 'Wayfinder'; text: string; createdAt: string; choices?: WayfinderChoice[]; choiceLabel?: string }>;
   lineOfInquiry: Array<{ id: string; question: string; status: string }>;
   evidence: Array<{ id: string; text: string; sourceTurn: string | number; createdAt: string }>;
   staged: ApiCandidate[];
@@ -140,7 +143,7 @@ type ApiDiscovery = {
     closedDecisions: Array<Decision & { id: string }>;
   };
   transcripts: {
-    intake: Array<{ id: string; actor: 'You' | 'Wayfinder'; text: string; createdAt: string }>;
+    intake: Array<{ id: string; actor: 'You' | 'Wayfinder'; text: string; createdAt: string; choices?: WayfinderChoice[]; choiceLabel?: string }>;
   };
   staged: ApiCandidate[];
   sessions: Array<ApiSession | { id: string; type: 'intake'; status: string; createdAt: string }>;
@@ -1427,6 +1430,7 @@ function DiscoveryIntake({
   const [discovery, setDiscovery] = useState<ApiDiscovery | null>(null);
   const [message, setMessage] = useState('');
   const [streamedReply, setStreamedReply] = useState('');
+  const [streamedChoices, setStreamedChoices] = useState<WayfinderChoice[]>([]);
   const [working, setWorking] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState<IntakeError | null>(null);
@@ -1462,12 +1466,13 @@ function DiscoveryIntake({
     return () => { cancelled = true; };
   }, [loadAttempt]);
 
-  async function sendMessage(textOverride?: string) {
+  async function sendMessage(textOverride?: string, choiceLabel?: string) {
     const text = (textOverride ?? message).trim();
     if (!text || !discovery || working) return;
     setError(null);
     setWorking(true);
     setStreamedReply('');
+    setStreamedChoices([]);
     const optimistic = {
       id: 'local-pending-turn',
       actor: 'You' as const,
@@ -1488,7 +1493,7 @@ function DiscoveryIntake({
       const response = await fetch(`/api/discoveries/${discovery.id}/intake/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, ...(choiceLabel ? { choiceLabel } : {}) }),
       });
       if (!response.ok || !response.body) throw new Error('Turn failed');
       const reader = response.body.getReader();
@@ -1514,6 +1519,8 @@ function DiscoveryIntake({
               ...current,
               staged: [...current.staged.filter((item) => item.id !== data.id), data as ApiCandidate],
             } : current);
+          } else if (event === 'choices') {
+            setStreamedChoices(data.choices);
           } else if (event === 'error') {
             throw new ServerTurnError(typeof data.message === 'string' ? data.message : '');
           }
@@ -1563,9 +1570,10 @@ function DiscoveryIntake({
     id: entry.id,
     actor: entry.actor,
     text: entry.text,
+    choices: entry.choices,
     time: new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   }));
-  if (streamedReply) messages.push({ actor: 'Wayfinder', text: streamedReply, time: 'Now' });
+  if (streamedReply) messages.push({ actor: 'Wayfinder', text: streamedReply, choices: streamedChoices, time: 'Now' });
   const staged = discovery?.staged ?? [];
 
   return (
@@ -1608,7 +1616,7 @@ function DiscoveryIntake({
               </Badge>
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-              <IntakeTranscriptView messages={messages} working={working} />
+              <IntakeTranscriptView messages={messages} working={working} onChoice={(label) => void sendMessage(label, label)} />
               <Separator />
               <div className="live-intake-composer shrink-0 bg-[var(--canvas)] p-3 md:bg-transparent">
                 <div className="intake-composer-shell mx-auto grid max-w-[800px] grid-cols-[1fr_auto] items-center gap-2 border border-[var(--border-strong)] bg-[var(--surface)] p-2.5">
@@ -1697,6 +1705,18 @@ function IntakeErrorState({ error, onRetry }: { error: IntakeError; onRetry: () 
   );
 }
 
+function ChoiceChips({ choices, active, onChoice }: { choices?: WayfinderChoice[]; active: boolean; onChoice: (label: string) => void }) {
+  if (!choices?.length) return null;
+  return <div className={`wayfinder-choices ${active ? 'choices-active' : 'choices-history'}`} role="group" aria-label={active ? 'Suggested replies' : 'Offered replies'}>
+    {active && <span className="sr-only" role="status">Suggested replies are available. You can also type your own reply.</span>}
+    {choices.map((choice) => <button type="button" key={choice.label} className={`wayfinder-choice ${choice.recommended ? 'choice-recommended' : ''}`} disabled={!active} onClick={() => onChoice(choice.label)}>
+      <span className="choice-label">{choice.label}</span>
+      {choice.recommended && <span className="choice-recommendation">Recommended</span>}
+      {choice.detail && <span className="choice-detail">{choice.detail}</span>}
+    </button>)}
+  </div>;
+}
+
 function useTranscriptFollow(lastText: string, length: number, working: boolean) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -1735,7 +1755,7 @@ function useTranscriptFollow(lastText: string, length: number, working: boolean)
   return { viewportRef, contentRef, onScroll };
 }
 
-function IntakeTranscriptView({ messages, working }: { messages: IntakeMessage[]; working: boolean }) {
+function IntakeTranscriptView({ messages, working, onChoice }: { messages: IntakeMessage[]; working: boolean; onChoice: (label: string) => void }) {
   const { viewportRef, contentRef, onScroll } = useTranscriptFollow(messages.at(-1)?.text ?? '', messages.length, working);
 
 
@@ -1743,7 +1763,7 @@ function IntakeTranscriptView({ messages, working }: { messages: IntakeMessage[]
     <div ref={viewportRef} className="live-intake-transcript min-h-0 flex-1" tabIndex={0} aria-label="Discovery session transcript" onScroll={(event) => onScroll(event.currentTarget)}>
       <div ref={contentRef} role="log" aria-label="Messages between You and Wayfinder" aria-busy={working} aria-live="polite" className="mx-auto max-w-[800px] space-y-5 px-5 py-5 pb-6">
         {messages.map((message, index) => (
-          <IntakeMessageRow key={message.id ?? `${message.time}-${index}`} message={message} index={index} />
+          <IntakeMessageRow key={message.id ?? `${message.time}-${index}`} message={message} index={index} choicesActive={index === messages.length - 1 && !working} onChoice={onChoice} />
         ))}
         {working && <WayfinderWorkingIndicator />}
       </div>
@@ -1751,7 +1771,7 @@ function IntakeTranscriptView({ messages, working }: { messages: IntakeMessage[]
   );
 }
 
-function IntakeMessageRow({ message, index }: { message: IntakeMessage; index: number }) {
+function IntakeMessageRow({ message, index, choicesActive, onChoice }: { message: IntakeMessage; index: number; choicesActive: boolean; onChoice: (label: string) => void }) {
   const isWayfinder = message.actor === 'Wayfinder';
   const messageContent = (
     <div className="p-3">
@@ -1763,6 +1783,7 @@ function IntakeMessageRow({ message, index }: { message: IntakeMessage; index: n
         </Badge>
       </div>
       <p className="text-[13px] leading-[1.7] text-[var(--text-secondary)]">{message.text}</p>
+      {isWayfinder && <ChoiceChips choices={message.choices} active={choicesActive} onChoice={onChoice} />}
       {message.note && (
         <Badge variant="secondary" className="mt-2 rounded-md bg-[var(--workbench-accent-soft)] text-[10px] font-medium text-[var(--workbench-accent)]">
           {message.note}
@@ -3004,6 +3025,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
   const [discovery, setDiscovery] = useState<ApiDiscovery | null>(null);
   const [message, setMessage] = useState('');
   const [streamedReply, setStreamedReply] = useState('');
+  const [streamedChoices, setStreamedChoices] = useState<WayfinderChoice[]>([]);
   const [working, setWorking] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [drawer, setDrawer] = useState<LiveSessionDrawer>(null);
@@ -3062,12 +3084,13 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
     } : current);
   }
 
-  async function sendSessionMessage(textOverride?: string) {
+  async function sendSessionMessage(textOverride?: string, choiceLabel?: string) {
     const text = (textOverride ?? message).trim();
     if (!text || !discoveryId || !session || working) return;
     setError(null);
     setWorking(true);
     setStreamedReply('');
+    setStreamedChoices([]);
     updateLiveSession((current) => ({
       ...current,
       transcript: [
@@ -3078,7 +3101,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
 
     try {
       const response = await fetch(`/api/discoveries/${discoveryId}/sessions/${session.id}/messages`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, ...(choiceLabel ? { choiceLabel } : {}) }),
       });
       if (!response.ok || !response.body) throw new Error('Session turn failed');
       const reader = response.body.getReader();
@@ -3105,6 +3128,8 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
             setInquiries((current) => current.some((item) => item.sourceQuestion === data.question)
               ? current
               : [...current, { id: `local-inquiry-${Date.now()}`, question: data.question, sourceQuestion: data.question }]);
+          } else if (event === 'choices') {
+            setStreamedChoices(data.choices);
           } else if (event === 'error') {
             throw new ServerTurnError(typeof data.message === 'string' ? data.message : '');
           }
@@ -3189,7 +3214,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
     );
   }
 
-  const transcriptLines = [...session.transcript, ...(streamedReply ? [{ id: 'streamed-session-reply', actor: 'Wayfinder' as const, text: streamedReply, createdAt: new Date().toISOString() }] : [])];
+  const transcriptLines = [...session.transcript, ...(streamedReply ? [{ id: 'streamed-session-reply', actor: 'Wayfinder' as const, text: streamedReply, choices: streamedChoices, createdAt: new Date().toISOString() }] : [])];
   const lastUserTurn = [...session.transcript].reverse().find((turn) => turn.actor === 'You' && turn.id !== 'local-pending-session-turn');
   const lastTurnMarked = Boolean(lastUserTurn && session.evidence.some((item) => String(item.sourceTurn) === lastUserTurn.id));
   const signals = <LiveSessionSignals session={session} onReview={() => { setApprovalError(''); setReviewOpen(true); }} />;
@@ -3217,7 +3242,7 @@ function LiveGrillingSession({ navigate, sessionId }: { navigate: (path: string)
         <section className="session-grid live-session-grid">
           {inquiryPanel}
           <PanelShell title="Live transcript">
-            <LiveSessionTranscript lines={transcriptLines} working={working} />
+            <LiveSessionTranscript lines={transcriptLines} working={working} onChoice={(label) => void sendSessionMessage(label, label)} />
             <LiveSessionComposer message={message} working={working} momentStatus={momentStatus} markDisabled={!lastUserTurn || lastTurnMarked} error={error} onMessageChange={(value) => { setMessage(value); if (error?.kind === 'stream') setError(null); }} onSend={() => sendSessionMessage()} onMark={markMoment} onRetry={retry} />
           </PanelShell>
           {signals}
@@ -3268,13 +3293,13 @@ function LiveSessionSignals({ session, onReview, drawer = false }: { session: Ap
   );
 }
 
-function LiveSessionTranscript({ lines, working }: { lines: ApiSession['transcript']; working: boolean }) {
+function LiveSessionTranscript({ lines, working, onChoice }: { lines: ApiSession['transcript']; working: boolean; onChoice: (label: string) => void }) {
   const { viewportRef, contentRef, onScroll } = useTranscriptFollow(lines.at(-1)?.text ?? '', lines.length, working);
 
   return (
     <div ref={viewportRef} className="live-transcript-viewport" role="log" aria-label="Messages between You and Wayfinder" aria-busy={working} aria-live="polite" tabIndex={0} onScroll={(event) => onScroll(event.currentTarget)}>
       <div ref={contentRef} className="transcript-list live-transcript-list">
-        {lines.map((line) => <div className={`transcript-row ${line.id === 'streamed-session-reply' ? 'is-streaming' : ''}`} key={line.id}><time>{new Date(line.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time><strong>{line.actor}</strong><div><p>{line.text}</p></div></div>)}
+        {lines.map((line, index) => <div className={`transcript-row ${line.id === 'streamed-session-reply' ? 'is-streaming' : ''}`} key={line.id}><time>{new Date(line.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time><strong>{line.actor}</strong><div><p>{line.text}</p>{line.actor === 'Wayfinder' && <ChoiceChips choices={line.choices} active={index === lines.length - 1 && !working} onChoice={onChoice} />}</div></div>)}
         {working && <div className="live-session-working" role="status"><LoaderCircle aria-hidden="true" className="animate-spin" /><span>Wayfinder is working</span></div>}
       </div>
     </div>

@@ -183,3 +183,16 @@ passed
 - Demo markup remains unchanged, and `/map?demo=1` still renders `Target developer-led teams first`. No server changes or commits.
 - Validation: Node 22 `npm run build`, all 29 `npm test` tests, and `git diff --check` passed.
 - Final result: passed.
+
+## Wayfinder choice chips — 2026-09-09
+
+- Live intake and Grilling render offered choices below Wayfinder reply text. Labels lead, optional details use secondary text, and the recommended option has one quiet accent treatment plus a text label. Only the latest unanswered offer is actionable; older offers remain as disabled history.
+- Chip activation sends its label as `message` and `choiceLabel`. Free-text entry remains available with or without offers; typing does not disable choices. Sending free text consumes the prior offer just like a chip answer. Choices are conversational replies, never approval actions.
+- Mock end-to-end QA passed on both surfaces: selected a recommended chip and an alternate chip with keyboard Enter, verified request metadata and persisted You-entry `choiceLabel`, then sent typed text without choice metadata. Each flow ended with one active offer and nine disabled historical chips.
+- Streaming QA used actual mock SSE with only the following discovery GET delayed for observation. Both surfaces rendered three offered chips while still busy, before the final refresh, then enabled them when the turn completed. Chips add no wrapper when absent. The existing resize-aware follow behavior reached the bottom after chip height changes (0px observed gap).
+- Real Codex QA on `codex-subscription / gpt-6-astra` completed an intake turn with `done`, no error, and no offered choices. No active chip group or empty choice container appeared. Both surfaces were restored to their original `codex-subscription / gpt-6-astra` routing after mock checks.
+- QA discovery: `963b7e45-078c-43eb-9147-ea410db50ccd`; Grilling session: `a437fe37-282f-409b-af42-05652edb4c75`.
+- Dark/light captures at 1440 × 900 and 390 × 844 passed without document horizontal overflow. Evidence: `../qa-choices-{intake|session}-{dark|light}-{1440|390}.png`; real no-choice reply: `../qa-choices-codex-1440.png`.
+- Buttons retain native keyboard focus and activation. Active offers announce that suggested replies are available and free text remains an option; history is labeled as offered replies and uses disabled buttons.
+- Validation: Node 22 build, all 33 tests, and `git diff --check` passed. Demo components and the pinned title are unchanged. No server changes or commits.
+- Final result: passed.

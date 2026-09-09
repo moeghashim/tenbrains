@@ -3579,3 +3579,15 @@ a,
   scrollbar-color: var(--border-strong) transparent;
 }
 .live-transcript-list { padding-bottom: 24px; }
+
+.wayfinder-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.wayfinder-choice { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; max-width: 100%; padding: 9px 12px; border: 1px solid var(--theme-border); border-radius: 8px; text-align: left; background: var(--theme-surface); color: var(--theme-text); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.choice-label { font-weight: 600; }
+.choice-detail { flex-basis: 100%; color: var(--theme-text-muted); font-size: 11px; }
+.choice-recommendation { color: var(--theme-accent); font-size: 10px; }
+.choices-active .choice-recommended { border-color: var(--theme-accent); background: var(--theme-accent-soft); }
+.wayfinder-choice:not(:disabled) { cursor: pointer; }
+.wayfinder-choice:not(:disabled):hover { background: var(--theme-surface-hover); }
+.choices-history .wayfinder-choice { background: transparent; border-color: var(--theme-border-subtle); color: var(--theme-text-muted); }
+.choices-history .choice-recommendation { color: var(--theme-text-muted); }
+@media (max-width: 650px) { .wayfinder-choice { width: 100%; } }
