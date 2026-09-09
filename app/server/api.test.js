@@ -345,8 +345,8 @@ test('Synthesis sessions stage one grounded update and retire fog only on approv
   assert.deepEqual(retry.body.map, approved.body.map);
 });
 
-test('Research persists exact findings before malformed or failed provider responses', async t => {
-  for (const status of [200, 400]) {
+test('Research and Prototype persist exact findings before malformed or failed provider responses', async t => {
+  for (const [type, status] of [['research', 200], ['research', 400], ['prototype', 200], ['prototype', 400]]) {
     const directory = await mkdtemp(path.join(tmpdir(), 'tenbrains-research-failure-'));
     await mkdir(path.join(directory, 'home/.codex'), { recursive: true });
     await writeFile(path.join(directory, 'home/.codex/auth.json'), JSON.stringify({ tokens: { access_token: 'fixture-access', account_id: 'fixture-account' } }));
@@ -355,13 +355,13 @@ test('Research persists exact findings before malformed or failed provider respo
       WAYFINDER_SESSION_PROVIDER: 'codex-subscription',
       NODE_OPTIONS: `--import=${path.join(appDirectory, 'server/fixtures/subscription-fetch.js')}`,
       TEST_REQUEST_LOG: path.join(directory, 'requests'), TEST_EXPECTED_TOKEN: 'fixture-access',
-      TEST_RESEARCH_ARGUMENTS: '{broken', TEST_UPSTREAM_STATUS: String(status), TEST_FINDING_TEXT: text,
+      TEST_RESEARCH_ARGUMENTS: '{broken', TEST_PROTOTYPE_ARGUMENTS: '{broken', TEST_UPSTREAM_STATUS: String(status), TEST_FINDING_TEXT: text, TEST_FINDING_TYPE: type,
     });
     try {
       const { baseUrl } = server;
       const { body: discovery } = await jsonRequest(baseUrl, '/api/discoveries', { method: 'POST', body: {} });
       const root = `/api/discoveries/${discovery.id}`;
-      const { body: research } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { type: 'research', objective: 'Examine findings', evidenceTarget: 'An example' } });
+      const { body: research } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { type, objective: 'Examine findings', evidenceTarget: 'An example' } });
       const { events } = await eventRequest(baseUrl, `${root}/sessions/${research.id}/messages`, { message: text, isFinding: true });
       assert.deepEqual(events.map(event => event.event), status === 200 ? ['evidence', 'token', 'done'] : ['evidence', 'error']);
       const doc = (await jsonRequest(baseUrl, root)).body;
@@ -436,6 +436,70 @@ test('Research opens from mock tickets, structures questions, and captures findi
   const approved = await jsonRequest(baseUrl, `${endpoint}/updates/approve`, { method: 'POST', body: { candidateIds: session.staged.map(candidate => candidate.id) } });
   assert.equal(approved.body.map.fogOfWar.some(item => item.id === fog.id), false);
   assert.deepEqual(approved.body.map.closedDecisions.at(-1).evidence, [evidence.id]);
+});
+
+test('Prototype plans stage and attach only on approval, with verbatim cited reports', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'tenbrains-prototype-api-'));
+  const server = await startServer(directory);
+  t.after(async () => { await stopServer(server.child); await rm(directory, { recursive: true, force: true }); });
+  const { baseUrl } = server;
+  const { body: discovery } = await jsonRequest(baseUrl, '/api/discoveries', { method: 'POST', body: {} });
+  const root = `/api/discoveries/${discovery.id}`;
+  for (let turn = 0; turn < 2; turn++) await eventRequest(baseUrl, `${root}/intake/messages`, { message: 'Test receipt sorting' });
+  const staged = (await jsonRequest(baseUrl, root)).body.staged;
+  const ticket = staged.find(candidate => candidate.ticketType === 'Prototype');
+  await jsonRequest(baseUrl, `${root}/intake/approve`, { method: 'POST', body: { candidateIds: [ticket.id] } });
+  const { body: session } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { ticketId: ticket.id } });
+  assert.equal(session.type, 'prototype');
+  const explicit = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { type: 'prototype', ticketId: ticket.id } });
+  assert.equal(explicit.body.type, 'prototype');
+  const standalone = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { type: 'prototype', objective: 'Examine sorting', evidenceTarget: 'One example' } });
+  assert.equal(standalone.body.type, 'prototype');
+  const unlinked = await eventRequest(baseUrl, `${root}/sessions/${standalone.body.id}/messages`, { message: 'Plan this' });
+  assert.equal(unlinked.events.some(event => event.event === 'candidate'), false);
+  const missing = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { type: 'prototype', ticketId: 'nonexistent' } });
+  assert.equal(missing.response.status, 400);
+  const endpoint = `${root}/sessions/${session.id}`;
+  const before = (await jsonRequest(baseUrl, root)).body.map;
+  const opening = await eventRequest(baseUrl, `${endpoint}/messages`, { message: 'Plan the first test' });
+  const plans = opening.events.filter(event => event.event === 'candidate').map(event => event.data);
+  assert.equal(plans.length, 1);
+  assert.equal(plans[0].type, 'ticket-plan');
+  assert.equal(plans[0].ticketId, ticket.id);
+  assert.ok(plans[0].criteria.length && plans[0].checklist.length);
+  let doc = (await jsonRequest(baseUrl, root)).body;
+  assert.deepEqual(doc.map, before);
+  const approved = await jsonRequest(baseUrl, `${endpoint}/updates/approve`, { method: 'POST', body: { candidateIds: [plans[0].id] } });
+  const plannedMap = { ...before, openFrontier: before.openFrontier.map(item => item.id === ticket.id ? { ...item, plan: { criteria: plans[0].criteria, checklist: plans[0].checklist } } : item) };
+  assert.deepEqual(approved.body.map, plannedMap);
+  const repeat = await eventRequest(baseUrl, `${endpoint}/messages`, { message: 'Discuss the approved plan' });
+  assert.equal(repeat.events.some(event => event.event === 'candidate'), false);
+  const text = '  Built one path.\r\nObserved two failed steps. 🧾 é\t  ';
+  const report = await eventRequest(baseUrl, `${endpoint}/messages`, { message: text, isFinding: true });
+  assert.equal(report.events[0].event, 'evidence');
+  assert.deepEqual(report.events.slice(-2).map(event => event.event), ['choices', 'done']);
+  doc = (await jsonRequest(baseUrl, root)).body;
+  const current = doc.sessions.find(item => item.id === session.id);
+  const evidence = current.evidence[0];
+  assert.deepEqual(Buffer.from(evidence.text), Buffer.from(text));
+  assert.equal(current.transcript.find(item => item.id === evidence.sourceTurn).text, text);
+  assert.equal(current.transcript.filter(item => item.id === evidence.sourceTurn).length, 1);
+  assert.match(doc.evidence.find(item => item.id === evidence.id).source, /^Prototype session:/);
+  assert.equal((current.transcript.at(-1).text.match(/\?/g) ?? []).length, 1);
+  assert.deepEqual(current.staged.map(item => item.type), ['closed-decision']);
+  assert.deepEqual(current.staged[0].evidence, [evidence.id]);
+  assert.deepEqual(doc.map, plannedMap);
+  const persisted = JSON.parse(await readFile(path.join(directory, `${discovery.id}.json`), 'utf8'));
+  assert.deepEqual(Buffer.from(persisted.evidence[0].text), Buffer.from(text));
+  await eventRequest(baseUrl, `${endpoint}/messages`, { message: 'Not a report' });
+  const decision = await jsonRequest(baseUrl, `${endpoint}/updates/approve`, { method: 'POST', body: { candidateIds: [current.staged[0].id] } });
+  assert.deepEqual(decision.body.map.closedDecisions.at(-1).evidence, [evidence.id]);
+  assert.equal(decision.body.sessions.find(item => item.id === session.id).evidence.length, 1);
+  // Approval revalidates stale or malformed plan targets from stored staging.
+  decision.body.sessions.find(item => item.id === session.id).staged.push({ ...plans[0], id: 'invalid-plan', ticketId: 'missing' });
+  await writeFile(path.join(directory, `${discovery.id}.json`), JSON.stringify(decision.body));
+  const rejected = await jsonRequest(baseUrl, `${endpoint}/updates/approve`, { method: 'POST', body: { candidateIds: ['invalid-plan'] } });
+  assert.deepEqual(rejected.body.map, decision.body.map);
 });
 
 const emptyMap = {

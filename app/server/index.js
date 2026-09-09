@@ -1,4 +1,5 @@
 import express from 'express';
+import { prototypeContext, validatePrototypeCandidates } from './prototype.js';
 import { researchContext, validateResearchCandidates, validateResearchQuestions } from './research.js';
 import { synthesisContext, validateSynthesisCandidates } from './synthesis.js';
 import { validateChoices, pickedChoice } from './choices.js';
@@ -203,11 +204,11 @@ app.post('/api/discoveries/:id/sessions', async (request, response, next) => {
     if (!discovery) return publicError(response, 404, 'Discovery not found');
     const ticketId = typeof request.body?.ticketId === 'string' ? request.body.ticketId : null;
     const ticket = ticketId ? discovery.map.openFrontier.find((item) => item.id === ticketId) : null;
-    if (ticketId && (!ticket || !['Grilling', 'Synthesis', 'Research'].includes(ticket.type))) {
-      return publicError(response, 400, 'Select an approved Grilling, Synthesis, or Research ticket');
+    if (ticketId && (!ticket || !['Grilling', 'Synthesis', 'Research', 'Prototype'].includes(ticket.type))) {
+      return publicError(response, 400, 'Select an approved Grilling, Synthesis, Research, or Prototype ticket');
     }
     const type = request.body?.type ?? ticket?.type.toLowerCase() ?? 'grilling';
-    if (!['grilling', 'synthesis', 'research'].includes(type)) return publicError(response, 400, 'Session type is invalid');
+    if (!['grilling', 'synthesis', 'research', 'prototype'].includes(type)) return publicError(response, 400, 'Session type is invalid');
     if (ticket && type !== ticket.type.toLowerCase()) return publicError(response, 400, 'Session type must match the ticket');
     const objective = (typeof request.body?.objective === 'string' && request.body.objective.trim()) || ticket?.title;
     const evidenceTarget = (typeof request.body?.evidenceTarget === 'string' && request.body.evidenceTarget.trim()) || ticket?.target;
@@ -231,6 +232,7 @@ app.post('/api/discoveries/:id/sessions', async (request, response, next) => {
         text: type === 'synthesis'
           ? 'Which part of the accumulated evidence should this session examine first?'
           : type === 'research' ? 'Wayfinder can structure this research while You investigate. Which source should You examine first?'
+            : type === 'prototype' ? 'You build outside Ten Brains and report the result here. Which outcome should the first test demonstrate?'
             : 'What concrete example should this session examine first?',
         createdAt: now,
       }],
@@ -253,9 +255,9 @@ app.post('/api/discoveries/:id/sessions/:sid/messages', async (request, response
   try {
     const discovery = await getDiscovery(request.params.id);
     if (!discovery) return publicError(response, 404, 'Discovery not found');
-    const session = discovery.sessions.find((item) => item.id === request.params.sid && ['grilling', 'synthesis', 'research'].includes(item.type));
+    const session = discovery.sessions.find((item) => item.id === request.params.sid && ['grilling', 'synthesis', 'research', 'prototype'].includes(item.type));
     if (!session) return publicError(response, 404, 'Session not found');
-    const isFinding = session.type === 'research' && request.body?.isFinding === true;
+    const isFinding = ['research', 'prototype'].includes(session.type) && request.body?.isFinding === true;
     if (isFinding) message = rawMessage; // Preserve every character of captured findings.
     response.status(200).set({
       'Content-Type': 'text/event-stream',
@@ -275,17 +277,19 @@ app.post('/api/discoveries/:id/sessions/:sid/messages', async (request, response
         finding = { id: `EVID-${crypto.randomUUID()}`, text: message, sourceTurn: userEntry.id, sessionId: session.id, createdAt: now };
         session.transcript.push(userEntry);
         session.evidence.push(finding);
-        discovery.evidence.push({ ...finding, source: `Research session: ${session.objective}` });
+        discovery.evidence.push({ ...finding, source: `${session.type === 'prototype' ? 'Prototype' : 'Research'} session: ${session.objective}` });
         // Capture is Your action: persist before inference, even when the
         // provider fails. No model output can ever enter this evidence record.
         await saveDiscovery(discovery);
         sendEvent(response, 'evidence', finding);
       }
       const research = session.type === 'research' ? researchContext(discovery, session, finding) : undefined;
-      const structured = session.type === 'synthesis' || session.type === 'research';
+      const prototype = session.type === 'prototype' ? prototypeContext(discovery, session, finding) : undefined;
+      const structured = ['synthesis', 'research', 'prototype'].includes(session.type);
       const result = await selectedProvider('sessions').createSessionTurn({
         message,
         researchContext: research,
+        prototypeContext: prototype,
         synthesisContext: session.type === 'synthesis' ? synthesisContext(discovery) : undefined,
         objective: session.objective,
         evidenceTarget: session.evidenceTarget,
@@ -307,6 +311,10 @@ app.post('/api/discoveries/:id/sessions/:sid/messages', async (request, response
         result.candidates = validateResearchCandidates(result.candidates, research);
         result.inquiries = session.lineOfInquiry.length ? [] : validateResearchQuestions(result.inquiries?.map(item => item.question));
         for (const inquiry of result.inquiries) sendEvent(response, 'inquiry', inquiry);
+      }
+      if (prototype) {
+        result.candidates = validatePrototypeCandidates(result.candidates, prototype);
+        result.inquiries = [];
       }
       if (structured) {
         const deduped = dedupeCandidates(session.staged, result.candidates);
@@ -384,15 +392,17 @@ app.post('/api/discoveries/:id/sessions/:sid/updates/approve', async (request, r
   try {
     const discovery = await getDiscovery(request.params.id);
     if (!discovery) return publicError(response, 404, 'Discovery not found');
-    const session = discovery.sessions.find((item) => item.id === request.params.sid && ['grilling', 'synthesis', 'research'].includes(item.type));
+    const session = discovery.sessions.find((item) => item.id === request.params.sid && ['grilling', 'synthesis', 'research', 'prototype'].includes(item.type));
     if (!session) return publicError(response, 404, 'Session not found');
     const selection = selectCandidates(session.staged, candidateIds);
     if (!selection) return publicError(response, 400, 'A selected staged item was not found');
-    const candidates = session.type === 'research'
+    const candidates = session.type === 'prototype'
+      ? validatePrototypeCandidates(selection.selected, prototypeContext(discovery, session))
+      : session.type === 'research'
       ? validateResearchCandidates(selection.selected, researchContext(discovery, session))
       : session.type === 'synthesis' ? validateSynthesisCandidates(selection.selected, synthesisContext(discovery)) : selection.selected;
     // Revalidate at approval too: stale retirements or citations never apply.
-    applyCandidates(discovery, candidates, { evidenceIds: ['synthesis', 'research'].includes(session.type) ? [] : session.evidence.map((item) => item.id) });
+    applyCandidates(discovery, candidates, { evidenceIds: ['synthesis', 'research', 'prototype'].includes(session.type) ? [] : session.evidence.map((item) => item.id) });
     session.staged = session.staged.filter((candidate) => !selection.selectedIds.has(candidate.id));
     await saveDiscovery(discovery);
     response.json(discovery);

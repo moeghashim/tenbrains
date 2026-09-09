@@ -19,7 +19,7 @@ globalThis.fetch = async (url, options) => {
   if (process.env.TEST_FINDING_TEXT) {
     const files = (await readdir(process.env.TEN_BRAINS_DATA_DIR)).filter(file => file.endsWith('.json'));
     const docs = await Promise.all(files.map(file => readFile(path.join(process.env.TEN_BRAINS_DATA_DIR, file), 'utf8').then(JSON.parse)));
-    const session = docs.flatMap(doc => doc.sessions).find(session => session.type === 'research');
+    const session = docs.flatMap(doc => doc.sessions).find(session => session.type === (process.env.TEST_FINDING_TYPE || 'research'));
     assert.equal(session.evidence[0].text, process.env.TEST_FINDING_TEXT);
     assert.equal(session.transcript.find(turn => turn.id === session.evidence[0].sourceTurn).text, process.env.TEST_FINDING_TEXT);
   }
@@ -30,6 +30,9 @@ globalThis.fetch = async (url, options) => {
     { type: 'response.output_text.delta', delta: 'Fixture reply.' },
     ...(process.env.TEST_CHOICE_ARGUMENTS ? [{ type: 'response.output_item.done', item: {
       type: 'function_call', name: 'offer_choices', arguments: process.env.TEST_CHOICE_ARGUMENTS,
+    } }] : []),
+    ...(process.env.TEST_PROTOTYPE_ARGUMENTS ? [{ type: 'response.output_item.done', item: {
+      type: 'function_call', name: 'stage_prototype', arguments: process.env.TEST_PROTOTYPE_ARGUMENTS,
     } }] : []),
     ...(process.env.TEST_RESEARCH_ARGUMENTS ? [{ type: 'response.output_item.done', item: {
       type: 'function_call', name: 'stage_research', arguments: process.env.TEST_RESEARCH_ARGUMENTS,

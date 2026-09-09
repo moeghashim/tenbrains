@@ -68,6 +68,66 @@ Grilling sessions use these endpoints:
 
 Only the intake and session approval endpoints mutate the map. Provider turns only stage reviewable candidates.
 
+## Prototype sessions (Phase 8)
+
+Use `POST /api/discoveries/:id/sessions` with an approved `Prototype` ticket's
+`ticketId` (type inferred), or explicit `type: "prototype"`. Explicit type may
+include `ticketId`, or objective/evidenceTarget for a standalone session. As with
+Research, creation returns a greeting and the first streamed message starts the
+opening turn. All four ticket types now have server session flows.
+
+A Prototype plan must target the session's **existing approved Prototype ticket**.
+A standalone session without a ticket can discuss/report results, but cannot stage
+a plan: Wayfinder asks You to select a ticket instead of inventing or creating one.
+Create the ticket-linked session to plan against it. Type/ticket mismatches and
+missing supplied ticket IDs return HTTP 400.
+
+On opening, optional `stage_prototype({candidates})` proposes one candidate:
+
+```json
+{
+  "id":"ticket-plan-example",
+  "type":"ticket-plan",
+  "stagedAfter":"turn 2",
+  "ticketId":"existing-prototype-ticket-id",
+  "criteria":["Sort one receipt without repeating a step."],
+  "checklist":["Build one sorting path.","Run one receipt through it."]
+}
+```
+
+`criteria` and `checklist` must each contain 1–8 nonblank short strings, at most
+20 words/240 characters per item, without control characters or exclamation marks.
+The prompt requires observable criteria, imperative checklist actions, and plain
+`voice.md` language. Only one plan is accepted per turn, targeting the linked ticket.
+Unknown types, missing/non-Prototype/other-session ticket targets, malformed arrays,
+and invalid citations are dropped. Repeated tool calls or malformed JSON leave a
+plain reply. Plan content participates in the existing content-hash staging dedupe.
+
+The plan emits a normal `candidate` event and remains staged. Only
+`POST /api/discoveries/:id/sessions/:sid/updates/approve` with selected candidate IDs
+attaches `{criteria, checklist}` to the map ticket's **`plan`** field. GET discovery
+then exposes `map.openFrontier[].plan`; other ticket fields and map sections stay
+unchanged. Approval revalidates the target and plan. A later approved revised plan
+replaces that field; discussions and unapproved revisions cannot change it.
+
+You build outside Ten Brains, then send a result using the **same `isFinding:true`
+message contract as Research**. The server stores the exact report and source You
+entry before inference, emits `evidence` first, and preserves them even on provider
+failure. Ordinary chat does not become evidence. Reports are mirrored to discovery
+evidence with a `Prototype session:` source label for later Synthesis.
+
+After a report, Wayfinder asks one probing question, optionally offers choice chips,
+and may stage `closed-decision` candidates citing that captured evidence ID. No
+plan is accepted on a report turn. Later chat candidates may cite existing session
+evidence; report-turn candidates must cite the current report. All Closed Decisions
+still require explicit approval and retain only validated session citations.
+Wayfinder never claims to build externally or turns model-written facts into evidence.
+
+Mock Prototype derives a deterministic minimal plan from the objective, avoids
+repeating a staged/approved plan, and grills captured reports with grounded candidate
+citations. All five real transports use the Prototype prompt and optional tool;
+intake, Grilling, Synthesis, and Research provider contracts remain separate.
+
 ## Research sessions (Phase 8)
 
 Create a session from an approved `Research` ticket's `ticketId`, or pass
@@ -90,7 +150,7 @@ findings. A regular message is chat, not evidence. To capture a finding:
 {"message":"  Exact pasted finding.\r\nKeep this spacing.  ","isFinding":true}
 ```
 
-Only literal boolean `true` on a **Research** turn enables capture. The server
+Only literal boolean `true` on a **Research or Prototype** turn enables capture. The server
 checks that the message is nonblank but preserves its exact decoded string,
 including outer whitespace, newlines, and Unicode, in both the You entry and
 evidence `text`. It creates `id`, `sourceTurn` (the You entry ID), `sessionId`, and
@@ -128,7 +188,7 @@ proposal, not a semantic claim. Mock intake rotates ticket types across successi
 turns: **Grilling → Prototype → Synthesis → Research**, then repeats. Four intake
 turns make every ticket type available for keyless review/approval.
 
-Synthesis and Research staging is deduplicated server-side by a stable content
+Synthesis, Research, and Prototype staging is deduplicated server-side by a stable content
 hash. Provenance (`id`, `stagedAfter`) and confidence changes do not create a new
 item when type, title, and citation set match. Fog question ID/reason and ticket
 fields also distinguish applicable content. The first record wins, citation order

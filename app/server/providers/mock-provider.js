@@ -89,7 +89,31 @@ export class MockProvider {
     return { reply, candidates, choices: labels.map((label, index) => ({ label, recommended: index === 0 })) };
   }
 
-  async createSessionTurn({ message, objective, transcript, synthesisContext, researchContext, onToken = () => {}, onCandidate = () => {}, onInquiry = () => {} }) {
+  async createSessionTurn({ message, objective, transcript, synthesisContext, researchContext, prototypeContext, staged = [], onToken = () => {}, onCandidate = () => {}, onInquiry = () => {} }) {
+    if (prototypeContext) {
+      const { ticket, evidence, findingId } = prototypeContext;
+      const report = evidence.find(item => item.id === findingId);
+      const stagedAfter = `turn ${transcript.length + 2}`;
+      const subject = artifactExcerpt(objective, 8);
+      const candidates = [];
+      if (report) candidates.push({
+        id: candidateId('closed-decision', report.id, transcript.length), type: 'closed-decision',
+        title: 'Use the reported result to guide the next review.', confidence: 'Medium', evidence: [report.id], stagedAfter,
+      });
+      else if (ticket && !ticket.plan && !staged.some(candidate => candidate.type === 'ticket-plan' && candidate.ticketId === ticket.id)) candidates.push({
+        id: candidateId('ticket-plan', ticket.id, transcript.length), type: 'ticket-plan', ticketId: ticket.id, stagedAfter,
+        criteria: [`One recorded example demonstrates “${subject}”.`, 'Record the elapsed time and any failed steps.'],
+        checklist: [`Build one path to test “${subject}”.`, 'Run that path with one concrete example.', 'Record the result against each criterion.'],
+      });
+      const reply = report ? 'Your report is captured without changes. Which observed result contradicts the success criteria?'
+        : ticket ? 'Wayfinder can stage a minimal plan while You build outside Ten Brains. Which criterion should You test first?'
+          : 'Which approved Prototype ticket should this session examine?';
+      for (const token of reply.match(/\S+\s*/g) ?? []) onToken(token);
+      return { reply, candidates, inquiries: [], choices: [
+        { label: report ? 'Examine the failed step' : 'Test one concrete example', recommended: true },
+        { label: 'Check the success criteria', recommended: false },
+      ] };
+    }
     if (researchContext) {
       const { evidence, findingId, map, lineOfInquiry } = researchContext;
       const subject = artifactExcerpt(objective, 8);

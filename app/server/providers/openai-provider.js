@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { PROTOTYPE_TOOL, prototypePrompt, prototypeResult } from '../prototype.js';
 import { RESEARCH_TOOL, researchPrompt, researchResult } from '../research.js';
 import { SYNTHESIS_TOOL, synthesisPrompt, synthesisResult } from '../synthesis.js';
 import { OFFER_CHOICES_TOOL, choicesFromTools } from '../choices.js';
@@ -164,7 +165,15 @@ export class OpenAIProvider {
     onInquiry = () => {},
     synthesisContext,
     researchContext,
+    prototypeContext,
   }) {
+    if (prototypeContext) {
+      const result = await this.streamTurn({
+        system: prototypePrompt(SYSTEM_PROMPT, { prototypeContext, transcript, staged }),
+        transcript, message, tools: [PROTOTYPE_TOOL, OFFER_CHOICES_TOOL], onToken,
+      });
+      return prototypeResult(result.reply, result.toolCalls, prototypeContext);
+    }
     if (researchContext) {
       const result = await this.streamTurn({
         system: researchPrompt(SYSTEM_PROMPT, { researchContext, transcript, staged }),

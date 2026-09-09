@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { validPlanItems } from './prototype.js';
 
 export function candidateContentHash(candidate) {
   // IDs and turn labels are provenance, not content. Citation order is not
@@ -8,6 +9,7 @@ export function candidateContentHash(candidate) {
     questionId: candidate.questionId, reason: candidate.reason,
     evidence: [...new Set(candidate.evidence ?? [])].sort(),
     ticketType: candidate.ticketType, mode: candidate.mode, target: candidate.target,
+    ...(candidate.type === 'ticket-plan' ? { ticketId: candidate.ticketId, criteria: candidate.criteria, checklist: candidate.checklist } : {}),
   };
   return createHash('sha256').update(JSON.stringify(content)).digest('hex');
 }
@@ -53,6 +55,11 @@ export function applyCandidates(discovery, candidates, { evidenceIds = [] } = {}
         question: candidate.question,
         ...(evidenceIds.length ? { evidence: evidenceIds } : {}),
       });
+    } else if (candidate.type === 'ticket-plan') {
+      const ticket = discovery.map.openFrontier.find(item => item.id === candidate.ticketId && item.type === 'Prototype');
+      if (ticket && validPlanItems(candidate.criteria) && validPlanItems(candidate.checklist)) {
+        ticket.plan = { criteria: [...candidate.criteria], checklist: [...candidate.checklist] };
+      }
     } else if (candidate.type === 'fog-retirement') {
       if (typeof candidate.questionId === 'string' && typeof candidate.reason === 'string' && candidate.reason.trim()) {
         discovery.map.fogOfWar = discovery.map.fogOfWar.filter(question => question.id !== candidate.questionId);
