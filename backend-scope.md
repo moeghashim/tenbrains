@@ -75,3 +75,30 @@ Planned 2026-09-06. Let users run Wayfinder on subscriptions they already pay fo
 Notes: subscription OAuth for third-party apps is ToS-gray for some providers — single local user, personal use; revisit before any deployment.
 
 Invariants unchanged: two actors; approve-only map mutation; Node 22; green build per stage.
+
+## Phase 7 — Wayfinder choice chips
+
+Planned 2026-09-09. Wayfinder turns can offer structured choices with one recommended pick; You answer by tapping a chip or typing freely. Choices are suggestions only — the two-actor staging contract is unchanged.
+
+1. **Server + provider contract** (Pi)
+   - Wayfinder replies may carry `choices`: up to 4 options ({label, detail?, recommended?}, exactly one recommended when present), delivered as a `choices` SSE event before `done` on intake and session streams.
+   - Transcript entries persist offered choices and, on the next user turn, which choice (if any) was picked (`choiceLabel` metadata on the user message; free text always allowed).
+   - Mock provider deterministically emits choices on suitable turns so the loop is testable keylessly. Real providers: extend the system prompt / tool contract so the model may return choices; absent or malformed choices degrade to a plain reply, never an error.
+   - Tests: SSE event shape, persistence, picked-choice metadata, malformed-choice degradation; voice.md constraints encoded in the prompt (labels ≤ 8 words, plain language).
+2. **UI** (Codex)
+   - Chips render under the newest Wayfinder turn on live intake and grilling sessions; recommended chip visually distinct (theme.md); tapping sends the label as Your turn; chips disable once answered or when typing sends; keyboard accessible.
+   - Older turns show offered chips inertly (history stays honest). Demo untouched.
+
+Invariants unchanged: two actors; approve-only map mutation; Node 22; green build per stage.
+
+## Phase 8 — Research, Prototype, Synthesis ticket flows
+
+Planned 2026-09-09 with user design decisions. Build order: Synthesis → Research → Prototype. Each type gets a server stage (Pi) then a UI stage (Codex), committed per reviewed stage.
+
+- **Synthesis** (first): a Synthesis ticket opens a session where Wayfinder reads the discovery's full accumulated evidence and sessions and proposes one consolidated update — Closed Decision candidates with evidence citations, Destination refinements, fog questions to retire — every item staged through the existing approve contract. No new capture UX.
+- **Research**: Wayfinder turns the ticket into concrete research questions; You investigate outside the app and paste findings; findings are captured verbatim as evidence (never model-invented), and Wayfinder stages fog-question closures from them.
+- **Prototype**: plan → build outside → report loop. Wayfinder helps define success criteria and a minimal checklist (staged ticket update), You build externally, then report results in-session; results are grilled, captured as evidence, and decision candidates staged.
+
+Shared: sessions open from their ticket type (map gating extends beyond Grilling); session records carry type; Session map and Evidence views include the new session types; choice chips (P7) work in all session types.
+
+Invariants unchanged: two actors; verbatim evidence; approve-only map mutation; Node 22; green build per stage.

@@ -62,11 +62,61 @@ Deletion is intentionally unavailable to avoid destructive surprises while the d
 Grilling sessions use these endpoints:
 
 - `POST /api/discoveries/:id/sessions` creates a standalone session or starts one from an approved Grilling ticket.
-- `POST /api/discoveries/:id/sessions/:sid/messages` streams `token`, `candidate`, `inquiry`, `done`, and `error` events.
+- `POST /api/discoveries/:id/sessions/:sid/messages` streams `token`, `candidate`, `inquiry`, optional `choices`, `done`, and `error` events.
 - `POST /api/discoveries/:id/sessions/:sid/evidence` captures a marked transcript moment.
 - `POST /api/discoveries/:id/sessions/:sid/updates/approve` applies selected session candidates.
 
 Only the intake and session approval endpoints mutate the map. Provider turns only stage reviewable candidates.
+
+## Optional answer choices (Phase 7)
+
+Both `POST /api/discoveries/:id/intake/messages` and
+`POST /api/discoveries/:id/sessions/:sid/messages` accept:
+
+```json
+{ "message": "Use evidence", "choiceLabel": "Use evidence" }
+```
+
+`message` remains required, nonempty text. `choiceLabel` is optional metadata;
+free text always works, with or without it. Only labels offered by the immediately
+preceding Wayfinder entry in that same transcript count as picks. An explicit
+matching `choiceLabel` takes precedence (so a chip can accompany edited text),
+otherwise the server matches `message` against offered labels. Matching trims
+outer whitespace and is case-sensitive. Invalid, stale, or unoffered metadata is
+ignored, never a request error. A picked label persists on the You entry as
+`choiceLabel`; no pick means the field is absent.
+
+A successful turn may emit **one** additive event, after all reply tokens and
+candidate/inquiry callbacks, immediately before `done`, after persistence:
+
+```text
+event: choices
+data: {"choices":[{"label":"Use evidence","detail":"Start with one recorded example.","recommended":true},{"label":"Try another example","recommended":false}]}
+```
+
+The payload contains 1–4 choices. Every option has a nonempty label (at most
+8 whitespace-separated words and 120 characters), an optional nonempty short
+sentence `detail` (at most 20 words and 240 characters), and a required boolean
+`recommended`. Exactly one recommendation is true. Duplicate labels and control
+characters are rejected. Providers are instructed to use plain sentence-case
+`voice.md` language, canonical vocabulary, and no additional actors or hedging.
+The server enforces structural/length constraints; it does not attempt to judge
+all natural-language voice rules.
+
+The same array persists as `choices` on the Wayfinder transcript entry, including
+`done.message.choices` and subsequent discovery reads. No offer means no event and
+no transcript field. Existing `token`, `candidate`, `inquiry`, `done`, and `error`
+payloads retain their fields; clients may ignore `choices` and still assemble the
+reply, receive staged items, and finish on `done` as before.
+
+All real transports expose optional `offer_choices({choices})` alongside existing
+tools: Anthropic Messages, OpenAI-compatible Chat Completions, Claude subscription,
+Codex Responses subscription, and Grok subscription. Absent, duplicate tool calls,
+malformed JSON, or invalid offers silently omit choices; they never invent options
+or turn optional-output failure into an SSE error. Candidate/provider failures
+retain their existing error behavior. Mock offers deterministic question-specific
+choices on every generated intake/Grilling reply; initial greetings stay unchanged.
+Picking a choice is conversational input only, **not approval or a map write**.
 
 ## Subscription credentials and login
 

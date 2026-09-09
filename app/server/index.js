@@ -1,4 +1,5 @@
 import express from 'express';
+import { validateChoices, pickedChoice } from './choices.js';
 import { loadServerEnvironment } from './env.js';
 import { applyCandidates, selectCandidates } from './candidates.js';
 import { createProvider } from './providers/index.js';
@@ -142,10 +143,15 @@ app.post('/api/discoveries/:id/intake/messages', async (request, response, next)
       const userEntry = { id: crypto.randomUUID(), actor: 'You', text: message, createdAt: now };
       const wayfinderEntry = { id: crypto.randomUUID(), actor: 'Wayfinder', text: result.reply, createdAt: now };
 
+      const choices = validateChoices(result.choices);
+      if (choices) wayfinderEntry.choices = choices;
+      const choiceLabel = pickedChoice(discovery.transcripts.intake, message, request.body?.choiceLabel);
+      if (choiceLabel) userEntry.choiceLabel = choiceLabel;
       discovery.transcripts.intake.push(userEntry, wayfinderEntry);
       const existingIds = new Set(discovery.staged.map((candidate) => candidate.id));
       discovery.staged.push(...result.candidates.filter((candidate) => !existingIds.has(candidate.id)));
       await saveDiscovery(discovery);
+      if (choices) sendEvent(response, 'choices', { choices });
       sendEvent(response, 'done', {
         discoveryId: discovery.id,
         message: wayfinderEntry,
@@ -265,6 +271,10 @@ app.post('/api/discoveries/:id/sessions/:sid/messages', async (request, response
       });
       const userEntry = { id: crypto.randomUUID(), actor: 'You', text: message, createdAt: now };
       const wayfinderEntry = { id: crypto.randomUUID(), actor: 'Wayfinder', text: result.reply, createdAt: now };
+      const choices = validateChoices(result.choices);
+      if (choices) wayfinderEntry.choices = choices;
+      const choiceLabel = pickedChoice(session.transcript, message, request.body?.choiceLabel);
+      if (choiceLabel) userEntry.choiceLabel = choiceLabel;
       session.transcript.push(userEntry, wayfinderEntry);
       const existingIds = new Set(session.staged.map((candidate) => candidate.id));
       session.staged.push(...result.candidates.filter((candidate) => !existingIds.has(candidate.id)));
@@ -275,6 +285,7 @@ app.post('/api/discoveries/:id/sessions/:sid/messages', async (request, response
         }
       }
       await saveDiscovery(discovery);
+      if (choices) sendEvent(response, 'choices', { choices });
       sendEvent(response, 'done', {
         discoveryId: discovery.id,
         sessionId: session.id,

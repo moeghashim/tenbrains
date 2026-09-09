@@ -180,6 +180,91 @@ async function eventRequest(baseUrl, pathname, body) {
   return { response, events: parseEvents(source) };
 }
 
+test('choices on both surfaces preserve offered and picked history, free text, and legacy SSE', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'ten-brains-choices-'));
+  const server = await startServer(directory);
+  t.after(async () => { await stopServer(server.child); await rm(directory, { recursive: true, force: true }); });
+  const { baseUrl } = server;
+  const { body: discovery } = await jsonRequest(baseUrl, '/api/discoveries', { method: 'POST', body: {} });
+  const root = `/api/discoveries/${discovery.id}`;
+  const { body: session } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { objective: 'Test choices', evidenceTarget: 'One example' } });
+  for (const surface of ['intake', `sessions/${session.id}`]) {
+    const endpoint = `${root}/${surface}/messages`;
+    const transcript = doc => surface === 'intake' ? doc.transcripts.intake : doc.sessions.find(s => s.id === session.id).transcript;
+    let events = (await eventRequest(baseUrl, endpoint, { message: 'A repeated step' })).events;
+    function offer(events) {
+      assert.equal(events.filter(e => e.event === 'choices').length, 1);
+      assert.deepEqual(events.slice(-2).map(e => e.event), ['choices', 'done']);
+      const choices = events.at(-2).data.choices;
+      assert.ok(choices.length >= 1 && choices.length <= 4);
+      assert.equal(choices.filter(c => c.recommended).length, 1);
+      for (const choice of choices) {
+        assert.equal(typeof choice.recommended, 'boolean');
+        assert.ok(choice.label.trim().split(/\s+/).length <= 8);
+      }
+      assert.deepEqual(events.at(-1).data.message.choices, choices);
+      // A legacy client still assembles the same reply and sees staged items.
+      const legacy = events.filter(e => ['token', 'candidate', 'inquiry', 'done', 'error'].includes(e.event));
+      assert.equal(legacy.filter(e => e.event === 'token').map(e => e.data.text).join(''), legacy.at(-1).data.message.text);
+      assert.ok(legacy.some(e => e.event === 'candidate'));
+      assert.equal(legacy.at(-1).event, 'done');
+      return choices;
+    }
+    let choices = offer(events);
+    let doc = (await jsonRequest(baseUrl, root)).body;
+    assert.deepEqual(transcript(doc).at(-1).choices, choices);
+    const matched = choices[0].label;
+    events = (await eventRequest(baseUrl, endpoint, { message: ` ${matched} ` })).events;
+    choices = offer(events);
+    doc = (await jsonRequest(baseUrl, root)).body;
+    assert.equal(transcript(doc).at(-2).choiceLabel, matched);
+    const explicit = choices[1].label;
+    events = (await eventRequest(baseUrl, endpoint, { message: 'My own explanation', choiceLabel: explicit })).events;
+    offer(events);
+    doc = (await jsonRequest(baseUrl, root)).body;
+    assert.equal(transcript(doc).at(-2).choiceLabel, explicit);
+    assert.equal(transcript(doc).at(-2).text, 'My own explanation');
+    await eventRequest(baseUrl, endpoint, { message: 'An unrelated free answer', choiceLabel: 'Never offered' });
+    doc = (await jsonRequest(baseUrl, root)).body;
+    assert.equal(transcript(doc).at(-2).choiceLabel, undefined);
+    assert.deepEqual(doc.map, emptyMap);
+    const persisted = JSON.parse(await readFile(path.join(directory, `${discovery.id}.json`), 'utf8'));
+    assert.deepEqual(transcript(persisted), transcript(doc));
+  }
+});
+
+test('fixture transport malformed choices silently degrade on both SSE surfaces', async t => {
+  const valid = [{ label: 'Use evidence', detail: 'Start with one recorded example.', recommended: true }];
+  for (const args of [undefined, '{broken', JSON.stringify({ choices: valid }), JSON.stringify({ choices: [{ label: 'No recommendation', recommended: false }] })]) {
+    const directory = await mkdtemp(path.join(tmpdir(), 'ten-brains-choice-fixture-'));
+    await mkdir(path.join(directory, 'home/.codex'), { recursive: true });
+    await writeFile(path.join(directory, 'home/.codex/auth.json'), JSON.stringify({ tokens: { access_token: 'fixture-access', account_id: 'fixture-account' } }));
+    const server = await startServer(directory, {
+      WAYFINDER_INTAKE_PROVIDER: 'codex-subscription', WAYFINDER_SESSION_PROVIDER: 'codex-subscription',
+      NODE_OPTIONS: `--import=${path.join(appDirectory, 'server/fixtures/subscription-fetch.js')}`,
+      TEST_REQUEST_LOG: path.join(directory, 'requests'), TEST_EXPECTED_TOKEN: 'fixture-access',
+      TEST_CHOICE_ARGUMENTS: args ?? '',
+    });
+    try {
+      const { baseUrl } = server;
+      const { body: discovery } = await jsonRequest(baseUrl, '/api/discoveries', { method: 'POST', body: {} });
+      const root = `/api/discoveries/${discovery.id}`;
+      const { body: session } = await jsonRequest(baseUrl, `${root}/sessions`, { method: 'POST', body: { objective: 'Test', evidenceTarget: 'One example' } });
+      for (const surface of ['intake', `sessions/${session.id}`]) {
+        const { events } = await eventRequest(baseUrl, `${root}/${surface}/messages`, { message: 'Example' });
+        const isValid = args === JSON.stringify({ choices: valid });
+        assert.deepEqual(events.map(e => e.event), isValid ? ['token', 'choices', 'done'] : ['token', 'done']);
+        assert.equal(events.at(-1).data.message.text, 'Fixture reply.');
+        assert.deepEqual(events.at(-1).data.message.choices, isValid ? valid : undefined);
+        const doc = (await jsonRequest(baseUrl, root)).body;
+        const entries = surface === 'intake' ? doc.transcripts.intake : doc.sessions.find(s => s.id === session.id).transcript;
+        assert.deepEqual(entries.at(-1).choices, isValid ? valid : undefined);
+        assert.deepEqual(doc.map, emptyMap);
+      }
+    } finally { await stopServer(server.child); await rm(directory, { recursive: true, force: true }); }
+  }
+});
+
 const emptyMap = {
   destination: null,
   openFrontier: [],

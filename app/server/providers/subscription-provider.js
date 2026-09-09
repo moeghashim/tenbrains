@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { OFFER_CHOICES_TOOL, choicesFromTools } from '../choices.js';
 import OpenAI from 'openai';
 import { OpenAIProvider } from './openai-provider.js';
 import { STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, contextBlock, sessionContextBlock, buildMessages } from './anthropic-provider.js';
@@ -52,14 +53,14 @@ export class SubscriptionProvider extends OpenAIProvider {
     try {
       const credential = await subscriptionCredential(this.id, this.environment);
       const client = new Anthropic({ apiKey: null, authToken: credential.token, logLevel: 'off', maxRetries: 0, timeout: 60000, defaultHeaders: { 'anthropic-beta': 'oauth-2025-04-20' } });
-      const stream = client.messages.stream({ model: this.model, max_tokens: session ? 1400 : 1200, system: session ? sessionContextBlock(args) : contextBlock(args), messages: buildMessages(args.transcript, args.message), tools: session ? [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL] : [STAGE_CANDIDATES_TOOL] });
+      const stream = client.messages.stream({ model: this.model, max_tokens: session ? 1400 : 1200, system: session ? sessionContextBlock(args) : contextBlock(args), messages: buildMessages(args.transcript, args.message), tools: session ? [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, OFFER_CHOICES_TOOL] : [STAGE_CANDIDATES_TOOL, OFFER_CHOICES_TOOL] });
       stream.on('text', text => args.onToken?.(text));
       const final = await stream.finalMessage();
       const reply = final.content.filter(b => b.type === 'text').map(b => b.text).join('');
       const candidates = final.content.filter(b => b.type === 'tool_use' && b.name === 'stage_candidates').flatMap(b => { if (!Array.isArray(b.input?.candidates)) throw new Error('Invalid candidates'); return b.input.candidates; }).filter(c => !session || c.type !== 'destination-draft');
       const inquiries = final.content.filter(b => b.type === 'tool_use' && b.name === 'suggest_inquiry' && typeof b.input?.question === 'string').map(b => ({ question: b.input.question }));
       candidates.forEach(c => args.onCandidate?.(c)); inquiries.forEach(i => args.onInquiry?.(i));
-      return { reply, candidates, inquiries };
+      return { reply, candidates, inquiries, choices: choicesFromTools(final.content.filter(b => b.type === 'tool_use')) };
     } catch (error) { throw subscriptionError(this.id, error); }
   }
   createIntakeTurn(args) { return this.id === 'claude-subscription' ? this.claudeTurn(args, false) : super.createIntakeTurn(args); }

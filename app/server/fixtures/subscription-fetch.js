@@ -20,6 +20,9 @@ globalThis.fetch = async (url, options) => {
   if (status !== 200) return Response.json({ error: { message: 'fixture-secret-do-not-echo' } }, { status });
   if (host === 'chatgpt.com') return sse([
     { type: 'response.output_text.delta', delta: 'Fixture reply.' },
+    ...(process.env.TEST_CHOICE_ARGUMENTS ? [{ type: 'response.output_item.done', item: {
+      type: 'function_call', name: 'offer_choices', arguments: process.env.TEST_CHOICE_ARGUMENTS,
+    } }] : []),
     { type: 'response.completed', response: { status: 'completed' } },
   ]);
   return sse([

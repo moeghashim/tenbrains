@@ -80,7 +80,13 @@ export class MockProvider {
 
     for (const token of reply.match(/\S+\s*/g) ?? []) onToken(token);
     for (const candidate of candidates) onCandidate(candidate);
-    return { reply, candidates };
+    const labels = [
+      ['You', 'Someone You observed', 'No concrete example yet'],
+      ['Less time spent', 'Fewer repeated steps', 'A clearer next step'],
+      ['No repeated need', 'No observable benefit', 'A simpler option works'],
+      ['Available time', 'Existing evidence', 'Cost'],
+    ][(userTurn - 1) % questions.length];
+    return { reply, candidates, choices: labels.map((label, index) => ({ label, recommended: index === 0 })) };
   }
 
   async createSessionTurn({ message, objective, transcript, onToken = () => {}, onCandidate = () => {}, onInquiry = () => {} }) {
@@ -124,6 +130,11 @@ export class MockProvider {
     for (const token of reply.match(/\S+\s*/g) ?? []) onToken(token);
     for (const candidate of candidates) onCandidate(candidate);
     for (const inquiry of inquiries) onInquiry(inquiry);
-    return { reply, candidates, inquiries };
+    const labels = [
+      ['A repeated step', 'A missing detail', 'No concrete example yet'],
+      ['Repeated behavior', 'A recorded example', 'No evidence yet'],
+      ['Earlier evidence', 'A smaller first step', 'More time'],
+    ][(userTurn - 1) % questions.length];
+    return { reply, candidates, inquiries, choices: labels.map((label, index) => ({ label, recommended: index === 0 })) };
   }
 }

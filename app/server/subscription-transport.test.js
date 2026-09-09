@@ -15,23 +15,26 @@ test('subscription transports send expected auth and parse staged tools without 
   await writeFile(path.join(home, '.codex/auth.json'), JSON.stringify({ tokens: { access_token: 'fake-codex', account_id: 'fake-account' } }));
   await writeFile(path.join(home, '.grok/auth.json'), JSON.stringify({ 'https://accounts.x.ai/sign-in': { key: 'fake-grok' } }));
   const candidate = { id: 'fog-question-1', type: 'fog-question', question: 'What evidence supports this?', stagedAfter: 'turn 2' };
+  const choices = [{ label: 'Use evidence', recommended: true }, { label: 'Try another example', recommended: false }];
+  let choiceArguments;
   let requests = 0;
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     requests++;
     const headers = new Headers(options.headers);
     const body = JSON.parse(options.body);
     assert.equal(body.stream, true);
+    assert.ok(body.tools.some(tool => (tool.name ?? tool.function?.name) === 'offer_choices'));
     if (String(url).startsWith('https://chatgpt.com/backend-api/codex/responses')) {
       assert.equal(headers.get('authorization'), 'Bearer fake-codex');
       assert.equal(headers.get('chatgpt-account-id'), 'fake-account');
       assert.equal(body.store, false); assert.equal(typeof body.instructions, 'string');
-      return sse([{ type: 'response.output_text.delta', delta: 'Which example?' }, { type: 'response.output_item.done', item: { type: 'function_call', name: 'stage_candidates', arguments: JSON.stringify({ candidates: [candidate] }) } }, { type: 'response.completed', response: { status: 'completed' } }]);
+      return sse([{ type: 'response.output_text.delta', delta: 'Which example?' }, { type: 'response.output_item.done', item: { type: 'function_call', name: 'stage_candidates', arguments: JSON.stringify({ candidates: [candidate] }) } }, { type: 'response.output_item.done', item: { type: 'function_call', name: 'offer_choices', arguments: choiceArguments } }, { type: 'response.completed', response: { status: 'completed' } }]);
     }
     if (String(url).startsWith('https://cli-chat-proxy.grok.com/v1/chat/completions')) {
       assert.equal(headers.get('authorization'), 'Bearer fake-grok');
       assert.equal(headers.get('x-xai-token-auth'), 'xai-grok-cli');
       assert.equal(headers.get('x-grok-model-override'), 'grok-build');
-      return sse([{ choices: [{ delta: { content: 'Which example?', tool_calls: [{ index: 0, function: { name: 'stage_candidates', arguments: JSON.stringify({ candidates: [candidate] }) } }] } }] }]);
+      return sse([{ choices: [{ delta: { content: 'Which example?', tool_calls: [{ index: 0, function: { name: 'stage_candidates', arguments: JSON.stringify({ candidates: [candidate] }) } }, { index: 1, function: { name: 'offer_choices', arguments: choiceArguments } }] } }] }]);
     }
     assert.equal(String(url), 'https://api.anthropic.com/v1/messages');
     assert.equal(headers.get('authorization'), 'Bearer fake-claude');
@@ -45,16 +48,25 @@ test('subscription transports send expected auth and parse staged tools without 
       { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'tool1', name: 'stage_candidates', input: {} } },
       { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ candidates: [candidate] }) } },
       { type: 'content_block_stop', index: 1 },
+      { type: 'content_block_start', index: 2, content_block: { type: 'tool_use', id: 'offer', name: 'offer_choices', input: {} } },
+      { type: 'content_block_delta', index: 2, delta: { type: 'input_json_delta', partial_json: choiceArguments } },
+      { type: 'content_block_stop', index: 2 },
       { type: 'message_delta', delta: { stop_reason: 'tool_use', stop_sequence: null }, usage: { output_tokens: 1 } },
       { type: 'message_stop' },
     ]);
   });
   for (const [id, model] of [['claude-subscription', 'claude-sonnet-5'], ['codex-subscription', 'gpt-5.4'], ['grok-subscription', 'grok-build']]) {
     const p = new SubscriptionProvider({ id, model, environment: { WAYFINDER_AUTH_HOME: home } });
-    const tokens = [], staged = [];
-    const result = await p.createIntakeTurn({ message: 'An example', transcript: [], map: {}, staged: [], onToken: x => tokens.push(x), onCandidate: x => staged.push(x) });
-    assert.equal(result.reply, 'Which example?'); assert.deepEqual(result.candidates, [candidate]);
-    assert.deepEqual(staged, [candidate]); assert.equal(tokens.join(''), 'Which example?');
+    for (const args of [JSON.stringify({ choices }), '{broken', JSON.stringify({ choices: [{ label: 'x', recommended: false }] })]) {
+      choiceArguments = args;
+      for (const method of ['createIntakeTurn', 'createSessionTurn']) {
+        const tokens = [], staged = [];
+        const result = await p[method]({ message: 'An example', transcript: [], map: {}, staged: [], objective: 'Test', evidenceTarget: 'Example', lineOfInquiry: [], evidence: [], onToken: x => tokens.push(x), onCandidate: x => staged.push(x) });
+        assert.equal(result.reply, 'Which example?'); assert.deepEqual(result.candidates, [candidate]);
+        assert.deepEqual(staged, [candidate]); assert.equal(tokens.join(''), 'Which example?');
+        assert.deepEqual(result.choices, args === JSON.stringify({ choices }) ? choices : undefined);
+      }
+    }
   }
-  assert.equal(requests, 3);
+  assert.equal(requests, 18);
 });

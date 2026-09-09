@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { OFFER_CHOICES_TOOL, choicesFromTools } from '../choices.js';
 import {
   SESSION_PROMPT,
   STAGE_CANDIDATES_TOOL,
@@ -136,14 +137,14 @@ export class OpenAIProvider {
       system: intakeContext({ map, staged, transcript }),
       transcript,
       message,
-      tools: [STAGE_CANDIDATES_TOOL],
+      tools: [STAGE_CANDIDATES_TOOL, OFFER_CHOICES_TOOL],
       onToken,
     });
     const candidates = toolCalls
       .filter((call) => call.name === 'stage_candidates')
       .flatMap((call) => candidatesFromInput(parseToolArguments(call)));
     for (const candidate of candidates) onCandidate(candidate);
-    return { reply, candidates };
+    return { reply, candidates, choices: choicesFromTools(toolCalls) };
   }
 
   async createSessionTurn({
@@ -164,7 +165,7 @@ export class OpenAIProvider {
       system: sessionContext({ objective, evidenceTarget, mode, lineOfInquiry, transcript, evidence, map, staged }),
       transcript,
       message,
-      tools: [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL],
+      tools: [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, OFFER_CHOICES_TOOL],
       onToken,
     });
     const candidates = toolCalls
@@ -178,6 +179,6 @@ export class OpenAIProvider {
       .map((input) => ({ question: input.question }));
     for (const candidate of candidates) onCandidate(candidate);
     for (const inquiry of inquiries) onInquiry(inquiry);
-    return { reply, candidates, inquiries };
+    return { reply, candidates, inquiries, choices: choicesFromTools(toolCalls) };
   }
 }

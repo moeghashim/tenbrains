@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { OFFER_CHOICES_TOOL, choicesFromTools } from '../choices.js';
 
 const SYSTEM_PROMPT = `You are Wayfinder inside Ten Brains. You run a focused intake session that turns a vague idea into reviewable map candidates.
 
@@ -48,6 +49,14 @@ Candidate copy hard rules
 - Use only You, Wayfinder, or You + Wayfinder as actors and modes.
 - Ticket type must be Grilling, Research, Prototype, or Synthesis.
 - Work mode must be You, Wayfinder, or You + Wayfinder.
+
+Optional answer choices
+- You MAY call offer_choices once after the reply with 1 to 4 answers to your question. Omit it when choices would not help.
+- Each label must use plain voice language, sentence case, and at most 8 words. Optional detail is one short sentence, at most 20 words.
+- Every option needs a boolean recommended. Exactly one must be true; all others must be false.
+- Use active voice and canonical vocabulary. No hedging, marketing adjectives, extra actors, or exclamation marks.
+- Choices are suggestions, not evidence, map writes, or approval. You can always type freely.
+- Keep choices structured in offer_choices, never JSON in the conversational reply.
 
 Tool use
 - Send all reviewable candidates through stage_candidates.
@@ -219,7 +228,7 @@ export class AnthropicProvider {
         max_tokens: 1200,
         system: contextBlock({ map, staged, transcript }),
         messages: buildMessages(transcript, message),
-        tools: [STAGE_CANDIDATES_TOOL],
+        tools: [STAGE_CANDIDATES_TOOL, OFFER_CHOICES_TOOL],
       });
       stream.on('text', (text) => onToken(text));
       const finalMessage = await stream.finalMessage();
@@ -231,7 +240,7 @@ export class AnthropicProvider {
         .filter((block) => block.type === 'tool_use' && block.name === 'stage_candidates')
         .flatMap((block) => candidatesFromToolInput(block.input));
       for (const candidate of candidates) onCandidate(candidate);
-      return { reply, candidates };
+      return { reply, candidates, choices: choicesFromTools(finalMessage.content.filter(block => block.type === 'tool_use')) };
     } catch (error) {
       throw publicProviderError(error);
     }
@@ -263,7 +272,7 @@ export class AnthropicProvider {
         max_tokens: 1400,
         system: sessionContextBlock({ objective, evidenceTarget, mode, lineOfInquiry, transcript, evidence, map, staged }),
         messages: buildMessages(transcript, message),
-        tools: [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL],
+        tools: [STAGE_CANDIDATES_TOOL, SUGGEST_INQUIRY_TOOL, OFFER_CHOICES_TOOL],
       });
       stream.on('text', (text) => onToken(text));
       const finalMessage = await stream.finalMessage();
@@ -280,7 +289,7 @@ export class AnthropicProvider {
         .map((block) => ({ question: block.input.question }));
       for (const candidate of candidates) onCandidate(candidate);
       for (const inquiry of inquiries) onInquiry(inquiry);
-      return { reply, candidates, inquiries };
+      return { reply, candidates, inquiries, choices: choicesFromTools(finalMessage.content.filter(block => block.type === 'tool_use')) };
     } catch (error) {
       throw publicProviderError(error);
     }
