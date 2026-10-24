@@ -1,8 +1,0 @@
-node_modules
-dist
-.DS_Store
-*.local
-server/data/
-server/.env
-server/provider-config.local.json
-server/provider-config.local.json.*.tmp
