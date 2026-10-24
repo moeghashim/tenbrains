@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Runs after initial activation and each wake. Keep this fast; dependency installs
+# belong in setup, and long-lived services belong in .amp/services.yaml.
+printf 'Orb resume: no authentication or service repair is required yet.\n'

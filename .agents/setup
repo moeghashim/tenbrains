@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Amp snapshots the environment after this script succeeds. Add pinned toolchain
+# and lockfile-based dependency installs here when the application is created.
+# Keep installs non-interactive and safe to repeat on a restored snapshot.
+printf 'Orb setup: no application toolchain or dependencies are declared yet.\n'
