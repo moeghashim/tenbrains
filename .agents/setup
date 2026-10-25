@@ -1,7 +1,39 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Amp snapshots the environment after this script succeeds. Add pinned toolchain
-# and lockfile-based dependency installs here when the application is created.
-# Keep installs non-interactive and safe to repeat on a restored snapshot.
-printf 'Orb setup: no application toolchain or dependencies are declared yet.\n'
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+node_version="$(cat .node-version)"
+node_home="$HOME/.local/share/tenbrains-node/$node_version"
+printf 'Preparing Node %s\n' "$node_version"
+if [[ ! -x "$node_home/bin/node" ]]; then
+  case "$(uname -m)" in x86_64) arch=x64 ;; aarch64) arch=arm64 ;; *) echo 'Unsupported orb architecture' >&2; exit 1 ;; esac
+  temp="$(mktemp -d)"
+  trap 'rm -rf "$temp"' EXIT
+  archive="node-v$node_version-linux-$arch.tar.xz"
+  curl -fsSL "https://nodejs.org/dist/v$node_version/$archive" -o "$temp/$archive"
+  curl -fsSL "https://nodejs.org/dist/v$node_version/SHASUMS256.txt" -o "$temp/checksums"
+  (cd "$temp"; grep " $archive\$" checksums | sha256sum --check -)
+  mkdir -p "$node_home"
+  tar -xJf "$temp/$archive" -C "$node_home" --strip-components=1
+fi
+export PATH="$node_home/bin:$PATH"
+marker='# tenbrains orb toolchain'
+if ! grep -Fqx "$marker" "$HOME/.bash_profile" 2>/dev/null; then
+  cat >> "$HOME/.bash_profile" <<EOF
+
+$marker
+if [[ "\$PWD" == "$repo_root" || "\$PWD" == "$repo_root/"* ]]; then
+  export PATH="$node_home/bin:\$PATH"
+fi
+EOF
+fi
+export NEXT_TELEMETRY_DISABLED=1
+export WRANGLER_SEND_METRICS=false
+printf 'Installing locked dependencies (warm caches reused)\n'
+time npx --yes npm@12.2.1 install --prefer-offline --no-audit --no-fund
+printf 'Preparing local D1 (never the remote database)\n'
+time npm run db:migrate
+printf 'Building static app assets\n'
+time npm run build
+printf 'Orb ready. Start the declared preview with amp orb services ensure.\n'

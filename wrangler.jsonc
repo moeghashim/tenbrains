@@ -1,0 +1,9 @@
+{
+  "name": "tenbrains",
+  "main": "src/server/worker.ts",
+  "compatibility_date": "2026-10-24",
+  "assets": { "directory": "out", "binding": "ASSETS", "run_worker_first": ["/api/*", "/auth/*"], "html_handling": "auto-trailing-slash" },
+  "dev": { "port": 8787 },
+  "d1_databases": [{ "binding": "DB", "database_name": "tenbrains", "database_id": "REPLACE_WITH_D1_DATABASE_ID", "migrations_dir": "migrations" }],
+  "triggers": { "crons": ["0 * * * *"] }
+}

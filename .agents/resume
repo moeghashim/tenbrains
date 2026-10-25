@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Runs after initial activation and each wake. Keep this fast; dependency installs
-# belong in setup, and long-lived services belong in .amp/services.yaml.
-printf 'Orb resume: no authentication or service repair is required yet.\n'
+# D1 local state is on disk; supervised services are declared separately.
+# Never install packages, authenticate users, or start servers on resume.
+printf 'tenbrains ready. Use amp orb services ensure to open the preview.\n'

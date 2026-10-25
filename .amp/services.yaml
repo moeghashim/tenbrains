@@ -1,0 +1,11 @@
+services:
+  web:
+    command: npm run dev:worker -- --port "$PORT"
+    port: 8787
+    health: /api/status
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    portal:
+      url: /demo/
+      title: tenbrains demo
+      description: Interactive sample workspace. X and Groq are not connected; sample grades are illustrative.

@@ -1,0 +1,19 @@
+CREATE TABLE IF NOT EXISTS owner_state (
+  owner_id TEXT PRIMARY KEY,
+  version INTEGER NOT NULL DEFAULT 0,
+  data TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+  owner_id TEXT PRIMARY KEY,
+  encrypted TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS jobs (
+  name TEXT PRIMARY KEY,
+  next_run INTEGER NOT NULL
+);
