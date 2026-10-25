@@ -49,7 +49,7 @@ npx wrangler login
 npx wrangler d1 create tenbrains
 ```
 
-Copy the returned database ID into `wrangler.jsonc`, replacing `REPLACE_WITH_D1_DATABASE_ID`. Keep the binding name `DB` and database name `tenbrains`.
+Replace `database_id` in `wrangler.jsonc` with the returned ID. Forks must use their own database, not the ID checked into this repository. Keep the binding name `DB` and database name `tenbrains`.
 
 The following commands **write to your cloud account and production database**. Run them deliberately:
 
