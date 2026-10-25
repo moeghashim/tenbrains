@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #1b1b18;
-  --muted: #7a776e;
-  --secondary: #66645c;
-  --border: #ebe9e3;
-  --paper: #f8f7f4;
-  --teal: #1f7f8f;
-  --teal-tint: #eaf4f5;
-  --amber: #a86500;
+  --ink: #19292f;
+  --muted: #626b70;
+  --secondary: #48545a;
+  --border: #e1e6e7;
+  --paper: #f5f7f7;
+  --teal: #146c78;
+  --teal-tint: #eaf5f5;
+  --amber: #995900;
   --amber-tint: #fff6e6;
   --green: #2f7a3a;
 }
@@ -20,7 +20,7 @@ body {
   background: #fff;
   color: var(--ink);
   font-family: "Geist", Arial, sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
 }
 button,
@@ -75,7 +75,8 @@ svg {
   flex-shrink: 0;
 }
 .button {
-  border-radius: 999px;
+  border-radius: 10px;
+  min-height: 40px;
   padding: 10px 18px;
   display: inline-flex;
   align-items: center;
@@ -114,14 +115,15 @@ svg {
 }
 .compact {
   padding: 6px 12px;
-  font-size: 11px;
+  font-size: 12px;
+  min-height: 34px;
 }
 .icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
   color: var(--secondary);
 }
@@ -148,7 +150,7 @@ svg {
 }
 .eyebrow {
   font-family: "Geist Mono", monospace;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -255,7 +257,10 @@ svg {
 .mode-switch button.active {
   background: #fff;
   box-shadow: 0 1px 4px #1b1b1812;
-  color: var(--ink);
+  color: var(--teal);
+}
+.mode-switch button.active:last-child {
+  color: var(--amber);
 }
 .sidebar-content {
   flex: 1;
@@ -266,7 +271,7 @@ svg {
   align-items: center;
   gap: 15px;
   width: 100%;
-  border-radius: 999px;
+  border-radius: 10px;
   padding: 12px 13px;
   font-size: 16px;
   margin-bottom: 3px;
@@ -277,7 +282,8 @@ svg {
   background: #efede8;
 }
 .nav-item.selected {
-  background: #eeece6;
+  background: var(--teal-tint);
+  color: var(--teal);
   font-weight: 600;
 }
 .count {
@@ -392,9 +398,9 @@ svg {
   align-items: center;
   justify-content: space-between;
   padding: 0 30px;
-  background: #fafaf8;
+  background: var(--paper);
   border-bottom: 1px solid var(--border);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
 }
 .demo-banner > span,
@@ -560,12 +566,12 @@ textarea::placeholder {
   gap: 5px;
   min-width: 0;
   margin-bottom: 7px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .author-name {
   padding: 0;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .author-name:hover,
@@ -589,7 +595,7 @@ textarea::placeholder {
   display: flex;
 }
 .post-text {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.75;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -610,10 +616,10 @@ textarea::placeholder {
 }
 .chip {
   border-radius: 6px;
-  background: #f5f5f1;
+  background: var(--paper);
   color: var(--secondary);
   padding: 4px 7px;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.5;
 }
 .chip:hover {
@@ -631,9 +637,10 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
-  padding: 5px 6px;
+  padding: 8px 6px;
+  min-height: 36px;
   margin-left: -6px;
   border-radius: 6px;
 }
@@ -734,9 +741,8 @@ textarea::placeholder {
   border-color: var(--teal);
 }
 .right-card {
-  padding: 20px 18px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  padding: 20px 2px;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 18px;
 }
 .right-card h2 {
@@ -746,7 +752,8 @@ textarea::placeholder {
 }
 .card-description {
   margin-top: 5px;
-  font-size: 10px;
+  font-size: 12px;
+  line-height: 1.6;
   color: var(--muted);
 }
 .person-row {
@@ -766,7 +773,7 @@ textarea::placeholder {
   padding: 0;
 }
 .person-name strong {
-  font-size: 11px;
+  font-size: 13px;
   display: block;
   font-weight: 600;
   white-space: nowrap;
@@ -774,7 +781,7 @@ textarea::placeholder {
   text-overflow: ellipsis;
 }
 .person-name > span {
-  font-size: 9px;
+  font-size: 11px;
   display: block;
   margin-top: 3px;
   color: var(--muted);
@@ -783,19 +790,20 @@ textarea::placeholder {
 }
 .person-row .button {
   padding: 5px 10px;
-  font-size: 9px;
+  font-size: 11px;
 }
 .card-link {
   margin-top: 22px;
   font-size: 10px;
 }
 .curiosity-card {
-  background: #fcfaf5;
-  border-color: #eee8dc;
+  background: var(--paper);
+  border: 0;
+  border-radius: 12px;
   padding: 23px 20px;
 }
 .curiosity-card .eyebrow {
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.04em;
 }
 .curiosity-card > svg {
@@ -811,7 +819,7 @@ textarea::placeholder {
 }
 .curiosity-card p {
   color: var(--secondary);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.8;
   margin: 12px 0 17px;
 }
@@ -1021,7 +1029,7 @@ textarea::placeholder {
   margin-top: 7px;
 }
 .path-nav.selected {
-  background: #efebe2;
+  background: var(--amber-tint);
 }
 .path-nav .nav-label {
   flex: 1;
@@ -1062,7 +1070,7 @@ textarea::placeholder {
 }
 .path-title h1 {
   font-family: "Source Serif 4", Georgia, serif;
-  font-size: 36px;
+  font-size: 40px;
   line-height: 1.15;
   letter-spacing: -1.1px;
   margin: 14px 0;
@@ -1072,7 +1080,7 @@ textarea::placeholder {
   align-items: center;
   gap: 9px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   flex-wrap: wrap;
 }
 .path-title .dot {
@@ -1080,9 +1088,9 @@ textarea::placeholder {
   height: 3px;
 }
 .level-card {
-  background: #fcfaf5;
-  border: 1px solid #eee6d9;
-  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
   margin: 27px 0 30px;
   padding: 20px;
 }
@@ -1093,7 +1101,7 @@ textarea::placeholder {
   gap: 10px;
 }
 .level-top .eyebrow {
-  font-size: 8px;
+  font-size: 10px;
 }
 .level-top h2 {
   font-size: 22px;
@@ -1115,7 +1123,7 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--amber);
 }
 .level-ladder {
@@ -1142,7 +1150,7 @@ textarea::placeholder {
   align-items: center;
 }
 .level-ladder strong {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--muted);
 }
@@ -1150,13 +1158,13 @@ textarea::placeholder {
   color: var(--amber);
 }
 .level-ladder span {
-  font-size: 7px;
+  font-size: 9px;
   font-family: "Geist Mono", monospace;
   color: var(--muted);
 }
 .level-card > p {
   margin-top: 16px;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   line-height: 1.6;
 }
@@ -1173,9 +1181,9 @@ textarea::placeholder {
 }
 .lesson-prose {
   font-family: "Source Serif 4", Georgia, serif;
-  font-size: 17px;
+  font-size: 18px;
   line-height: 1.85;
-  color: #444239;
+  color: var(--secondary);
 }
 .lesson-prose p {
   margin-bottom: 17px;
@@ -1191,15 +1199,15 @@ textarea::placeholder {
 }
 .source-links a,
 .source-links button {
-  font-size: 9px;
+  font-size: 11px;
   display: flex;
   gap: 4px;
   align-items: center;
 }
 .feynman-card {
-  border: 1px solid #e9dfce;
-  background: #fffdfa;
-  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--paper);
+  border-radius: 12px;
   padding: 21px;
   margin-top: 20px;
 }
@@ -1210,7 +1218,7 @@ textarea::placeholder {
   align-items: center;
 }
 .feynman-title .eyebrow {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--amber);
 }
 .feynman-title > .muted {
@@ -1224,7 +1232,7 @@ textarea::placeholder {
 .feynman-steps > span {
   display: flex;
   align-items: center;
-  font-size: 9px;
+  font-size: 11px;
   gap: 5px;
   color: var(--muted);
 }
@@ -1249,12 +1257,12 @@ textarea::placeholder {
   border-color: var(--amber);
 }
 .feynman-card h3 {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   margin-bottom: 9px;
 }
 .feynman-card > p {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.7;
 }
 .feynman-card textarea {
@@ -1281,12 +1289,12 @@ textarea::placeholder {
   margin-top: 12px;
 }
 .feynman-submit > .muted {
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.5;
   max-width: 210px;
 }
 .feynman-submit .button {
-  font-size: 10px;
+  font-size: 12px;
   padding: 9px 13px;
 }
 .feedback {
@@ -1305,7 +1313,7 @@ textarea::placeholder {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 11px;
+  font-size: 13px;
   margin: 14px 0;
   color: var(--secondary);
   line-height: 1.7;
@@ -1367,14 +1375,14 @@ textarea::placeholder {
   flex: 1;
 }
 .suggestion strong {
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.6;
   font-weight: 500;
   display: block;
 }
 .suggestion span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   display: block;
   margin-top: 4px;
 }
@@ -1410,7 +1418,7 @@ textarea::placeholder {
   font-size: 9px;
 }
 .learning-note {
-  background: #fcfaf5;
+  background: var(--paper);
   margin-top: 58px;
   padding: 25px;
 }
@@ -1588,7 +1596,7 @@ textarea::placeholder {
   justify-content: center;
   flex-direction: column;
   padding: 40px 24px;
-  background: radial-gradient(ellipse at 50% 15%, #f5f2e9, transparent 65%);
+  background: #fff;
   text-align: center;
 }
 .welcome-brand {
@@ -1613,6 +1621,7 @@ textarea::placeholder {
 }
 .welcome h1 em {
   font-weight: 400;
+  font-style: normal;
   color: var(--teal);
 }
 .welcome > p {
@@ -1629,23 +1638,23 @@ textarea::placeholder {
 .setup-note {
   display: flex;
   gap: 12px;
-  max-width: 380px;
+  max-width: 440px;
   padding: 18px;
   margin: 6px 0 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: #ffffffa0;
+  background: var(--paper);
   text-align: left;
 }
 .setup-note > svg {
   color: var(--teal);
 }
 .setup-note strong {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
 }
 .setup-note p {
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.8;
   color: var(--secondary);
   margin-top: 4px;
@@ -1795,7 +1804,7 @@ textarea::placeholder {
     gap: 40px;
   }
   .post-text {
-    font-size: 14px;
+    font-size: 15px;
   }
   .right-column {
     width: 310px;
@@ -1897,7 +1906,7 @@ textarea::placeholder {
     gap: 11px;
   }
   .capture-input-row input {
-    font-size: 14px;
+    font-size: 16px;
   }
   .capture-input-row .avatar {
     width: 32px;
@@ -1929,14 +1938,14 @@ textarea::placeholder {
     height: 34px;
   }
   .post-text {
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.8;
   }
   .post-heading {
     gap: 4px;
   }
   .author-name {
-    font-size: 11px;
+    font-size: 13px;
   }
   .handle {
     font-size: 10px;
@@ -1973,7 +1982,7 @@ textarea::placeholder {
     color: var(--muted);
   }
   .mobile-nav button span {
-    font-size: 8px;
+    font-size: 10px;
   }
   .mobile-nav button.active {
     color: var(--teal);
@@ -1994,7 +2003,7 @@ textarea::placeholder {
     padding: 16px;
   }
   .level-badge {
-    font-size: 8px;
+    font-size: 10px;
   }
   .level-ladder > div > div {
     flex-direction: column;
@@ -2018,7 +2027,7 @@ textarea::placeholder {
     gap: 3px;
   }
   .feynman-steps > span {
-    font-size: 8px;
+    font-size: 10px;
     gap: 3px;
   }
   .feynman-submit {
@@ -2032,7 +2041,7 @@ textarea::placeholder {
     align-self: flex-end;
   }
   .day-list > button {
-    font-size: 10px;
+    font-size: 12px;
     gap: 7px;
   }
   .day-list > button > span:nth-child(3) {
@@ -2054,6 +2063,23 @@ textarea::placeholder {
   .modal.panel {
     width: min(420px, 100vw);
     border-radius: 0;
+  }
+}
+@media (pointer: coarse) {
+  .icon-button,
+  .button,
+  .post-actions button,
+  .mobile-nav button,
+  .mobile-header > div > button {
+    min-height: 44px;
+  }
+  .icon-button {
+    min-width: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
   }
 }
 @media (prefers-reduced-motion: no-preference) {

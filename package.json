@@ -14,8 +14,40 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "db:migrate": "wrangler d1 migrations apply tenbrains --local",
-    "deploy": "npm run build && wrangler deploy"
+    "db:migrate": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "deploy": "npm run build && npm run db:migrate:remote && wrangler deploy"
+  },
+  "cloudflare": {
+    "bindings": {
+      "DB": {
+        "description": "Your private library and learning history. Cloudflare creates a new D1 database for this installation; keep the binding name `DB`."
+      },
+      "APP_URL": {
+        "description": "The exact public HTTPS origin, with no path, such as `https://tenbrains.your-subdomain.workers.dev`. If unknown, update it in Worker Settings after deployment and before signing in. Do not use localhost in production."
+      },
+      "OWNER_X_ID": {
+        "description": "Your numeric X account ID, not your @handle. Only this account can sign in."
+      },
+      "X_CLIENT_ID": {
+        "description": "OAuth 2.0 client ID from your confidential Web App in the [X developer console](https://console.x.com/). Register `APP_URL/auth/callback` as its callback."
+      },
+      "X_CLIENT_SECRET": {
+        "description": "OAuth 2.0 client secret from the same X Web App. Enable read-only permissions, not writes."
+      },
+      "SESSION_SECRET": {
+        "description": "A new cryptographically random secret of at least 32 characters. Generate one locally with `openssl rand -hex 32`. Keep it stable across deployments."
+      },
+      "TOKEN_ENCRYPTION_KEY": {
+        "description": "Optional separate random secret for X token encryption. Leave blank to derive encryption from SESSION_SECRET. Changing it requires signing in again."
+      },
+      "GROQ_API_KEY": {
+        "description": "Your [Groq API key](https://console.groq.com/keys), used only for explicit learning, analysis, import, and grading actions."
+      },
+      "GROQ_MODEL": {
+        "description": "Optional model supporting Groq strict structured outputs. Defaults to `openai/gpt-oss-20b`."
+      }
+    }
   },
   "dependencies": {
     "next": "16.4.3",

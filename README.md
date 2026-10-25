@@ -4,6 +4,10 @@
 
 A personal, open-source workspace that turns X profiles, posts, threads, and bookmarks into a feed to **Follow** or a path to **Learn**. Built for Cloudflare Workers and D1, with Next.js App Router, TypeScript, Tailwind, and Groq.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/moeghashim/tenbrains)
+
+[Try the interactive demo](https://tenbrains.mohanadgh.workers.dev/demo/) · [Watch the demo video](docs/media/demo.mp4) · [Guided installation](#guided-installation-recommended)
+
 ## What it does
 
 - Follow accounts and tags locally without changing who you follow on X.
@@ -15,6 +19,25 @@ A personal, open-source workspace that turns X profiles, posts, threads, and boo
 - Install the online-only PWA on a phone. No offline caching, synchronization, or background phone process is required.
 
 Each deployment belongs to **one X account**. Other people fork the project and deploy their own copy. The public `/demo/` uses fictional sample accounts and illustrative AI results; it never accesses the owner's data or calls X/Groq, and resets when reloaded.
+
+## Screenshots and demo
+
+All screenshots and the video show fictional demo content. Grades and AI feedback are illustrative, not live Groq responses. Mobile captures use Chromium touch emulation, not a physical phone.
+
+| Follow | Learn |
+| --- | --- |
+| [![Follow feed on desktop — click to watch the demo](docs/media/follow-desktop.webp)](docs/media/demo.mp4) | ![Learning path on desktop](docs/media/learn-desktop.webp) |
+
+<details>
+<summary>Phone layouts and lesson feedback</summary>
+
+| Follow on mobile | Learn on mobile | Explanation feedback |
+| --- | --- | --- |
+| ![Follow on mobile](docs/media/follow-mobile.webp) | ![Learn on mobile](docs/media/learn-mobile.webp) | ![Illustrative lesson feedback on mobile](docs/media/learn-mobile-checked.webp) |
+
+</details>
+
+[Watch or download the demo video (MP4, 21 seconds)](docs/media/demo.mp4). It shows account details, post analysis, switching to Learn, entering an explanation, and illustrative feedback. The [media files](docs/media) are included in the repository.
 
 ## Try it locally
 
@@ -28,11 +51,28 @@ npm run preview
 
 Open the local address printed by Wrangler, then `/demo/`. No credentials are needed for the demo. The home screen explains setup; it never silently signs you in or falls back to fake data.
 
-For live local integration, copy `.dev.vars.example` to `.dev.vars`, configure the credentials described below, and set the matching local X callback. Never commit `.dev.vars`. `npm run dev` provides fast Next.js UI development only; `npm run preview` runs the real Worker API and D1 alongside the built interface.
+For live local integration, copy `.dev.vars.example` to `.dev.vars`, set `APP_URL=http://localhost:8787`, configure the credentials described below, and set the matching local X callback. Never commit `.dev.vars`. `npm run dev` provides fast Next.js UI development only; `npm run preview` runs the real Worker API and D1 alongside the built interface.
 
 ## Deploy your own to Cloudflare
 
 You need a Cloudflare account, an X developer app with API access/credits, and a Groq API key. A custom domain is optional; a `workers.dev` HTTPS address works for the PWA.
+
+### Guided installation (recommended)
+
+Click **Deploy to Cloudflare** above. Cloudflare guides you through connecting GitHub/GitLab, creating your own repository and Worker, provisioning a **new D1 database**, and entering configuration and secrets. It writes your new database ID into your copy of `wrangler.jsonc`; your installation does not share the original deployment's database or credentials.
+
+1. Choose names for your repository, Worker, and database. Keep the D1 binding name `DB` even if you rename the database.
+2. Enter your X client ID and secret, numeric owner X ID, Groq key, and a new random `SESSION_SECRET` of at least 32 characters. Generate that secret locally with `openssl rand -hex 32`. `TOKEN_ENCRYPTION_KEY` and `GROQ_MODEL` are optional; the form explains each field. Never reuse an example secret or paste keys into a Git commit.
+3. Accept the detected build/deploy commands. The deploy script builds the static app, applies pending migrations to the bound remote database, and deploys the Worker. Migrations use the binding `DB`, so renamed databases work too.
+4. After deployment, set `APP_URL` to the **exact HTTPS origin** in Worker Settings → Variables and Secrets. If you knew the final address during setup, verify it matches. Register that origin plus `/auth/callback` in your X application as described below, then sign in with your owner account.
+
+This is a guided installation, not zero-configuration: Cloudflare cannot create your X developer app or Groq account, register the X callback, or generate your personal API credentials. If configuration is incomplete, the app safely shows setup instructions and the public demo remains available. See the configuration table below for all fields.
+
+Cloudflare's template flow creates cloud resources and runs remote migrations. Review the [free-tier limits and API costs](#usage-and-cost-controls) before deploying. Subsequent deployments also apply pending migrations automatically. The repository must be public for others to use this button.
+
+### Manual installation
+
+If you prefer the CLI, use the following steps instead. Both installation methods share the X, secret, and phone-installation steps below.
 
 ### 1. Fork and install
 
@@ -54,11 +94,10 @@ Replace `database_id` in `wrangler.jsonc` with the returned ID. Forks must use t
 The following commands **write to your cloud account and production database**. Run them deliberately:
 
 ```sh
-npx wrangler d1 migrations apply tenbrains --remote
 npm run deploy
 ```
 
-The first deployment safely shows setup instructions until credentials are configured. Note its HTTPS address.
+`npm run deploy` builds the app, applies pending migrations to the remote `DB` binding, and deploys it. The first deployment safely shows setup instructions until credentials are configured. Note its HTTPS address. For migrations without deploying, use `npm run db:migrate:remote`.
 
 ### 3. Configure your X application
 
@@ -151,7 +190,7 @@ Tests exercise the Worker API with real SQLite and controlled X/Groq HTTP fixtur
 amp orb services ensure
 ```
 
-This starts the declared supervised Worker preview and prints an accessible demo portal. Rebuild with `npm run build` after changing UI files; Wrangler reloads Worker code automatically. Setup only becomes active for future project orbs after its commit reaches the default branch.
+This starts the declared supervised Worker preview and prints an accessible demo portal. After UI changes, run `npm run build` followed by `amp orb service restart web` so the preview picks up new hashed asset paths. Wrangler reloads Worker code automatically. Setup only becomes active for future project orbs after its commit reaches the default branch.
 
 ## License
 

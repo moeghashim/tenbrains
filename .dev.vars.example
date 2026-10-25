@@ -1,4 +1,4 @@
-APP_URL=http://localhost:8787
+APP_URL=
 OWNER_X_ID=
 X_CLIENT_ID=
 X_CLIENT_SECRET=
