@@ -32,7 +32,7 @@ beforeEach(async () => {
   db.exec(readFileSync(new URL("../../migrations/0001_backend.sql", import.meta.url), "utf8"));
   db.exec(readFileSync(new URL("../../migrations/0002_entities.sql", import.meta.url), "utf8"));
   const execute = new Map<Statement, () => DBResult>();
-  env = { APP_URL: "https://app.example", OWNER_X_ID: "42", X_CLIENT_ID: "client", SESSION_SECRET: "test-only-not-a-real-secret-1234567890", GROQ_API_KEY: "test-key", ASSETS: { fetch: async () => new Response("static") }, DB: { prepare(sql) {
+  env = { APP_URL: "https://app.example", OWNER_X_ID: "42", X_CLIENT_ID: "client", SESSION_SECRET: "test-only-not-a-real-secret-1234567890", XAI_API_KEY: "test-key", ASSETS: { fetch: async () => new Response("static") }, DB: { prepare(sql) {
     let args: unknown[] = [];
     const run = () => {
       const query = db.prepare(sql);
@@ -107,7 +107,7 @@ it("logout revokes the server-side session", async () => {
 it("imports one read-only bookmark page and returns a usable next cursor", async () => {
   network.mockImplementation(async (input: URL, init: RequestInit) => {
     input = new URL(input);
-    if (input.hostname === "api.groq.com") {
+    if (input.hostname === "api.x.ai") {
       const sources = JSON.parse(JSON.parse(init.body as string).messages[1].content).sources;
       return completion({ title: "Bookmark summary", summary: "Saved learning material", posts: sources.map((p: { id: string }) => ({ postId: p.id, tags: ["learning"] })) });
     }
@@ -144,12 +144,28 @@ it("validates cited lessons and sends strict non-streaming structured output", a
   expect(result.at(-1).state.paths[0].days).toHaveLength(5);
   expect(result.at(-1).state.paths[0].suggestions).toEqual([{ postId: "100", minLevel: "Rookie" }]);
   expect(result.at(-1).state.paths[0].currentDay).toBe(0);
+  expect(network.mock.calls[0][0]).toBe("https://api.x.ai/v1/chat/completions");
+  expect(network.mock.calls[0][1].headers.Authorization).toBe("Bearer test-key");
   const payload = JSON.parse(network.mock.calls[0][1].body);
   expect(payload.stream).toBe(false); expect(payload.response_format.json_schema.strict).toBe(true);
-  expect(payload.model).toBe("openai/gpt-oss-20b");
+  expect(payload.model).toBe("grok-4.3");
   network.mockResolvedValueOnce(completion({ title: "Fabrication", days: days.map(d => ({ ...d, sourcePostIds: ["fake"] })), suggestions: [] }));
   expect((await action({ type: "learn", postIds: ["100"] })).at(-1).error).toContain("invalid result");
   expect((await (await request("/api/state")).json()).paths).toHaveLength(1);
+});
+it("uses the configured Grok model for analysis", async () => {
+  env.XAI_MODEL = "grok-4.7";
+  network.mockResolvedValueOnce(completion({ title: "Learning", summary: "A source summary", tags: ["learning"], sourceNote: "text only", concepts: ["Learning"], isTeachable: true }));
+  const result = await action({ type: "analyze", postId: "100" });
+  expect(result.at(-1).state.posts[0].analysis.summary).toBe("A source summary");
+  expect(JSON.parse(network.mock.calls[0][1].body).model).toBe("grok-4.7");
+});
+it("reports missing xAI credentials and saves nothing without an upstream call", async () => {
+  env.XAI_API_KEY = "";
+  expect(await (await request("/api/status")).json()).toEqual({ configured: true, xConfigured: true, aiConfigured: false });
+  expect((await action({ type: "learn", postIds: ["100"] })).at(-1).error).toContain("xAI API key");
+  expect((await (await request("/api/state")).json()).paths).toEqual([]);
+  expect(network).not.toHaveBeenCalled();
 });
 it.each([4, 8])("rejects %i lessons without saving", async count => {
   network.mockResolvedValue(completion({ title: "Invalid", days: Array.from({ length: count }, () => ({ concept: "x", lesson: "y", sourcePostIds: ["100"] })), suggestions: [] }));
@@ -303,7 +319,7 @@ it("Learn on a saved tag uses the actual tagged posts without X searching", asyn
   network.mockResolvedValueOnce(completion({ title: "Learning tag", days: path().days, suggestions: [] }));
   const learned = (await action({ type: "learn", tag: "learning" })).at(-1).state.paths[0];
   expect(learned.tag).toBe("learning"); expect(learned.days[0].sourcePostIds).toEqual(["100"]);
-  expect(new URL(network.mock.calls[0][0]).hostname).toBe("api.groq.com");
+  expect(new URL(network.mock.calls[0][0]).hostname).toBe("api.x.ai");
 });
 it("fabricated suggestion IDs cannot be persisted", async () => {
   network.mockResolvedValueOnce(completion({ title: "Bad suggestions", days: path().days, suggestions: [{ postId: "fake", minLevel: "Ninja" }] }));

@@ -601,7 +601,7 @@ export default function Workspace({ demo = false }: { demo?: boolean }) {
             <div>
               <strong>Your personal workspace</strong>
               <p>
-                Connect X and Groq in your deployment settings to get started.
+                Connect X and Grok in your deployment settings to get started.
                 Only your X account can sign in.
               </p>
             </div>
@@ -1466,7 +1466,7 @@ export default function Workspace({ demo = false }: { demo?: boolean }) {
             </div>
             <div className="settings-row">
               <div>
-                <strong>Groq · text-first learning</strong>
+                <strong>Grok · text-first learning</strong>
                 <p>
                   {demo
                     ? "Not connected. Feedback and scores are illustrative."

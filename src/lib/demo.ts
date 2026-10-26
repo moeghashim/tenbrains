@@ -143,7 +143,7 @@ export const demoState: AppState = {
   followedTags: ["systems-thinking", "learning"],
 };
 
-// The public demo never calls X or Groq and never writes to the owner's database.
+// The public demo never calls X or Grok and never writes to the owner's database.
 export function applyDemoAction(state: AppState, action: Action): AppState {
   const next = structuredClone(state);
   if (action.type === "followAccount")
@@ -201,7 +201,7 @@ export function applyDemoAction(state: AppState, action: Action): AppState {
         },
         {
           kind: "gap",
-          text: "In a live check, Groq reviews your explanation against these sources. This demo always returns a sample score of 82.",
+          text: "In a live check, Grok reviews your explanation against these sources. This demo always returns a sample score of 82.",
           sourceRef: "demo-1",
         },
         {

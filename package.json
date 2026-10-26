@@ -41,11 +41,11 @@
       "TOKEN_ENCRYPTION_KEY": {
         "description": "Optional separate random secret for X token encryption. Leave blank to derive encryption from SESSION_SECRET. Changing it requires signing in again."
       },
-      "GROQ_API_KEY": {
-        "description": "Your [Groq API key](https://console.groq.com/keys), used only for explicit learning, analysis, import, and grading actions."
+      "XAI_API_KEY": {
+        "description": "Your [xAI API key](https://console.x.ai/), used to call Grok only for explicit learning, analysis, import, and grading actions. Billed separately from X API access and Grok subscriptions."
       },
-      "GROQ_MODEL": {
-        "description": "Optional model supporting Groq strict structured outputs. Defaults to `openai/gpt-oss-20b`."
+      "XAI_MODEL": {
+        "description": "Optional Grok model supporting xAI structured outputs. Defaults to `grok-4.3`."
       }
     }
   },

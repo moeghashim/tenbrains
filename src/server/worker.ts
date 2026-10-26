@@ -52,7 +52,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname;
     try {
-      if (path === "/api/status" && request.method === "GET") return json({ configured: configured(env), xConfigured: !!(env.X_CLIENT_ID && env.OWNER_X_ID), aiConfigured: !!env.GROQ_API_KEY });
+      if (path === "/api/status" && request.method === "GET") return json({ configured: configured(env), xConfigured: !!(env.X_CLIENT_ID && env.OWNER_X_ID), aiConfigured: !!env.XAI_API_KEY });
       if (path.startsWith("/auth/")) return await auth(request, env, path);
       if (!path.startsWith("/api/")) return env.ASSETS.fetch(request);
       await authenticated(request, env);

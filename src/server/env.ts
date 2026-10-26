@@ -8,7 +8,7 @@ export interface Env {
   DB: { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<DBResult[]> };
   ASSETS: { fetch(request: Request): Promise<Response> };
   APP_URL: string; OWNER_X_ID: string; X_CLIENT_ID: string; X_CLIENT_SECRET?: string;
-  SESSION_SECRET: string; TOKEN_ENCRYPTION_KEY?: string; GROQ_API_KEY?: string; GROQ_MODEL?: string;
+  SESSION_SECRET: string; TOKEN_ENCRYPTION_KEY?: string; XAI_API_KEY?: string; XAI_MODEL?: string;
 }
 export class SafeError extends Error {
   constructor(message: string, public status = 400) { super(message); }

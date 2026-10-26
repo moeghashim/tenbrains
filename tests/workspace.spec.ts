@@ -43,6 +43,7 @@ test("a checked lesson keeps its feedback visible and unlocks reading", async ({
     .getByRole("button", { name: "Check explanation", exact: true })
     .click();
   await expect(page.getByText("82/100", { exact: true })).toBeVisible();
+  await expect(page.getByText("In a live check, Grok reviews your explanation", { exact: false })).toBeVisible();
   await expect(
     page
       .getByRole("heading", { name: "Thinking in systems", exact: true })
@@ -93,6 +94,7 @@ test("mobile layout has no horizontal overflow and exposes installation instruct
     .getByRole("button", { name: "Settings", exact: true })
     .last()
     .click();
+  await expect(page.getByRole("dialog")).toContainText("Grok · text-first learning");
   await page
     .getByRole("button", { name: "Install tenbrains on your phone" })
     .click();

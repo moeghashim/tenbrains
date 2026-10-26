@@ -8,4 +8,4 @@ services:
     portal:
       url: /demo/
       title: tenbrains demo
-      description: Interactive sample workspace. X and Groq are not connected; sample grades are illustrative.
+      description: Interactive sample workspace. X and Grok are not connected; sample grades are illustrative.
